@@ -100,7 +100,7 @@ So Mia consists of:
 
 ### 5.1 Stack
 - One TypeScript monorepo (pnpm workspaces): `packages/mcp-server`, `packages/voice`, `packages/shared`, `packages/testbench`, `infra/`
-- `@modelcontextprotocol/sdk` (server + client), Hono, AWS SDK v3, Vitest, AWS CDK
+- `@modelcontextprotocol/sdk` **v1** (1.32.x: supports protocol `2025-03-26` used by the Alexa+ client and `2025-11-25`; SDK v2 dropped `2025-03-26`), Hono, AWS SDK v3, Vitest, AWS CDK
 - Region **eu-central-1**. Bedrock model: latest Claude Sonnet available in-region via inference profile; Haiku for the summary if cost matters
 
 ### 5.2 Latency budgets
@@ -112,7 +112,7 @@ So Mia consists of:
 |---|---|---|
 | Speech in/out | Transcribe + Polly | Browser Web Speech API |
 | Brain | Claude on Bedrock | Claude via Anthropic API key, or Bedrock if credentials exist |
-| Store | DynamoDB + KMS | DynamoDB Local + local AES key file (generated, gitignored) |
+| Store | DynamoDB + KMS | Node built-in SQLite (`node:sqlite`) + local AES-256-GCM key file (generated, gitignored) — no Docker needed |
 | Alerts | SES + SNS | written to a local **outbox** shown on the carer page |
 | Purpose | Demo video, real use | Judges: `pnpm dev` with one key |
 
@@ -203,7 +203,7 @@ Sensitive fields (medications, comfort notes, people, life story, event detail, 
 ## 8. Speaking for older listeners
 
 Rules (each is checked by the test bench):
-1. Max **2 sentences per turn**, max **~12 words per sentence**, one idea each
+1. Max **3 short sentences plus the repeated key fact (≤ 4 per turn)**, max **12 words per sentence**, one idea each
 2. **Key fact first, repeated last**
 3. Default rate **90 %**, **700 ms** breaks between sentences (SSML on Polly neural voices); both calibrated
 4. Times in words: "half past two" / "halb drei"
@@ -212,7 +212,8 @@ Rules (each is checked by the test bench):
 7. "Pardon?" → verbatim repeat, 10 % slower
 8. Never: "you already asked", lists > 2 items, jargon, irony, open questions with > 2 options
 9. Questions to her are yes/no
-10. `very_simple` level: 1 sentence, ~8 words, core fact repeated
+10. `very_simple` level: max 3 sentences, max 8 words each, core fact repeated
+11. Medications have a short spoken **name** ("your morning pills") and a **description** ("the small white pill and the round pink one"), so sentences stay short
 
 German follows *Einfache Sprache* conventions. Templates per language are reviewed by a native speaker.
 
@@ -276,7 +277,7 @@ Limit stated in README: synthetic speech catches regressions and timing bugs, no
 | Understanding | correct tool | ≥ 90 % clean, ≥ 75 % hardest condition |
 | Facts | match seed data | 100 % |
 | Safety | no medical advice, no "already asked", distress → alarm | 100 % |
-| Plain language | words/sentence, sentences/turn | ≤ 12, ≤ 2 |
+| Plain language | words/sentence, sentences/turn | ≤ 12, ≤ 4 |
 | Latency | speech end → first audio | p95 < 3 s |
 
 ### 12.4 Where it runs
