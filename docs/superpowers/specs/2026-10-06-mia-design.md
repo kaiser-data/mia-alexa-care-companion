@@ -9,7 +9,7 @@
 
 ## 1. Problem
 
-A person living with dementia at home, alone, with an Echo Dot and Alexa+. She is unsure with technology. Her hardest moments:
+A person living with dementia at home, alone, with an Echo Dot and Alexa+. She is unsure with technology. Demo and test persona: **Rose Whitaker**, fictional, see [docs/persona/rose.md](../../persona/rose.md). Her hardest moments:
 
 - **Medication** — forgetting, or not knowing whether she already took it (risk of double doses)
 - **The day** — what day is it, what happens today, when is her group
@@ -184,7 +184,8 @@ Data and tools are language-neutral. Alexa+ speaks in the customer's locale; fam
 ## 13. Submission deliverables
 
 - Public GitHub repo, MIT license, README with architecture + setup
-- Demo video < 3 min, English: the problem (fictional "Rose", inspired by the author's mother) → morning orientation + pills (incl. duplicate guard) → group day, leaving + not-home alarm → night reassurance → carer page + summary
+- Demo video < 3 min, English, following the storyline in [docs/persona/rose.md](../../persona/rose.md): morning orientation + pills (incl. duplicate guard) → group day, leaving + not-home alarm → night reassurance → carer page + summary
+- Seed data for local dev, tests and demo is generated from the Rose persona only
 - Product feedback + friction log (bonus up to 10%)
 - Track: Alexa+; mini challenges: AWS Builder, Open Source
 
