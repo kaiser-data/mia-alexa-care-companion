@@ -1999,18 +1999,26 @@ describe("confirm_medication", () => {
     expect(r.say).toEqual(["Not yet.", "Your next pills are at eight o'clock in the morning."]);
     expect(await types(m)).toEqual(["med_not_due_attempt"]);
   });
-  it("noon pill on a group day is given at the group", async () => {
+  it("noon pill on a group day is given at the group when she went", async () => {
     const m = await connect(at("2026-10-12T08:05:00"));
     await m.call("confirm_medication");
+    await m.store.addEvent({ profileId: "rose", type: "left_home", at: "2026-10-12T13:38:00Z", detail: { appointmentId: "maple-grove" } });
     m.setNow(at("2026-10-12T21:00:00"));
-    await m.call("confirm_medication");
+    expect((await m.call("confirm_medication")).say).toEqual(["Thank you. I've noted your evening pill."]);
     const r = await m.call("get_medication_status");
     expect(r.say[1]).toBe("There are no more pills today.");
+  });
+  it("noon pill is due at home when she did not go to the group", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"));
+    await m.call("confirm_medication");
+    m.setNow(at("2026-10-12T12:30:00"));
+    const r = await m.call("get_medication_status");
+    expect(r.say).toEqual(["Not yet.", "Now it's time for your noon pill.", "That's the little yellow one."]);
   });
 });
 ```
 
-Note: the last test also confirms the evening pill at 21:00 (due since 19:30), then expects "no more pills today" — the noon pill was `at_appointment`, not due.
+Note: since Task 7b, the noon pill counts as `at_appointment` only before the group starts or if she logged `left_home` for that appointment; otherwise it is due at home.
 
 - [ ] **Step 2: Run test to verify it fails**
 
