@@ -67,3 +67,52 @@ export function rose(): Profile {
     speech: defaultSpeech(),
   };
 }
+
+/** Same fictional Rose, German-speaking — for the language demo and tests */
+export function roseDe(): Profile {
+  const p = rose();
+  return {
+    ...p,
+    id: "rose-de",
+    locale: "de-DE",
+    routine: [
+      { time: "07:30", label: "Kaffee" },
+      { time: "08:00", label: "Frühstück" },
+      { time: "12:00", label: "Mittagessen" },
+      { time: "15:00", label: "Kaffee und Kuchen" },
+      { time: "18:00", label: "Abendbrot" },
+      { time: "19:00", label: "Toms Anruf" },
+      { time: "21:30", label: "Schlafenszeit" },
+    ],
+    medications: [
+      { id: "morning-pills", name: "deine Morgentabletten", description: "die kleine weiße und die runde rosa Tablette", times: ["08:00"] },
+      { id: "noon-pill", name: "deine Mittagstablette", description: "die kleine gelbe", times: ["12:00"], takenAtAppointmentId: "maple-grove" },
+      { id: "evening-pill", name: "deine Abendtablette", description: "die weiße Kapsel", times: ["20:00"] },
+    ],
+    appointments: [{
+      ...p.appointments[0]!,
+      name: "Tagesgruppe",
+      aliases: ["gruppe", "tagesgruppe", "club", "maple grove"],
+      checklist: ["deinen Schlüssel am roten Band", "deine Handtasche", "deine Brille", "deinen Mantel"],
+    }],
+    people: [
+      { id: "tom", name: "Tom", relationship: "dein Sohn", contact: "Tom ruft dich jeden Abend um sieben an." },
+      { id: "lily", name: "Lily", relationship: "deine Enkelin", contact: "Lily ruft dich sonntags an." },
+      { id: "june", name: "June", relationship: "deine Nachbarin", contact: "June wohnt nebenan und hat einen Schlüssel." },
+      { id: "frank", name: "Frank", relationship: "dein Mann", notes: "Frank hat dich sehr geliebt." },
+    ],
+    comfortNotes: [
+      "Du bist sicher zu Hause in der Linden Street.",
+      "Tom ruft dich jeden Abend um sieben an. Er hat dich lieb.",
+      "Du musst nicht mehr zur Arbeit. Du bist in Rente.",
+      "June von nebenan hat einen Schlüssel und hilft gern.",
+    ],
+    lifeStory: [
+      "Du warst 38 Jahre lang Bibliothekarin an einer Schule.",
+      "Du liebst deinen Rosengarten, besonders die gelbe Kletterrose.",
+      "Du magst Frank Sinatra und Ella Fitzgerald.",
+      "Du hast Frank 1966 geheiratet.",
+      "Dein Apfelkuchen ist der beste in der Straße.",
+    ],
+  };
+}

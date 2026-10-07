@@ -4,3 +4,5 @@ export * from "./domain/today";
 export * from "./domain/medication";
 export * from "./seed/rose";
 export * from "./i18n/words";
+export * from "./i18n/templates";
+export * from "./i18n/plain";
