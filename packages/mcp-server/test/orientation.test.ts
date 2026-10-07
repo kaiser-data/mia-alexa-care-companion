@@ -1,7 +1,38 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { randomBytes } from "node:crypto";
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { roseDe } from "@mia/shared";
 import { at } from "@mia/shared/testing";
+import { StoreAlertSink } from "../src/alerts";
+import { createMiaServer } from "../src/server";
+import { LocalAesCipher } from "../src/store/crypto";
+import { SqliteStore } from "../src/store/sqliteStore";
 import { connect } from "./helpers";
+
+describe("run() fallback", () => {
+  it("profile does not exist: calm fallback", async () => {
+    const store = new SqliteStore(":memory:", new LocalAesCipher(randomBytes(32)));
+    let clock = at("2026-10-12T08:05:00");
+    const server = createMiaServer({ store, profileId: "nobody", now: () => clock, alerts: new StoreAlertSink(store) });
+    const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: "mia-test", version: "0.0.0" });
+    await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
+
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const r = await client.callTool({ name: "get_today", arguments: {} });
+      const sc = r.structuredContent as any;
+      const content = r.content as { type: string; text: string }[];
+
+      expect(sc).toEqual({ facts: { error: "unavailable" }, say: ["I can't check right now. Your family can help."], verbatim: true, guidance: expect.any(String) });
+      expect(content[0]?.text).toBe("I can't check right now. Your family can help.");
+      expect(spy).toHaveBeenCalledOnce();
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
 
 describe("get_today", () => {
   it("Monday 08:05: date, leave time for the group, day repeated", async () => {
@@ -47,6 +78,10 @@ describe("get_next_appointment", () => {
     const r = await (await connect(at("2026-10-12T08:05:00"))).call("get_next_appointment", { name: "group" });
     expect(r.say).toEqual(["Yes, Maple Grove Day Club is today.", "You leave for Maple Grove Day Club at twenty to ten."]);
   });
+  it("Monday 15:00 after the group: next is Tuesday", async () => {
+    const r = await (await connect(at("2026-10-12T15:00:00"))).call("get_next_appointment", { name: "group" });
+    expect(r.say).toEqual(["Not today. Maple Grove Day Club is on Tuesday.", "On Tuesday."]);
+  });
   it("unknown appointment: don't know, logs the question", async () => {
     const m = await connect(at("2026-10-12T08:05:00"));
     const r = await m.call("get_next_appointment", { name: "dentist" });
@@ -63,7 +98,9 @@ describe("get_preparation_steps", () => {
     expect(first.say).toEqual(["Take your keys on the red lanyard and your handbag."]);
     expect(first.facts).toMatchObject({ nextStep: 1, hasMore: true });
     expect((await m.call("get_preparation_steps", { step: 1 })).say).toEqual(["Take your glasses and your coat."]);
-    expect((await m.call("get_preparation_steps", { step: 2 })).say).toEqual(["That's everything."]);
+    const last = await m.call("get_preparation_steps", { step: 2 });
+    expect(last.say).toEqual(["That's everything."]);
+    expect(last.facts).toMatchObject({ hasMore: false });
   });
   it("nothing planned today", async () => {
     const r = await (await connect(at("2026-10-14T09:00:00"))).call("get_preparation_steps");

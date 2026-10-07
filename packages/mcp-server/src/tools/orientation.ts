@@ -66,7 +66,7 @@ export function registerOrientationTools(server: McpServer, ctx: ToolContext): v
       "Returns two items at a time; call again with step = facts.nextStep for more. Examples: 'What do I need?', 'Was muss ich mitnehmen?'.",
     inputSchema: { step: z.number().int().min(0).optional().describe("0 for the first items, then facts.nextStep") },
     outputSchema: OUTPUT_SHAPE,
-    annotations: { readOnlyHint: true },
+    annotations: { readOnlyHint: false },
   }, async ({ step }) => run(ctx, async (p) => {
     const T = templates(p.locale);
     const n = nextAppointment(p, ctx.now());
