@@ -1,5 +1,5 @@
 import { randomBytes } from "node:crypto";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
@@ -25,6 +25,27 @@ describe("LocalAesCipher", () => {
   });
   it("rejects keys that are not 32 bytes", () => {
     expect(() => new LocalAesCipher(randomBytes(16))).toThrow(/32 bytes/);
+  });
+  it("rejects tampered ciphertext", async () => {
+    const c = new LocalAesCipher(randomBytes(32));
+    const token = await c.encrypt("secret");
+    const raw = Buffer.from(token.slice(3), "base64");
+    raw[raw.length - 1] ^= 0xff;
+    await expect(c.decrypt(`v1:${raw.toString("base64")}`)).rejects.toThrow();
+  });
+  it("rejects ciphertext moved to another row (AAD)", async () => {
+    const c = new LocalAesCipher(randomBytes(32));
+    const token = await c.encrypt("secret", "events:rose");
+    await expect(c.decrypt(token, "events:other")).rejects.toThrow();
+    expect(await c.decrypt(token, "events:rose")).toBe("secret");
+  });
+  it("rejects truncated ciphertext", async () => {
+    await expect(new LocalAesCipher(randomBytes(32)).decrypt("v1:AAAA")).rejects.toThrow(/Malformed/);
+  });
+  it("creates the key file with mode 0600", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "mia-")), "local.key");
+    loadOrCreateLocalKey(path);
+    expect(statSync(path).mode & 0o777).toBe(0o600);
   });
   it("creates a key file once and reuses it", () => {
     const path = join(mkdtempSync(join(tmpdir(), "mia-")), "local.key");
@@ -56,16 +77,27 @@ describe("SqliteStore", () => {
     await s.setLastSay("rose", ["Today is Monday."]);
     expect(await s.getLastSay("rose")).toEqual(["Today is Monday."]);
   });
+  it("creates the database file with mode 0600", () => {
+    const path = join(mkdtempSync(join(tmpdir(), "mia-")), "mia.db");
+    new SqliteStore(path, new LocalAesCipher(randomBytes(32)));
+    expect(statSync(path).mode & 0o777).toBe(0o600);
+  });
   it("never stores sensitive text in plaintext", async () => {
     const s = newStore();
     await s.putProfile(rose());
     await s.addEvent({ profileId: "rose", type: "distress", at: "2026-10-12T12:00:00Z", detail: { what: "I fell in the kitchen" } });
+    await s.addEvent({ profileId: "rose", type: "anxious", at: "2026-10-12T12:01:00Z" });
+    await s.addEvent({ profileId: "rose", type: "med_confirmed", at: "2026-10-12T12:02:00Z" });
+    await s.addEvent({ profileId: "rose", type: "call_requested", at: "2026-10-12T12:03:00Z" });
     await s.setLastSay("rose", ["You took your morning pills."]);
     await new StoreAlertSink(s).raise({ profileId: "rose", rule: "distress", severity: "high", message: "Rose asked for help", at: "2026-10-12T12:00:00Z" });
     const dump = s.rawDump();
     // only strings of 8+ chars: short ones could appear by chance inside base64 ciphertext
     for (const secret of ["Whitaker", "small white pill", "Linden Street", "I fell in the kitchen", "your morning pills", "Rose asked for help"]) {
       expect(dump).not.toContain(secret);
+    }
+    for (const word of ["distress", "anxious", "med_confirmed", "call_requested", "high"]) {
+      expect(dump).not.toContain(word);
     }
   });
 });
