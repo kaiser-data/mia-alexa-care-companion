@@ -49,6 +49,12 @@ describe("templates", () => {
     expect(T.leaveFor("Tagesgruppe", "zwanzig vor zehn")).toBe("Tagesgruppe ist heute. Du gehst um zwanzig vor zehn los.");
     expect(T.take(["deinen Schlüssel", "deine Tasche"])).toBe("Nimm deinen Schlüssel und deine Tasche mit.");
   });
+  it("unsure dose wording", () => {
+    expect(templates("en-US").medUnsure("your noon pill")).toBe("I'm not sure if you had your noon pill yet.");
+    expect(templates("en-US").askCarerFirst("Tom")).toBe("Let's ask Tom first.");
+    expect(templates("de-DE").medUnsure("deine Mittagstablette")).toBe("Ich weiß nicht sicher, ob du deine Mittagstablette schon hattest.");
+    expect(templates("de-DE").askCarerFirst("Tom")).toBe("Wir fragen zuerst Tom.");
+  });
 });
 
 describe("roseDe", () => {

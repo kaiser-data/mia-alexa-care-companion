@@ -78,8 +78,8 @@ export interface Profile {
 }
 
 export const EVENT_TYPES = [
-  "orientation_asked", "left_home", "arrived_home",
-  "med_asked", "med_confirmed", "med_duplicate_attempt", "med_not_due_attempt",
+  "orientation_asked", "left_home", "arrived_home", "stayed_home",
+  "med_asked", "med_confirmed", "med_duplicate_attempt", "med_not_due_attempt", "med_unsure",
   "anxious", "night_awake", "person_asked", "lonely", "call_requested",
   "distress", "repeat_asked", "unknown_question",
 ] as const;

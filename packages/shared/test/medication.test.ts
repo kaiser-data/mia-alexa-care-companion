@@ -31,13 +31,25 @@ describe("doseStatuses", () => {
     expect(s[0]!.state).toBe("due");
   });
   const left = (iso: string): CareEvent => ({ profileId: "rose", type: "left_home", at: iso, detail: { appointmentId: "maple-grove" } });
-  it("Monday 12:30, she did not leave: noon pill is due at home", () => {
-    expect(doseStatuses(rose(), [], at("2026-10-12T12:30:00"))[1]!.state).toBe("due");
+  const stayed = (iso: string): CareEvent => ({ profileId: "rose", type: "stayed_home", at: iso, detail: { appointmentId: "maple-grove" } });
+  it("Monday 12:30, no word whether she went: noon pill is unsure", () => {
+    const s = doseStatuses(rose(), [], at("2026-10-12T12:30:00"));
+    expect(s[1]).toMatchObject({ state: "unsure", appointmentName: "Maple Grove Day Club" });
+  });
+  it("Monday 12:30, carer noted she stayed home: noon pill is due at home", () => {
+    expect(doseStatuses(rose(), [stayed("2026-10-12T14:00:00Z")], at("2026-10-12T12:30:00"))[1]!.state).toBe("due");
   });
   it("Monday 12:30, she left for the group: noon pill given there", () => {
-    expect(doseStatuses(rose(), [left("2026-10-12T13:38:00Z")], at("2026-10-12T12:30:00"))[1]!.state).toBe("at_appointment");
+    expect(doseStatuses(rose(), [left("2026-10-12T14:00:00Z")], at("2026-10-12T12:30:00"))[1]!.state).toBe("at_appointment");
   });
   it("leaving yesterday does not count today", () => {
-    expect(doseStatuses(rose(), [left("2026-10-11T13:38:00Z")], at("2026-10-12T12:30:00"))[1]!.state).toBe("due");
+    expect(doseStatuses(rose(), [left("2026-10-11T14:00:00Z")], at("2026-10-12T12:30:00"))[1]!.state).toBe("unsure");
+  });
+  it("a departure logged after now does not count", () => {
+    expect(doseStatuses(rose(), [left("2026-10-12T17:00:00Z")], at("2026-10-12T12:30:00"))[1]!.state).toBe("unsure");
+  });
+  it("a confirmed noon dose stays taken even without a departure", () => {
+    const s = doseStatuses(rose(), [confirmed("noon-pill", "12:00", "2026-10-12T16:10:00Z")], at("2026-10-12T12:30:00"));
+    expect(s[1]).toMatchObject({ state: "taken", takenAt: "12:10" });
   });
 });

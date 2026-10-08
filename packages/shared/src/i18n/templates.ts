@@ -25,6 +25,8 @@ export interface Templates {
   medTaken(name: string, time: string): string;
   medNextAt(time: string): string;
   medAtAppt(name: string, appointment: string): string;
+  medUnsure(name: string): string;
+  askCarerFirst(carer: string): string;
   medNoneToday(): string;
   medConfirmed(names: string): string;
   medAlreadyTaken(name: string, time: string): string;
@@ -64,6 +66,8 @@ const EN: Templates = {
   medTaken: (n, t) => `Yes. You took ${n} at ${t}.`,
   medNextAt: (t) => `Your next pills are at ${t}.`,
   medAtAppt: (n, a) => `You get ${n} at ${a} today.`,
+  medUnsure: (n) => `I'm not sure if you had ${n} yet.`,
+  askCarerFirst: (c) => `Let's ask ${c} first.`,
   medNoneToday: () => "There are no more pills today.",
   medConfirmed: (n) => `Thank you. I've noted ${n}.`,
   medAlreadyTaken: (n, t) => `You took ${n} at ${t}.`,
@@ -103,6 +107,8 @@ const DE: Templates = {
   medTaken: (n, t) => `Ja. Du hast ${n} um ${t} genommen.`,
   medNextAt: (t) => `Die nächsten Tabletten sind um ${t}.`,
   medAtAppt: (n, a) => `${n} bekommst du heute dort: ${a}.`,
+  medUnsure: (n) => `Ich weiß nicht sicher, ob du ${n} schon hattest.`,
+  askCarerFirst: (c) => `Wir fragen zuerst ${c}.`,
   medNoneToday: () => "Heute sind keine Tabletten mehr dran.",
   medConfirmed: (n) => `Danke. Ich habe ${n} notiert.`,
   medAlreadyTaken: (n, t) => `Du hast ${n} um ${t} genommen.`,

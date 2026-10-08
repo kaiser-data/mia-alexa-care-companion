@@ -1,8 +1,8 @@
 import { localParts, toMinutes } from "./clock";
 import { appointmentsOn } from "./today";
-import type { CareEvent, HHMM, Profile } from "./types";
+import type { CareEvent, EventType, HHMM, Profile } from "./types";
 
-export type DoseState = "taken" | "due" | "upcoming" | "at_appointment";
+export type DoseState = "taken" | "due" | "upcoming" | "at_appointment" | "unsure";
 
 export interface DoseStatus {
   medicationId: string;
@@ -15,6 +15,23 @@ export interface DoseStatus {
 }
 
 export const DUE_WINDOW_MINUTES = 30;
+
+/** Event of type eventType for this appointment on today's date, at or before now */
+function appointmentEventBefore(
+  events: CareEvent[],
+  apptId: string,
+  todayDate: string,
+  now: Date,
+  timezone: string,
+  eventType: EventType,
+): CareEvent | undefined {
+  return events.find((e) =>
+    e.type === eventType &&
+    e.detail?.appointmentId === apptId &&
+    localParts(new Date(e.at), timezone).date === todayDate &&
+    new Date(e.at) <= now,
+  );
+}
 
 export function doseStatuses(p: Profile, events: CareEvent[], now: Date): DoseStatus[] {
   const l = localParts(now, p.timezone);
@@ -35,13 +52,31 @@ export function doseStatuses(p: Profile, events: CareEvent[], now: Date): DoseSt
         ? todays.find((a) => a.id === m.takenAtAppointmentId &&
             toMinutes(a.start) <= toMinutes(time) && toMinutes(time) <= toMinutes(a.end))
         : undefined;
-      const stayedHome = appt !== undefined && l.minutes >= toMinutes(appt.start) &&
-        !events.some((e) => e.type === "left_home" && e.detail?.appointmentId === appt.id &&
-          localParts(new Date(e.at), p.timezone).date === l.date);
-      if (appt && !stayedHome) {
-        out.push({ ...base, state: "at_appointment", appointmentName: appt.name });
+
+      if (appt) {
+        // Rule 1: now before appt.start → at_appointment (still expected to go)
+        if (l.minutes < toMinutes(appt.start)) {
+          out.push({ ...base, state: "at_appointment", appointmentName: appt.name });
+          continue;
+        }
+
+        // Rule 2: left_home event exists for this appointment today, at or before now
+        if (appointmentEventBefore(events, appt.id, l.date, now, p.timezone, "left_home")) {
+          out.push({ ...base, state: "at_appointment", appointmentName: appt.name });
+          continue;
+        }
+
+        // Rule 3: stayed_home event exists for this appointment today, at or before now → normal evaluation
+        if (appointmentEventBefore(events, appt.id, l.date, now, p.timezone, "stayed_home")) {
+          out.push({ ...base, state: l.minutes >= toMinutes(time) - DUE_WINDOW_MINUTES ? "due" : "upcoming" });
+          continue;
+        }
+
+        // Rule 4: otherwise → unsure
+        out.push({ ...base, state: "unsure", appointmentName: appt.name });
         continue;
       }
+
       out.push({ ...base, state: l.minutes >= toMinutes(time) - DUE_WINDOW_MINUTES ? "due" : "upcoming" });
     }
   }
