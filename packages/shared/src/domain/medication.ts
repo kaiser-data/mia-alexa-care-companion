@@ -35,7 +35,10 @@ export function doseStatuses(p: Profile, events: CareEvent[], now: Date): DoseSt
         ? todays.find((a) => a.id === m.takenAtAppointmentId &&
             toMinutes(a.start) <= toMinutes(time) && toMinutes(time) <= toMinutes(a.end))
         : undefined;
-      if (appt) {
+      const stayedHome = appt !== undefined && l.minutes >= toMinutes(appt.start) &&
+        !events.some((e) => e.type === "left_home" && e.detail?.appointmentId === appt.id &&
+          localParts(new Date(e.at), p.timezone).date === l.date);
+      if (appt && !stayedHome) {
         out.push({ ...base, state: "at_appointment", appointmentName: appt.name });
         continue;
       }

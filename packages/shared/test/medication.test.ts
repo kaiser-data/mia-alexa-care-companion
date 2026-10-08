@@ -30,4 +30,14 @@ describe("doseStatuses", () => {
     const s = doseStatuses(rose(), [confirmed("morning-pills", "08:00", "2026-10-11T12:06:00Z")], at("2026-10-12T08:10:00"));
     expect(s[0]!.state).toBe("due");
   });
+  const left = (iso: string): CareEvent => ({ profileId: "rose", type: "left_home", at: iso, detail: { appointmentId: "maple-grove" } });
+  it("Monday 12:30, she did not leave: noon pill is due at home", () => {
+    expect(doseStatuses(rose(), [], at("2026-10-12T12:30:00"))[1]!.state).toBe("due");
+  });
+  it("Monday 12:30, she left for the group: noon pill given there", () => {
+    expect(doseStatuses(rose(), [left("2026-10-12T13:38:00Z")], at("2026-10-12T12:30:00"))[1]!.state).toBe("at_appointment");
+  });
+  it("leaving yesterday does not count today", () => {
+    expect(doseStatuses(rose(), [left("2026-10-11T13:38:00Z")], at("2026-10-12T12:30:00"))[1]!.state).toBe("due");
+  });
 });
