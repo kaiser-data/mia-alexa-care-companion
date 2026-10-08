@@ -42,3 +42,16 @@ describe("dates and lists", () => {
     expect(joinList(["a", "b", "c"], "de-DE")).toBe("a, b und c");
   });
 });
+
+describe("timeWords noon and midnight", () => {
+  it("hedges rounded noon", () => {
+    expect(timeWords("11:58", "en-US", { withPart: true })).toBe("about twelve noon");
+    expect(timeWords("12:02", "de-DE", { withPart: true })).toBe("etwa zwölf Uhr mittags");
+    expect(timeWords("12:00", "en-US", { withPart: true })).toBe("twelve noon");
+  });
+  it("rounds 23:58 to midnight", () => expect(timeWords("23:58", "en-US")).toBe("about twelve o'clock"));
+  it("12:45 is quarter to one", () => {
+    expect(timeWords("12:45", "en-US")).toBe("quarter to one");
+    expect(timeWords("12:45", "de-DE")).toBe("Viertel vor eins");
+  });
+});

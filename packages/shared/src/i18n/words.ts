@@ -43,9 +43,12 @@ export function timeWords(t: HHMM, locale: Locale, opts: { withPart?: boolean } 
   const h = Math.floor(rounded / 60);
   const m = rounded % 60;
   const isDe = locale === "de-DE";
-  if (opts.withPart && rounded === 720) return isDe ? "zwölf Uhr mittags" : "twelve noon";
-  let words = isDe ? de(h, m) : en(h, m);
-  if (opts.withPart) words += ` ${(isDe ? DE_PART : EN_PART)[partOfDay(rounded)]}`;
+  let words: string;
+  if (opts.withPart && rounded === 720) words = isDe ? "zwölf Uhr mittags" : "twelve noon";
+  else {
+    words = isDe ? de(h, m) : en(h, m);
+    if (opts.withPart) words += ` ${(isDe ? DE_PART : EN_PART)[partOfDay(rounded)]}`;
+  }
   if (rounded !== total) words = `${isDe ? "etwa" : "about"} ${words}`;
   return words;
 }
