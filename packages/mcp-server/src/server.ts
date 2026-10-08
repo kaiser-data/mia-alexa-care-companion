@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerOrientationTools } from "./tools/orientation";
+import { registerMedicationTools } from "./tools/medication";
 import type { ToolContext } from "./tools/runtime";
 
 export const SERVER_INSTRUCTIONS =
@@ -10,5 +11,6 @@ export const SERVER_INSTRUCTIONS =
 export function createMiaServer(ctx: ToolContext): McpServer {
   const server = new McpServer({ name: "mia", version: "0.1.0" }, { instructions: SERVER_INSTRUCTIONS });
   registerOrientationTools(server, ctx);
+  registerMedicationTools(server, ctx);
   return server;
 }
