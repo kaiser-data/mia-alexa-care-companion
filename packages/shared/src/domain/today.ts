@@ -45,11 +45,14 @@ export function todayView(p: Profile, now: Date): TodayView {
   };
 }
 
+const words = (s: string): string[] => s.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+
 export function matchesAppointment(a: Appointment, query: string): boolean {
-  const q = query.trim().toLowerCase();
+  const q = new Set(words(query));
+  if (q.size === 0) return false;
   return [a.name, ...a.aliases].some((n) => {
-    const name = n.toLowerCase();
-    return q.includes(name) || name.includes(q);
+    const w = words(n);
+    return w.length > 0 && w.every((x) => q.has(x));
   });
 }
 
@@ -57,7 +60,7 @@ export interface NextAppointment { appointment: Appointment; date: string; weekd
 
 export function nextAppointment(p: Profile, now: Date, nameQuery?: string): NextAppointment | null {
   const l = localParts(now, p.timezone);
-  const candidates = (nameQuery ? p.appointments.filter((a) => matchesAppointment(a, nameQuery)) : p.appointments)
+  const candidates = (nameQuery?.trim() ? p.appointments.filter((a) => matchesAppointment(a, nameQuery)) : p.appointments)
     .slice()
     .sort(byStart);
   for (let d = 0; d <= 14; d++) {

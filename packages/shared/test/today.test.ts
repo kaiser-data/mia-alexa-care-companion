@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { at } from "../src/testing";
 import { rose } from "../src/seed/rose";
-import { appointmentsOn, nextAppointment, partOfDay, todayView } from "../src/domain/today";
+import { appointmentsOn, matchesAppointment, nextAppointment, partOfDay, todayView } from "../src/domain/today";
 
 describe("appointmentsOn", () => {
   it("finds the group on Monday", () => {
@@ -55,5 +55,15 @@ describe("nextAppointment", () => {
   });
   it("returns null for unknown appointments", () => {
     expect(nextAppointment(rose(), at("2026-10-12T08:00:00"), "dentist")).toBeNull();
+  });
+});
+
+describe("matchesAppointment", () => {
+  it.each(["group", "my group", "Is it group today?", "maple grove", "the day club"])("matches %s", (q) =>
+    expect(matchesAppointment(rose().appointments[0]!, q)).toBe(true));
+  it.each(["a", "ma", "clubbing", "groups", "", "   ", "dentist"])("does not match %j", (q) =>
+    expect(matchesAppointment(rose().appointments[0]!, q)).toBe(false));
+  it("blank name query means any appointment", () => {
+    expect(nextAppointment(rose(), at("2026-10-14T10:00:00"), "  ")?.weekday).toBe(4);
   });
 });
