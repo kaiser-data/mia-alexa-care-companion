@@ -15,12 +15,14 @@ export function registerProblemTools(server: McpServer, ctx: ToolContext): void 
     annotations: { readOnlyHint: false },
   }, async ({ what }) => run(ctx, async (p) => {
     const T = templates(p.locale);
-    await logEvent(ctx, "distress", what ? { what } : undefined);
+    // The alert goes out first; a failed log write must never block it.
     await ctx.alerts.raise({
       profileId: p.id, rule: "distress", severity: "high",
       message: `${p.preferredName} asked for help${what ? `: "${what}"` : ""}.`,
       at: ctx.now().toISOString(),
     });
+    await logEvent(ctx, "distress", what ? { what } : undefined)
+      .catch((err) => console.error("[mia] distress log failed:", err));
     return { facts: { alerted: true }, say: [T.distressAck(p.carerName), T.distressFollow(p.carerName)], verbatim: true };
   }));
 }

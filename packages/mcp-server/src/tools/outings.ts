@@ -2,6 +2,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { templates, todayView, toMinutes } from "@mia/shared";
 import { logEvent, OUTPUT_SHAPE, run, type ToolContext } from "./runtime";
 
+const LEAVE_WINDOW_MINUTES = 60;
+
 export function registerOutingTools(server: McpServer, ctx: ToolContext): void {
   server.registerTool("report_leaving", {
     title: "I'm going out",
@@ -13,7 +15,9 @@ export function registerOutingTools(server: McpServer, ctx: ToolContext): void {
   }, async () => run(ctx, async (p) => {
     const T = templates(p.locale);
     const v = todayView(p, ctx.now());
-    const appt = v.appointments.find((a) => toMinutes(a.end) > v.minutes);
+    // Count the outing for an appointment only from an hour before it is time to go.
+    const appt = v.appointments.find((a) =>
+      v.minutes >= toMinutes(a.leaveBy ?? a.start) - LEAVE_WINDOW_MINUTES && v.minutes < toMinutes(a.end));
     await logEvent(ctx, "left_home", appt ? { appointmentId: appt.id } : undefined);
     return { facts: { appointment: appt?.name ?? null, expectedReturn: appt?.expectedReturn ?? null }, say: [T.leavingOk(), T.keysCheck()], verbatim: true };
   }));

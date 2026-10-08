@@ -13,6 +13,13 @@ describe("outings", () => {
     expect(r.say).toEqual(["Have a lovely time.", "Do you have your keys?"]);
     expect(await lastEvent(m)).toMatchObject({ type: "left_home", detail: { appointmentId: "maple-grove" } });
   });
+  it("leaving long before the group is not counted as going to the group", async () => {
+    const m = await connect(at("2026-10-12T07:30:00"));
+    await m.call("report_leaving");
+    const e = await lastEvent(m);
+    expect(e?.type).toBe("left_home");
+    expect(e?.detail).toBeUndefined();
+  });
   it("coming home: welcome by name", async () => {
     const m = await connect(at("2026-10-12T14:25:00"));
     const r = await m.call("report_home");
@@ -73,6 +80,13 @@ describe("report_problem", () => {
     expect(r.say).toEqual(["I've let Tom know right away.", "Tom will get in touch with you."]);
     expect(await m.store.listAlerts("rose")).toMatchObject([{ rule: "distress", severity: "high", message: 'Rose asked for help: "I fell".' }]);
     expect((await lastEvent(m))?.type).toBe("distress");
+  });
+  it("the alert still goes out when writing the log fails", async () => {
+    const m = await connect(at("2026-10-12T11:00:00"));
+    m.store.addEvent = async () => { throw new Error("disk full"); };
+    const r = await m.call("report_problem", { what: "I fell" });
+    expect(r.say).toEqual(["I've let Tom know right away.", "Tom will get in touch with you."]);
+    expect(await m.store.listAlerts("rose")).toMatchObject([{ rule: "distress", severity: "high" }]);
   });
 });
 
