@@ -14,6 +14,7 @@ export async function todayResult(ctx: ToolContext, p: Profile): Promise<MiaResu
   if (current) say.push(appointmentLine(current, v.minutes, p.locale));
   else if (v.nextRoutine) say.push(T.nextRoutine(v.nextRoutine.label, timeWords(v.nextRoutine.time, p.locale, { withPart: true })));
   else say.push(T.nothingToday());
+  say.push(T.repeatDay(weekdayName(v.weekday, p.locale)));
   await logEvent(ctx, "orientation_asked");
   return {
     facts: { date: v.date, weekday: v.weekday, time: v.time, partOfDay: v.partOfDay, appointments: v.appointments.map((a) => a.name), nextRoutine: v.nextRoutine ?? null },

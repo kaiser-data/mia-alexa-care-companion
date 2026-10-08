@@ -10,8 +10,10 @@ const FORBIDDEN: Record<Locale, string[]> = {
   "de-DE": ["schon gefragt", "wie gesagt", "hab ich doch", "habe ich dir doch"],
 };
 
-export function splitSentences(text: string): string[] {
-  return text.split(/(?<=[.!?])\s+/).map((s) => s.trim()).filter(Boolean);
+export function splitSentences(text: string, locale: Locale = "en-US"): string[] {
+  // In German a dot after a number is an ordinal ("12. Oktober"), not a sentence end.
+  const end = locale === "de-DE" ? /(?<=[^\d\s][.!?]|\d[!?])\s+/ : /(?<=[.!?])\s+/;
+  return text.split(end).map((s) => s.trim()).filter(Boolean);
 }
 
 const countWords = (s: string) => s.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
@@ -19,7 +21,7 @@ const countWords = (s: string) => s.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.t
 export function checkPlain(text: string, locale: Locale, level: keyof typeof PLAIN_LIMITS = "simple"): { ok: boolean; problems: string[] } {
   const limits = PLAIN_LIMITS[level];
   const problems: string[] = [];
-  const sentences = splitSentences(text);
+  const sentences = splitSentences(text, locale);
   if (sentences.length > limits.maxSentences) problems.push(`${sentences.length} sentences (max ${limits.maxSentences})`);
   for (const s of sentences) {
     const n = countWords(s);

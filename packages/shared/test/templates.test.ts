@@ -5,6 +5,10 @@ import { rose, roseDe } from "../src/seed/rose";
 
 describe("splitSentences", () => {
   it("splits on . ! ?", () => expect(splitSentences("Yes. You took them! Good?")).toEqual(["Yes.", "You took them!", "Good?"]));
+  it("splits after an English date", () =>
+    expect(splitSentences("Today is Monday, October 12. Today is Monday.")).toEqual(["Today is Monday, October 12.", "Today is Monday."]));
+  it("does not split German ordinal dates", () =>
+    expect(splitSentences("Heute ist Montag, der 12. Oktober. Heute ist Montag.", "de-DE")).toEqual(["Heute ist Montag, der 12. Oktober.", "Heute ist Montag."]));
 });
 
 describe("checkPlain", () => {

@@ -35,12 +35,13 @@ describe("run() fallback", () => {
 });
 
 describe("get_today", () => {
-  it("Monday 08:05: date, leave time for the group", async () => {
+  it("Monday 08:05: date, leave time for the group, day repeated", async () => {
     const m = await connect(at("2026-10-12T08:05:00"));
     const r = await m.call("get_today");
     expect(r.say).toEqual([
       "Today is Monday, October 12.",
       "You leave for Maple Grove Day Club at twenty to ten.",
+      "Today is Monday.",
     ]);
     expect(r.verbatim).toBe(true);
     expect(r.text).toBe(r.say.join(" "));
@@ -63,6 +64,7 @@ describe("get_today", () => {
     expect(r.say).toEqual([
       "Heute ist Montag, der 12. Oktober.",
       "Tagesgruppe ist heute. Du gehst um zwanzig vor zehn los.",
+      "Heute ist Montag.",
     ]);
   });
 });
