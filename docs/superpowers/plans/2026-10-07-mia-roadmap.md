@@ -19,6 +19,7 @@ The spec spans several subsystems, so it is built as **six sub-plans**. Each pro
 - **Family voice messages** — carer records short messages on the carer page (Plan 3); Mia Voice plays them at a set time or from `comfort_me` (Plan 2). Audio is family content, stored encrypted, deleted with the profile.
 - **Weather on the way out** — `get_preparation_steps` adds "It's cold today. Take your coat." from a free weather API (Open-Meteo, no key) using the profile location (Plan 2/4).
 - **Favourite music offer** — late afternoon (sundowning) or from `comfort_me`: "Shall I play Frank Sinatra?" → simulator plays a royalty-free stand-in; on real Alexa+ this hands off to Alexa music (Plan 2).
+- **Unsure noon pill (best practice: never risk a double dose)** — if Mia cannot know whether she went to the group, the noon pill is *unsure*: Mia says "I'm not sure… Let's ask Tom first." and alerts the carer (medium). Carer page (Plan 3) gets two buttons: "she went" / "she stayed home" (logs `left_home` / `stayed_home`).
 - Later list (not in hackathon scope): morning "Did you sleep well?" check, group confirms arrival by link, drink reminders, camera activity signal, pharmacy blister integration.
 
 **Stretch (only after Plan 5, by ~Oct 18):** Amazon Connect call, drift check, extra audio conditions, Nova 2 Sonic mode, MCP Apps widget, extra roles, Claude Desktop interop demo.

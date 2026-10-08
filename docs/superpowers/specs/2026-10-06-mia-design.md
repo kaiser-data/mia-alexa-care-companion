@@ -153,7 +153,7 @@ Tool descriptions are written so the assistant selects them from natural, vague 
 | `get_preparation_steps` | "What do I need?" | Short checklist, max 2 items per turn, "and then?" continues | — |
 | `report_leaving` | "I'm going to my group now." | Confirms, reminds keys; starts expected-return timer | `left_home` |
 | `report_home` | "I'm home." | Welcome; stops timer; asks how it was (yes/no) | `arrived_home` |
-| `get_medication_status` | "Did I take my pills?" | Per dose: taken (time) / due now (plain description) / not yet. Only from log | `med_asked` |
+| `get_medication_status` | "Did I take my pills?" | Per dose: taken (time) / due now (plain description) / not yet. Only from log. A dose given at an appointment when attendance is unknown is **unsure**: never "take it" — "I'm not sure if you had your noon pill yet. Let's ask Tom first." | `med_asked` / `med_unsure` |
 | `confirm_medication` | "I took them." | Logs. Already confirmed → "You took those at ten past eight. No more needed." | `med_confirmed` / `med_duplicate_attempt` |
 | `comfort_me` | "I'm scared." | Comfort notes, anchors, offer to call carer | `anxious` |
 | `night_reassurance` | 00:00–05:00, "Is it time for work?" | "It's the middle of the night. You're safe at home." | `night_awake` |
@@ -250,6 +250,7 @@ Rules on events (immediate) and EventBridge Scheduler (every 5 min; `local`: in-
 | Rule | Condition (defaults, configurable) | Severity |
 |---|---|---|
 | Missed medication | Not confirmed 45 min after time, not `takenElsewhere` | medium |
+| Unsure dose | `med_unsure`, or a dose given at an appointment is still unresolved (no `left_home` / `stayed_home`) 45 min after its time. Carer answers on the carer page: "she went" (dose counted) or "she stayed home" (dose due at home) | medium |
 | Duplicate dose attempt | Confirm on already-confirmed dose | low (medium if ≥ 2/day) |
 | Distress | `report_problem` | high |
 | Not home on time | `left_home`, no `arrived_home` by expected-return + 30 min (`alone` only) | high |
