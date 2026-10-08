@@ -11,14 +11,18 @@ const root = resolve(import.meta.dirname, "../../..");
 try { process.loadEnvFile(join(root, ".env")); } catch { /* no .env: rely on the environment */ }
 
 const token = process.env.MIA_DEV_TOKEN;
-if (!token || token.length < 24) throw new Error("Set MIA_DEV_TOKEN (≥ 24 chars) in .env — see .env.example");
+if (!token || token.length < 24 || token.startsWith("replace-with")) {
+  throw new Error("Set your own MIA_DEV_TOKEN (≥ 24 random chars) in .env — see .env.example");
+}
 
 const dataDir = resolve(root, process.env.MIA_DATA_DIR ?? ".mia-data");
 mkdirSync(dataDir, { recursive: true });
 const store = new SqliteStore(join(dataDir, "mia.db"), new LocalAesCipher(loadOrCreateLocalKey(join(dataDir, "local.key"))));
 
+const seeds = { rose, "rose-de": roseDe } as const;
 const profileId = process.env.MIA_PROFILE ?? "rose";
-if (!(await store.getProfile(profileId))) await store.putProfile(profileId === "rose-de" ? roseDe() : rose());
+if (!(profileId in seeds)) throw new Error(`MIA_PROFILE must be one of: ${Object.keys(seeds).join(", ")}`);
+if (!(await store.getProfile(profileId))) await store.putProfile(seeds[profileId as keyof typeof seeds]());
 
 const app = createHttpApp({
   tokens: new Map([[token, profileId]]),
