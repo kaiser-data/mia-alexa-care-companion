@@ -16,7 +16,7 @@ function split(s: DoseStatus[]) {
 
 const facts = (s: DoseStatus[]) => ({ doses: s.map(({ medicationId, name, time, state, takenAt }) => ({ medicationId, name, time, state, takenAt: takenAt ?? null })) });
 
-async function flagUnsure(ctx: ToolContext, doses: DoseStatus[], extra?: Record<string, unknown>) {
+async function flagUnsure(ctx: ToolContext, doses: DoseStatus[], extra?: Record<string, string>) {
   for (const d of doses) {
     await logEvent(ctx, "med_unsure", { medicationId: d.medicationId, doseTime: d.time, ...extra });
   }
@@ -38,7 +38,7 @@ export function registerMedicationTools(server: McpServer, ctx: ToolContext): vo
     await logEvent(ctx, "med_asked");
     let say: string[];
     if (due.length) {
-      if (unsure.length) await flagUnsure(ctx, unsure);
+      await flagUnsure(ctx, unsure);
       say = [T.notYet(), T.medDue(names(due, p)), T.medIs(joinList(due.map((d) => d.description), p.locale))];
     } else if (unsure.length) {
       await flagUnsure(ctx, unsure);
@@ -75,14 +75,8 @@ export function registerMedicationTools(server: McpServer, ctx: ToolContext): vo
     const toConfirm = due.length ? due : unsure;
     if (toConfirm.length) {
       for (const d of toConfirm) await logEvent(ctx, "med_confirmed", { medicationId: d.medicationId, doseTime: d.time });
-      // If confirming unsure doses (no due), also flag them for the carer with selfReported flag
-      if (!due.length && unsure.length) {
-        await flagUnsure(ctx, unsure, { selfReported: "true" });
-      }
-      // If confirming due doses and unsure exist, flag the unsure ones silently
-      if (due.length && unsure.length) {
-        await flagUnsure(ctx, unsure);
-      }
+      // The carer checks unsure doses; a self-report may have meant another dose.
+      await flagUnsure(ctx, unsure, due.length ? undefined : { selfReported: "true" });
       return { facts: { confirmed: toConfirm.map((d) => d.medicationId) }, say: [T.medConfirmed(names(toConfirm, p))], verbatim: true };
     }
     if (taken.length) {
