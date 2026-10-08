@@ -50,7 +50,7 @@ describe("confirm_medication", () => {
     expect(r.say).toEqual(["Not yet.", "Your next pills are at eight o'clock in the morning."]);
     expect(await types(m)).toEqual(["med_not_due_attempt"]);
   });
-  it("noon pill on a group day is given at the group when she went", async () => {
+  it("on a group day she went: the evening pill is confirmed and no pills remain", async () => {
     const m = await connect(at("2026-10-12T08:05:00"));
     await m.call("confirm_medication");
     await m.store.addEvent({ profileId: "rose", type: "left_home", at: "2026-10-12T13:38:00Z", detail: { appointmentId: "maple-grove" } });
@@ -91,6 +91,25 @@ describe("unsure noon pill (no word whether she went to the group)", () => {
     m.setNow(at("2026-10-12T14:45:00"));
     expect((await m.call("confirm_medication")).say).toEqual(["Thank you. I've noted your noon pill."]);
     const events = await m.store.eventsSince("rose", "2026-10-01T00:00:00Z");
-    expect(events.at(-1)).toMatchObject({ type: "med_confirmed", detail: { medicationId: "noon-pill", doseTime: "12:00" } });
+    expect(events.at(-2)).toMatchObject({ type: "med_confirmed", detail: { medicationId: "noon-pill", doseTime: "12:00" } });
+  });
+  it("a self-report of an unsure dose is recorded and flagged for the carer", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"));
+    await m.call("confirm_medication");
+    m.setNow(at("2026-10-12T14:45:00"));
+    await m.call("confirm_medication");
+    const events = await m.store.eventsSince("rose", "2026-10-01T00:00:00Z");
+    expect(events.slice(-2)).toMatchObject([
+      { type: "med_confirmed", detail: { medicationId: "noon-pill", doseTime: "12:00" } },
+      { type: "med_unsure", detail: { medicationId: "noon-pill", doseTime: "12:00", selfReported: "true" } },
+    ]);
+  });
+  it("evening due while noon is unsure: speaks the due dose, flags the unsure one silently", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"));
+    await m.call("confirm_medication");
+    m.setNow(at("2026-10-12T20:00:00"));
+    const r = await m.call("get_medication_status");
+    expect(r.say).toEqual(["Not yet.", "Now it's time for your evening pill.", "That's the white capsule."]);
+    expect(await types(m)).toEqual(["med_confirmed", "med_asked", "med_unsure"]);
   });
 });
