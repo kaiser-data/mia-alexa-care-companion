@@ -79,7 +79,9 @@ export function registerMedicationTools(server: McpServer, ctx: ToolContext): vo
       for (const d of toConfirm) await logEvent(ctx, "med_confirmed", { medicationId: d.medicationId, doseTime: d.time });
       // The carer checks unsure doses; a self-report may have meant another dose.
       await flagUnsure(ctx, unsure, due.length ? undefined : { selfReported: "true" });
-      return { facts: { confirmed: toConfirm.map((d) => d.medicationId) }, say: [T.medConfirmed(names(toConfirm, p))], verbatim: true };
+      // A self-report for unsure doses is not read back as a list; the carer checks it.
+      const say = due.length ? [T.medConfirmed(names(due, p))] : [T.medEarlyNoted(p.carerName)];
+      return { facts: { confirmed: toConfirm.map((d) => d.medicationId) }, say, verbatim: true };
     }
     if (taken.length) {
       const last = taken.at(-1)!;

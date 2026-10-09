@@ -89,7 +89,7 @@ describe("unsure noon pill (no word whether she went to the group)", () => {
     const m = await connect(at("2026-10-12T08:05:00"));
     await m.call("confirm_medication");
     m.setNow(at("2026-10-12T14:45:00"));
-    expect((await m.call("confirm_medication")).say).toEqual(["Thank you. I've noted your noon pill."]);
+    expect((await m.call("confirm_medication")).say).toEqual(["Thank you. I'll tell Tom."]);
     const events = await m.store.eventsSince("rose", "2026-10-01T00:00:00Z");
     expect(events.at(-2)).toMatchObject({ type: "med_confirmed", detail: { medicationId: "noon-pill", doseTime: "12:00" } });
   });
