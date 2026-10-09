@@ -1,0 +1,17 @@
+{
+  "name": "@mia/voice",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.132.1",
+    "@hono/node-server": "2.1.3",
+    "@mia/mcp-server": "workspace:*",
+    "@mia/shared": "workspace:*",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "hono": "4.13.13"
+  }
+}
