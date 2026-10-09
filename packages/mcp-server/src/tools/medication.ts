@@ -42,7 +42,8 @@ export function registerMedicationTools(server: McpServer, ctx: ToolContext): vo
       say = [T.notYet(), T.medDue(names(due, p)), T.medIs(joinList(due.map((d) => d.description), p.locale))];
     } else if (unsure.length) {
       await flagUnsure(ctx, unsure);
-      say = [T.medUnsure(names(unsure, p)), T.askCarerFirst(p.carerName)];
+      // Name only the earliest unsure dose: two names make the sentence too long to follow. The carer is told about all of them.
+      say = [T.medUnsure(names(unsure.slice(0, 1), p)), T.askCarerFirst(p.carerName)];
     } else if (taken.length) {
       const last = taken.at(-1)!;
       say = [

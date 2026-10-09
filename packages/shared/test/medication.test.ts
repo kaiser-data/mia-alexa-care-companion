@@ -52,4 +52,50 @@ describe("doseStatuses", () => {
     const s = doseStatuses(rose(), [confirmed("noon-pill", "12:00", "2026-10-12T16:10:00Z")], at("2026-10-12T12:30:00"));
     expect(s[1]).toMatchObject({ state: "taken", takenAt: "12:10" });
   });
+
+  describe("overdue, early self-report, early return", () => {
+    const wed = (t: string) => at(`2026-10-14T${t}:00`);
+    const ev = (type: CareEvent["type"], iso: string, detail?: Record<string, string>): CareEvent =>
+      ({ profileId: "rose", type, at: iso, ...(detail ? { detail } : {}) });
+    const attempt = (iso: string) => ev("med_not_due_attempt", iso, { medicationId: "morning-pills", doseTime: "08:00" });
+    it("Wednesday 20:00, nothing logged: morning and noon unsure (overdue), evening due", () => {
+      const s = doseStatuses(rose(), [], wed("20:00"));
+      expect(states(s)).toEqual([["morning-pills", "unsure"], ["noon-pill", "unsure"], ["evening-pill", "due"]]);
+      expect(s[0]!.unsureReason).toBe("overdue");
+      expect(s[1]!.unsureReason).toBe("overdue");
+    });
+    it("morning is due until 09:59 and unsure from 10:00", () => {
+      expect(doseStatuses(rose(), [], wed("09:59"))[0]!.state).toBe("due");
+      expect(doseStatuses(rose(), [], wed("10:00"))[0]).toMatchObject({ state: "unsure", unsureReason: "overdue" });
+    });
+    it("an early self-report makes the dose unsure", () => {
+      expect(doseStatuses(rose(), [attempt("2026-10-14T11:15:00Z")], wed("08:05"))[0]).toMatchObject({ state: "unsure", unsureReason: "early_report" });
+    });
+    it("an attempt three hours before does not count", () => {
+      expect(doseStatuses(rose(), [attempt("2026-10-14T09:00:00Z")], wed("08:05"))[0]!.state).toBe("due");
+    });
+    it("an attempt for another dose time does not count", () => {
+      const other = ev("med_not_due_attempt", "2026-10-14T11:15:00Z", { medicationId: "morning-pills", doseTime: "09:00" });
+      expect(doseStatuses(rose(), [other], wed("08:05"))[0]!.state).toBe("due");
+    });
+    const mon = (t: string) => at(`2026-10-12T${t}:00`);
+    const left = ev("left_home", "2026-10-12T13:38:00Z", { appointmentId: "maple-grove" });
+    it("she left but came home before the dose time: noon unsure (came_home)", () => {
+      const home = ev("arrived_home", "2026-10-12T14:30:00Z");
+      expect(doseStatuses(rose(), [left, home], mon("12:10"))[1]).toMatchObject({ state: "unsure", unsureReason: "came_home" });
+    });
+    it("she came home after the dose time: noon stays at_appointment", () => {
+      const home = ev("arrived_home", "2026-10-12T18:25:00Z");
+      expect(doseStatuses(rose(), [left, home], mon("14:30"))[1]!.state).toBe("at_appointment");
+    });
+    it("stayed_home logged before the group starts: still at_appointment", () => {
+      expect(doseStatuses(rose(), [stayed("2026-10-12T13:00:00Z")], mon("09:00"))[1]!.state).toBe("at_appointment");
+    });
+    it("both left_home and stayed_home: at_appointment", () => {
+      expect(doseStatuses(rose(), [left, stayed("2026-10-12T14:00:00Z")], mon("12:30"))[1]!.state).toBe("at_appointment");
+    });
+    it("stayed_home logged after now: unsure", () => {
+      expect(doseStatuses(rose(), [stayed("2026-10-12T17:00:00Z")], mon("12:30"))[1]!.state).toBe("unsure");
+    });
+  });
 });
