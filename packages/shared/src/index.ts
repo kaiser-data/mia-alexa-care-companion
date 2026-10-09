@@ -2,6 +2,7 @@ export * from "./domain/types";
 export * from "./domain/clock";
 export * from "./domain/today";
 export * from "./domain/medication";
+export * from "./domain/proactive";
 export * from "./seed/rose";
 export * from "./i18n/words";
 export * from "./i18n/templates";
