@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { templates, type Person } from "@mia/shared";
-import { logEvent, OUTPUT_SHAPE, run, type ToolContext } from "./runtime";
+import { capText, logEvent, OUTPUT_SHAPE, run, type ToolContext } from "./runtime";
 
 export function findPerson(people: Person[], query: string): Person | undefined {
   const words = query.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
@@ -21,7 +21,7 @@ export function registerPeopleTools(server: McpServer, ctx: ToolContext): void {
     const T = templates(p.locale);
     const person = findPerson(p.people, name);
     if (!person) {
-      await logEvent(ctx, "unknown_question", { topic: "person", query: name.slice(0, 80) });
+      await logEvent(ctx, "unknown_question", { topic: "person", query: capText(name, 80) });
       return { facts: { found: false }, say: [T.dontKnow(p.carerName)], verbatim: true };
     }
     await logEvent(ctx, "person_asked", { personId: person.id });

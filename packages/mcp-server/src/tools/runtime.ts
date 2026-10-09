@@ -37,6 +37,11 @@ export const OUTPUT_SHAPE = {
 
 const LOOKBACK_MS = 36 * 3600 * 1000;
 
+/** Cut free text to at most n characters without splitting an emoji. */
+export function capText(s: string, n: number): string {
+  return Array.from(s).slice(0, n).join("");
+}
+
 export async function logEvent(ctx: ToolContext, type: EventType, detail?: Record<string, string>): Promise<void> {
   await ctx.store.addEvent({ profileId: ctx.profileId, type, at: ctx.now().toISOString(), ...(detail ? { detail } : {}) });
 }

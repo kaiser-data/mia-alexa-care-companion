@@ -83,17 +83,22 @@ export function registerMedicationTools(server: McpServer, ctx: ToolContext): vo
       const say = due.length ? [T.medConfirmed(names(due, p))] : [T.medEarlyNoted(p.carerName)];
       return { facts: { confirmed: toConfirm.map((d) => d.medicationId) }, say, verbatim: true };
     }
+    // Close to the next dose time a "yes, I took it" may be a real early dose — also after an earlier dose today.
+    const next = upcoming[0];
+    const nowMinutes = localParts(ctx.now(), p.timezone).minutes;
+    if (next && toMinutes(next.time) - nowMinutes <= OVERDUE_MINUTES) {
+      await logEvent(ctx, "med_not_due_attempt", { medicationId: next.medicationId, doseTime: next.time });
+      await flagUnsure(ctx, [next], { reason: "early_report", selfReported: "true" });
+      return { facts: { notDue: true, earlyNoted: true }, say: [T.medEarlyNoted(p.carerName)], verbatim: true };
+    }
     if (taken.length) {
       const last = taken.at(-1)!;
       await logEvent(ctx, "med_duplicate_attempt", { medicationId: last.medicationId, doseTime: last.time });
       return { facts: { duplicate: true, medicationId: last.medicationId }, say: [T.medAlreadyTaken(last.name, timeWords(last.takenAt!, p.locale)), T.noMoreNow()], verbatim: true };
     }
-    if (upcoming[0]) {
-      await logEvent(ctx, "med_not_due_attempt", { medicationId: upcoming[0].medicationId, doseTime: upcoming[0].time });
-      const minutesAway = toMinutes(upcoming[0].time) - localParts(ctx.now(), p.timezone).minutes;
-      // Close to the dose time a "yes, I took it" may be a real early dose: tell the carer, do not rule it out.
-      if (minutesAway <= OVERDUE_MINUTES) return { facts: { notDue: true, earlyNoted: true }, say: [T.medEarlyNoted(p.carerName)], verbatim: true };
-      return { facts: { notDue: true }, say: [T.notYet(), T.medNextAt(timeWords(upcoming[0].time, p.locale, { withPart: true }))], verbatim: true };
+    if (next) {
+      await logEvent(ctx, "med_not_due_attempt", { medicationId: next.medicationId, doseTime: next.time });
+      return { facts: { notDue: true }, say: [T.notYet(), T.medNextAt(timeWords(next.time, p.locale, { withPart: true }))], verbatim: true };
     }
     return { facts: {}, say: [T.medNoneToday()], verbatim: true };
   }));

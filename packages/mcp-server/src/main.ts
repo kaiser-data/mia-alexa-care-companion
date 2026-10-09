@@ -1,4 +1,4 @@
-import { mkdirSync } from "node:fs";
+import { chmodSync, mkdirSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { serve } from "@hono/node-server";
 import { rose, roseDe } from "@mia/shared";
@@ -17,6 +17,7 @@ if (!token || token.length < 24 || token.startsWith("replace-with")) {
 
 const dataDir = resolve(root, process.env.MIA_DATA_DIR ?? ".mia-data");
 mkdirSync(dataDir, { recursive: true, mode: 0o700 });
+chmodSync(dataDir, 0o700);
 const store = new SqliteStore(join(dataDir, "mia.db"), new LocalAesCipher(loadOrCreateLocalKey(join(dataDir, "local.key"))));
 
 const seeds = { rose, "rose-de": roseDe } as const;

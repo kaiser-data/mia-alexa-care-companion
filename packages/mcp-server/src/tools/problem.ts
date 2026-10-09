@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { templates, type Profile } from "@mia/shared";
-import { logEvent, OUTPUT_SHAPE, toResult, type ToolContext } from "./runtime";
+import { capText, logEvent, OUTPUT_SHAPE, toResult, type ToolContext } from "./runtime";
 
 export function registerProblemTools(server: McpServer, ctx: ToolContext): void {
   server.registerTool("report_problem", {
@@ -14,7 +14,7 @@ export function registerProblemTools(server: McpServer, ctx: ToolContext): void 
     outputSchema: OUTPUT_SHAPE,
     annotations: { readOnlyHint: false },
   }, async ({ what: rawWhat }) => {
-    const what = rawWhat?.slice(0, 200);
+    const what = rawWhat === undefined ? undefined : capText(rawWhat, 200);
     // Deliberately not run(): the alert must not depend on reading the profile's event log.
     let p: Profile | null = null;
     try { p = await ctx.store.getProfile(ctx.profileId); } catch (err) { console.error("[mia] distress: profile read failed:", err); }
@@ -31,7 +31,8 @@ export function registerProblemTools(server: McpServer, ctx: ToolContext): void 
     } catch (err) { console.error("[mia] distress alert failed:", err); }
     await logEvent(ctx, "distress", what ? { what } : undefined)
       .catch((err) => console.error("[mia] distress log failed:", err));
-    const say = alerted ? [T.distressAck(carer), T.distressFollow(carer)] : [T.distressFailed(carer)];
+    // Without a profile there is no carer name to start the follow-up sentence with.
+    const say = !alerted ? [T.distressFailed(carer)] : p ? [T.distressAck(carer), T.distressFollow(carer)] : [T.distressAck(carer)];
     await ctx.store.setLastSay(ctx.profileId, say).catch(() => undefined);
     return toResult({ facts: { alerted }, say, verbatim: true });
   });

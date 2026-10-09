@@ -4,7 +4,7 @@ import {
   dateWords, localParts, nextAppointment, partOfDay, templates, timeWords, todayView, toMinutes, weekdayName,
   type Profile,
 } from "@mia/shared";
-import { appointmentLine, logEvent, OUTPUT_SHAPE, run, type MiaResult, type ToolContext } from "./runtime";
+import { appointmentLine, capText, logEvent, OUTPUT_SHAPE, run, type MiaResult, type ToolContext } from "./runtime";
 
 export async function todayResult(ctx: ToolContext, p: Profile): Promise<MiaResult> {
   const T = templates(p.locale);
@@ -46,7 +46,7 @@ export function registerOrientationTools(server: McpServer, ctx: ToolContext): v
     const now = ctx.now();
     const n = nextAppointment(p, now, name);
     if (!n) {
-      await logEvent(ctx, "unknown_question", { topic: "appointment", query: (name ?? "").slice(0, 80) });
+      await logEvent(ctx, "unknown_question", { topic: "appointment", query: capText(name ?? "", 80) });
       return { facts: { found: false }, say: [T.dontKnow(p.carerName)], verbatim: true };
     }
     await logEvent(ctx, "orientation_asked", { appointmentId: n.appointment.id });

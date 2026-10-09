@@ -88,6 +88,13 @@ describe("who_is", () => {
 });
 
 describe("report_problem", () => {
+  it("without a profile the alert still goes out and the reply reads well", async () => {
+    const m = await connect(at("2026-10-12T11:00:00"));
+    m.store.getProfile = async () => null;
+    const r = await m.call("report_problem", { what: "I fell" });
+    expect(r.say).toEqual(["I've let your family know right away."]);
+    expect(await m.store.listAlerts("rose")).toMatchObject([{ rule: "distress", severity: "high" }]);
+  });
   it("raises a high alert immediately and reassures", async () => {
     const m = await connect(at("2026-10-12T11:00:00"));
     const r = await m.call("report_problem", { what: "I fell" });
