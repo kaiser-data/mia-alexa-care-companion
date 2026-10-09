@@ -11,6 +11,17 @@ describe("checkDevToken", () => {
 });
 
 describe("startLocalMia", () => {
+  it("refuses an empty or weak token itself, not only in main.ts", async () => {
+    const dataDir = join(mkdtempSync(join(tmpdir(), "mia-")), "data");
+    await expect(startLocalMia({ token: "", profileId: "rose", dataDir, port: 0 })).rejects.toThrow(/MIA_DEV_TOKEN/);
+  });
+  it("close() returns even while a client keeps a connection open", async () => {
+    const dataDir = join(mkdtempSync(join(tmpdir(), "mia-")), "data");
+    const mia = await startLocalMia({ token: "t".repeat(32), profileId: "rose", dataDir, port: 0 });
+    await fetch(`${mia.url}/health`, { keepalive: true });
+    await mia.close();
+    expect(statSync(join(dataDir, "local.key")).mode & 0o777).toBe(0o600);
+  });
   it("serves health on 127.0.0.1, seeds the profile, locks the data dir", async () => {
     const dataDir = join(mkdtempSync(join(tmpdir(), "mia-")), "data");
     const mia = await startLocalMia({ token: "t".repeat(32), profileId: "rose-de", dataDir, port: 0 });

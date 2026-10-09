@@ -3,7 +3,11 @@ import { logEvent, type ToolContext } from "./tools/runtime";
 
 const LOOKBACK_MS = 36 * 3600 * 1000;
 
-/** Care Mode demo: the add-on tells the voice device what to say first. Logged so each prompt is spoken once. */
+/**
+ * Care Mode demo: the add-on tells the voice device what to say first. Logged so each prompt is spoken once.
+ * Contract: a prompt counts as spoken when it is handed out (demo simplification; one device, serialised
+ * requests). A production version would confirm playback with a separate acknowledgement.
+ */
 export async function nextProactive(ctx: ToolContext): Promise<ProactivePrompt | null> {
   const p = await ctx.store.getProfile(ctx.profileId);
   if (!p) return null;

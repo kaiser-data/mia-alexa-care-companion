@@ -23,6 +23,7 @@ export interface LocalMiaOptions { token: string; profileId: SeedId; dataDir: st
 
 /** Starts the Mia MCP server in local mode (SQLite + local AES key) on 127.0.0.1. Port 0 picks a free port. */
 export async function startLocalMia(o: LocalMiaOptions): Promise<{ url: string; close(): Promise<void> }> {
+  checkDevToken(o.token);
   mkdirSync(o.dataDir, { recursive: true, mode: 0o700 });
   chmodSync(o.dataDir, 0o700);
   const store = new SqliteStore(join(o.dataDir, "mia.db"), new LocalAesCipher(loadOrCreateLocalKey(join(o.dataDir, "local.key"))));
@@ -31,11 +32,16 @@ export async function startLocalMia(o: LocalMiaOptions): Promise<{ url: string; 
     tokens: new Map([[o.token, o.profileId]]),
     makeContext: (id) => ({ store, profileId: id, now: () => new Date(), alerts: new StoreAlertSink(store), weather: o.weather }),
   });
-  const { server, port } = await new Promise<{ server: ReturnType<typeof serve>; port: number }>((resolve) => {
+  const { server, port } = await new Promise<{ server: ReturnType<typeof serve>; port: number }>((resolve, reject) => {
     const s = serve({ fetch: app.fetch, port: o.port, hostname: "127.0.0.1" }, (info: AddressInfo) => resolve({ server: s, port: info.port }));
+    s.once("error", (err) => { store.close(); reject(err); });
   });
   return {
     url: `http://127.0.0.1:${port}`,
-    close: () => new Promise<void>((resolve) => server.close(() => resolve())),
+    close: () => new Promise<void>((resolve) => {
+      server.close(() => { store.close(); resolve(); });
+      // Do not wait for idle keep-alive connections (e.g. the voice gateway's client).
+      if ("closeAllConnections" in server) server.closeAllConnections();
+    }),
   };
 }
