@@ -1,5 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { doseStatuses, joinList, templates, timeWords, type DoseStatus, type Profile } from "@mia/shared";
+import { doseStatuses, joinList, localParts, OVERDUE_MINUTES, templates, timeWords, toMinutes, type DoseStatus, type Profile } from "@mia/shared";
 import { logEvent, OUTPUT_SHAPE, run, type MiaResult, type ToolContext } from "./runtime";
 
 const names = (doses: DoseStatus[], p: Profile) => joinList([...new Set(doses.map((d) => d.name))], p.locale);
@@ -18,7 +18,7 @@ const facts = (s: DoseStatus[]) => ({ doses: s.map(({ medicationId, name, time, 
 
 async function flagUnsure(ctx: ToolContext, doses: DoseStatus[], extra?: Record<string, string>) {
   for (const d of doses) {
-    await logEvent(ctx, "med_unsure", { medicationId: d.medicationId, doseTime: d.time, ...extra });
+    await logEvent(ctx, "med_unsure", { medicationId: d.medicationId, doseTime: d.time, ...(d.unsureReason ? { reason: d.unsureReason } : {}), ...extra });
   }
 }
 
@@ -39,7 +39,8 @@ export function registerMedicationTools(server: McpServer, ctx: ToolContext): vo
     let say: string[];
     if (due.length) {
       await flagUnsure(ctx, unsure);
-      say = [T.notYet(), T.medDue(names(due, p)), T.medIs(joinList(due.map((d) => d.description), p.locale))];
+      const lead = taken.length ? T.medTaken(taken.at(-1)!.name, timeWords(taken.at(-1)!.takenAt!, p.locale)) : T.notYet();
+      say = [lead, T.medDue(names(due, p)), T.medIs(joinList(due.map((d) => d.description), p.locale))];
     } else if (unsure.length) {
       await flagUnsure(ctx, unsure);
       // Name only the earliest unsure dose: two names make the sentence too long to follow. The carer is told about all of them.
@@ -87,6 +88,9 @@ export function registerMedicationTools(server: McpServer, ctx: ToolContext): vo
     }
     if (upcoming[0]) {
       await logEvent(ctx, "med_not_due_attempt", { medicationId: upcoming[0].medicationId, doseTime: upcoming[0].time });
+      const minutesAway = toMinutes(upcoming[0].time) - localParts(ctx.now(), p.timezone).minutes;
+      // Close to the dose time a "yes, I took it" may be a real early dose: tell the carer, do not rule it out.
+      if (minutesAway <= OVERDUE_MINUTES) return { facts: { notDue: true, earlyNoted: true }, say: [T.medEarlyNoted(p.carerName)], verbatim: true };
       return { facts: { notDue: true }, say: [T.notYet(), T.medNextAt(timeWords(upcoming[0].time, p.locale, { withPart: true }))], verbatim: true };
     }
     return { facts: {}, say: [T.medNoneToday()], verbatim: true };

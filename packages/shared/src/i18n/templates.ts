@@ -29,6 +29,7 @@ export interface Templates {
   askCarerFirst(carer: string): string;
   medNoneToday(): string;
   medConfirmed(names: string): string;
+  medEarlyNoted(carer: string): string;
   medAlreadyTaken(name: string, time: string): string;
   noMoreNow(): string;
   safeAtHome(): string;
@@ -70,6 +71,7 @@ const EN: Templates = {
   askCarerFirst: (c) => `Let's ask ${c} first.`,
   medNoneToday: () => "There are no more pills today.",
   medConfirmed: (n) => `Thank you. I've noted ${n}.`,
+  medEarlyNoted: (c) => `Thank you. I'll tell ${c}.`,
   medAlreadyTaken: (n, t) => `You took ${n} at ${t}.`,
   noMoreNow: () => "No more pills needed now.",
   safeAtHome: () => "You're safe at home.",
@@ -111,6 +113,7 @@ const DE: Templates = {
   askCarerFirst: (c) => `Wir fragen zuerst ${c}.`,
   medNoneToday: () => "Heute sind keine Tabletten mehr dran.",
   medConfirmed: (n) => `Danke. Ich habe ${n} notiert.`,
+  medEarlyNoted: (c) => `Danke. Ich sage es ${c}.`,
   medAlreadyTaken: (n, t) => `Du hast ${n} um ${t} genommen.`,
   noMoreNow: () => "Jetzt brauchst du keine mehr.",
   safeAtHome: () => "Du bist sicher zu Hause.",
