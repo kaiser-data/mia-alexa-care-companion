@@ -27,6 +27,7 @@ const SCRIPT: [string, string, Record<string, unknown>?][] = [
   ["2026-10-14T10:00:00", "get_next_appointment", { name: "group" }],
   ["2026-10-14T15:10:00", "get_today"],
   ["2026-10-14T15:20:00", "report_problem", { what: "I fell" }],
+  ["2026-10-14T16:31:00", "play_music"],
   ["2026-10-14T20:00:00", "get_medication_status"],
   ["2026-10-14T21:00:00", "confirm_medication"],
   ["2026-10-15T14:45:00", "get_medication_status"],
