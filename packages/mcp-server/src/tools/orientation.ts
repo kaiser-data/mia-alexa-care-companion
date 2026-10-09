@@ -46,7 +46,7 @@ export function registerOrientationTools(server: McpServer, ctx: ToolContext): v
     const now = ctx.now();
     const n = nextAppointment(p, now, name);
     if (!n) {
-      await logEvent(ctx, "unknown_question", { topic: "appointment", query: name ?? "" });
+      await logEvent(ctx, "unknown_question", { topic: "appointment", query: (name ?? "").slice(0, 80) });
       return { facts: { found: false }, say: [T.dontKnow(p.carerName)], verbatim: true };
     }
     await logEvent(ctx, "orientation_asked", { appointmentId: n.appointment.id });

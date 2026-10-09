@@ -21,7 +21,7 @@ export function registerPeopleTools(server: McpServer, ctx: ToolContext): void {
     const T = templates(p.locale);
     const person = findPerson(p.people, name);
     if (!person) {
-      await logEvent(ctx, "unknown_question", { topic: "person", query: name });
+      await logEvent(ctx, "unknown_question", { topic: "person", query: name.slice(0, 80) });
       return { facts: { found: false }, say: [T.dontKnow(p.carerName)], verbatim: true };
     }
     await logEvent(ctx, "person_asked", { personId: person.id });

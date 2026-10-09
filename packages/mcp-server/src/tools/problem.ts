@@ -13,7 +13,8 @@ export function registerProblemTools(server: McpServer, ctx: ToolContext): void 
     inputSchema: { what: z.string().optional().describe("Her own words about what happened") },
     outputSchema: OUTPUT_SHAPE,
     annotations: { readOnlyHint: false },
-  }, async ({ what }) => {
+  }, async ({ what: rawWhat }) => {
+    const what = rawWhat?.slice(0, 200);
     // Deliberately not run(): the alert must not depend on reading the profile's event log.
     let p: Profile | null = null;
     try { p = await ctx.store.getProfile(ctx.profileId); } catch (err) { console.error("[mia] distress: profile read failed:", err); }

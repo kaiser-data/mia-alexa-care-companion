@@ -111,6 +111,24 @@ describe("report_problem failure paths", () => {
   });
 });
 
+describe("data minimisation", () => {
+  it("a long distress text is capped at 200 characters in alert and log", async () => {
+    const m = await connect(at("2026-10-12T11:00:00"));
+    await m.call("report_problem", { what: "x".repeat(500) });
+    const [alert] = await m.store.listAlerts("rose");
+    expect(alert!.message).toContain("x".repeat(200));
+    expect(alert!.message).not.toContain("x".repeat(201));
+    expect((await lastEvent(m))?.detail?.what).toHaveLength(200);
+  });
+  it("an unknown-question query is capped at 80 characters", async () => {
+    const m = await connect(at("2026-10-12T10:00:00"));
+    await m.call("who_is", { name: "y".repeat(300) });
+    expect((await lastEvent(m))?.detail?.query).toHaveLength(80);
+    await m.call("get_next_appointment", { name: "z".repeat(300) });
+    expect((await lastEvent(m))?.detail?.query).toHaveLength(80);
+  });
+});
+
 describe("repeat_last", () => {
   it("repeats the last answer verbatim and asks to slow down", async () => {
     const m = await connect(at("2026-10-12T08:05:00"));
