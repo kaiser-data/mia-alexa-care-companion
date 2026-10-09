@@ -9,3 +9,4 @@ cdk.out/
 coverage/
 .superpowers/
 .mia-data/
+graphify-out/
