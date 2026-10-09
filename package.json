@@ -9,6 +9,7 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "pnpm -r exec tsc --noEmit -p tsconfig.json",
+    "dev": "pnpm --filter @mia/voice dev",
     "dev:mcp": "pnpm --filter @mia/mcp-server dev"
   },
   "devDependencies": {
