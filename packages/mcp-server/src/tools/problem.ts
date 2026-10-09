@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { templates } from "@mia/shared";
-import { logEvent, OUTPUT_SHAPE, run, type ToolContext } from "./runtime";
+import { templates, type Profile } from "@mia/shared";
+import { logEvent, OUTPUT_SHAPE, toResult, type ToolContext } from "./runtime";
 
 export function registerProblemTools(server: McpServer, ctx: ToolContext): void {
   server.registerTool("report_problem", {
@@ -13,16 +13,25 @@ export function registerProblemTools(server: McpServer, ctx: ToolContext): void 
     inputSchema: { what: z.string().optional().describe("Her own words about what happened") },
     outputSchema: OUTPUT_SHAPE,
     annotations: { readOnlyHint: false },
-  }, async ({ what }) => run(ctx, async (p) => {
-    const T = templates(p.locale);
-    // The alert goes out first; a failed log write must never block it.
-    await ctx.alerts.raise({
-      profileId: p.id, rule: "distress", severity: "high",
-      message: `${p.preferredName} asked for help${what ? `: "${what}"` : ""}.`,
-      at: ctx.now().toISOString(),
-    });
+  }, async ({ what }) => {
+    // Deliberately not run(): the alert must not depend on reading the profile's event log.
+    let p: Profile | null = null;
+    try { p = await ctx.store.getProfile(ctx.profileId); } catch (err) { console.error("[mia] distress: profile read failed:", err); }
+    const T = templates(p?.locale ?? "en-US");
+    const carer = p?.carerName ?? "your family";
+    let alerted = false;
+    try {
+      await ctx.alerts.raise({
+        profileId: ctx.profileId, rule: "distress", severity: "high",
+        message: `${p?.preferredName ?? "Your family member"} asked for help${what ? `: "${what}"` : ""}.`,
+        at: ctx.now().toISOString(),
+      });
+      alerted = true;
+    } catch (err) { console.error("[mia] distress alert failed:", err); }
     await logEvent(ctx, "distress", what ? { what } : undefined)
       .catch((err) => console.error("[mia] distress log failed:", err));
-    return { facts: { alerted: true }, say: [T.distressAck(p.carerName), T.distressFollow(p.carerName)], verbatim: true };
-  }));
+    const say = alerted ? [T.distressAck(carer), T.distressFollow(carer)] : [T.distressFailed(carer)];
+    await ctx.store.setLastSay(ctx.profileId, say).catch(() => undefined);
+    return toResult({ facts: { alerted }, say, verbatim: true });
+  });
 }

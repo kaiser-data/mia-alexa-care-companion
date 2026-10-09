@@ -90,6 +90,27 @@ describe("report_problem", () => {
   });
 });
 
+describe("report_problem failure paths", () => {
+  it("the alert still goes out and the normal reply is given when reading the log fails", async () => {
+    const m = await connect(at("2026-10-12T11:00:00"));
+    m.store.eventsSince = async () => { throw new Error("db locked"); };
+    const r = await m.call("report_problem", { what: "I fell" });
+    expect(r.say).toEqual(["I've let Tom know right away.", "Tom will get in touch with you."]);
+    expect(await m.store.listAlerts("rose")).toMatchObject([{ rule: "distress", severity: "high" }]);
+  });
+  it("when the alert cannot be raised, she is told to call for help", async () => {
+    const m = await connect(at("2026-10-12T11:00:00"));
+    m.store.addAlert = async () => { throw new Error("disk full"); };
+    const r = await m.call("report_problem", { what: "I fell" });
+    expect(r.say).toEqual(["I couldn't reach Tom. Please call for help."]);
+  });
+  it("German failure reply", async () => {
+    const m = await connect(at("2026-10-12T11:00:00"), roseDe());
+    m.store.addAlert = async () => { throw new Error("disk full"); };
+    expect((await m.call("report_problem")).say).toEqual(["Ich konnte Tom nicht erreichen. Bitte ruf um Hilfe."]);
+  });
+});
+
 describe("repeat_last", () => {
   it("repeats the last answer verbatim and asks to slow down", async () => {
     const m = await connect(at("2026-10-12T08:05:00"));

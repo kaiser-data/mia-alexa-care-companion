@@ -40,7 +40,7 @@ export async function logEvent(ctx: ToolContext, type: EventType, detail?: Recor
   await ctx.store.addEvent({ profileId: ctx.profileId, type, at: ctx.now().toISOString(), ...(detail ? { detail } : {}) });
 }
 
-function toResult(r: MiaResult): CallToolResult {
+export function toResult(r: MiaResult): CallToolResult {
   return {
     content: [{ type: "text", text: r.say.length ? r.say.join(" ") : (r.text ?? "") }],
     structuredContent: { facts: r.facts, say: r.say, verbatim: r.verbatim, guidance: r.verbatim ? VERBATIM_GUIDANCE : CHAT_GUIDANCE },

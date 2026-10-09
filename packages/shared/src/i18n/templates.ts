@@ -39,6 +39,7 @@ export interface Templates {
   nightSafe(): string;
   distressAck(carer: string): string;
   distressFollow(carer: string): string;
+  distressFailed(carer: string): string;
   systemError(carer: string): string;
   personIs(name: string, relationship: string): string;
 }
@@ -81,6 +82,7 @@ const EN: Templates = {
   nightSafe: () => "You're safe at home. You can go back to sleep.",
   distressAck: (c) => `I've let ${c} know right away.`,
   distressFollow: (c) => `${c} will get in touch with you.`,
+  distressFailed: (c) => `I couldn't reach ${c}. Please call for help.`,
   systemError: (c) => `I can't check right now. ${c} can help.`,
   personIs: (n, r) => `${n} is your ${r}.`,
 };
@@ -123,6 +125,7 @@ const DE: Templates = {
   nightSafe: () => "Du bist sicher zu Hause. Du kannst weiterschlafen.",
   distressAck: (c) => `Ich habe ${c} sofort Bescheid gegeben.`,
   distressFollow: (c) => `${c} meldet sich bei dir.`,
+  distressFailed: (c) => `Ich konnte ${c} nicht erreichen. Bitte ruf um Hilfe.`,
   systemError: (c) => `Ich kann das gerade nicht nachsehen. ${c} hilft dir.`,
   personIs: (n, r) => `${n} ist ${r}.`,
 };
