@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { inMemoryMia } from "@mia/mcp-server/testing";
 import { at } from "@mia/shared/testing";
-import { connectMia } from "../src/mcp";
+import { connectMia, MiaToolError } from "../src/mcp";
 
 describe("connectMia", () => {
   it("lists Mia's tools, calls one, fetches the proactive prompt", async () => {
@@ -21,5 +21,10 @@ describe("connectMia", () => {
   it("a wrong token fails loudly", async () => {
     const m = await inMemoryMia({ now: () => at("2026-10-12T08:05:00") });
     await expect(connectMia({ url: m.url, token: "wrong", fetch: m.fetch })).rejects.toThrow();
+  });
+  it("a tool error is thrown as MiaToolError", async () => {
+    const m = await inMemoryMia({ now: () => at("2026-10-12T08:05:00") });
+    const mia = await connectMia({ url: m.url, token: m.token, fetch: m.fetch });
+    await expect(mia.call("no_such_tool")).rejects.toBeInstanceOf(MiaToolError);
   });
 });

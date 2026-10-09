@@ -12,7 +12,7 @@ async function setup(time: string, steps: ConstructorParameters<typeof ScriptedL
   const mia = await connectMia({ url: m.url, token: m.token, fetch: m.fetch });
   const llm = new ScriptedLlm(steps);
   const brain = new Brain({ mia, llm, profile, now: () => now });
-  return { brain, llm, store: m.store, setNow: (t: string) => { now = at(t); } };
+  return { brain, mia, llm, store: m.store, setNow: (t: string) => { now = at(t); } };
 }
 
 const PILLS = ["Not yet.", "Now it's time for your morning pills.", "That's the small white pill and the round pink one."];
@@ -109,6 +109,12 @@ describe("Brain.turn", () => {
     expect(last.length).toBe(HISTORY_MESSAGES + 1);
     expect(last[0]!.role).toBe("user");
   });
+  it("a failing tool never leaves her in silence", async () => {
+    const s = await setup("2026-10-13T03:10:00", []);
+    const mia = { ...s.mia, call: async (n: string) => { if (n === "night_reassurance") throw new Error("boom"); return s.mia.call(n); } };
+    const brain = new Brain({ mia, llm: s.llm, profile: rose(), now: () => at("2026-10-13T03:10:00") });
+    expect((await brain.turn({ text: "hello" })).sentences).toEqual(["I can't check right now.", "Tom can help."]);
+  });
 });
 
 describe("Brain.proactive", () => {
@@ -124,6 +130,12 @@ describe("Brain.proactive", () => {
     expect(msgs[0]).toEqual({ role: "user", text: SPEAKS_FIRST_MARKER });
     expect(msgs[1]).toEqual({ role: "assistant", text: "Now it's time for your morning pills. Have you taken your morning pills yet?" });
     expect(msgs[2]).toEqual({ role: "user", text: "yes" });
+  });
+  it("a throwing proactive() returns null", async () => {
+    const s = await setup("2026-10-12T08:00:00", []);
+    const mia = { ...s.mia, proactive: async () => { throw new Error("down"); } };
+    const brain = new Brain({ mia, llm: s.llm, profile: rose(), now: () => at("2026-10-12T08:00:00") });
+    expect(await brain.proactive()).toBeNull();
   });
   it("nothing to say → null", async () => {
     const s = await setup("2026-10-14T11:00:00", []);

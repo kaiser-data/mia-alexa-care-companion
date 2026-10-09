@@ -37,15 +37,28 @@ export class Brain {
   constructor(private readonly deps: BrainDeps) {}
 
   turn(input: TurnInput): Promise<Reply> {
-    return this.serial(() => this.handleTurn(input));
+    return this.serial(async () => {
+      try {
+        return await this.handleTurn(input);
+      } catch (err) {
+        console.error("[mia-voice] turn failed:", err);
+        const { profile: p } = this.deps;
+        return this.reply(splitSentences(templates(p.locale).systemError(p.carerName), p.locale), []);
+      }
+    });
   }
 
   proactive(): Promise<Reply | null> {
     return this.serial(async () => {
-      const prompt = await this.deps.mia.proactive();
-      if (!prompt) return null;
-      this.remember(SPEAKS_FIRST_MARKER, prompt.say);
-      return this.reply(prompt.say, []);
+      try {
+        const prompt = await this.deps.mia.proactive();
+        if (!prompt) return null;
+        this.remember(SPEAKS_FIRST_MARKER, prompt.say);
+        return this.reply(prompt.say, []);
+      } catch (err) {
+        console.error("[mia-voice] proactive failed:", err);
+        return null;
+      }
     });
   }
 
@@ -72,12 +85,7 @@ export class Brain {
     if (detectDistress(text)) return this.direct(text, "report_problem", { what: text });
     if (localParts(now(), p.timezone).minutes < NIGHT_END_MINUTES) return this.direct(text, "night_reassurance", {});
 
-    try {
-      return await this.llmTurn(text, input.confidence);
-    } catch (err) {
-      console.error("[mia-voice] turn failed:", err);
-      return this.reply(splitSentences(T.systemError(p.carerName), p.locale), []);
-    }
+    return this.llmTurn(text, input.confidence);
   }
 
   private async direct(text: string, tool: string, args: Record<string, unknown>): Promise<Reply> {

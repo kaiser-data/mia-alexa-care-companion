@@ -26,4 +26,11 @@ describe("enforceVerbatim", () => {
   it("German ordinal dates stay whole", () => {
     expect(enforceVerbatim("", ["Heute ist Montag, der 12. Oktober."], "de-DE")).toEqual(["Heute ist Montag, der 12. Oktober."]);
   });
+  it("a lead-in may not state facts", () => {
+    expect(enforceVerbatim("Yes, you did.", ["Not yet."], "en-US")).toEqual(["Not yet."]);
+    expect(enforceVerbatim("No, not yet.", ["Yes. You took them at eight."], "en-US")).toEqual(["Yes.", "You took them at eight."]);
+    expect(enforceVerbatim("You took them at nine.", ["Yes."], "en-US")).toEqual(["Yes."]);
+    expect(enforceVerbatim("Ja, genau.", ["Noch nicht."], "de-DE")).toEqual(["Noch nicht."]);
+    expect(enforceVerbatim("Of course, Rose.", ["Not yet."], "en-US")).toEqual(["Of course, Rose.", "Not yet."]);
+  });
 });

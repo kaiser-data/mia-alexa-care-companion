@@ -2,6 +2,13 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import type { ProactivePrompt } from "@mia/shared";
 
+export class MiaToolError extends Error {
+  constructor(readonly tool: string, readonly text: string) {
+    super(`Mia tool ${tool} failed: ${text}`);
+    this.name = "MiaToolError";
+  }
+}
+
 export interface ToolReply { say: string[]; facts: Record<string, unknown>; verbatim: boolean; guidance: string; text: string }
 export interface ToolInfo { name: string; description: string; inputSchema: Record<string, unknown> }
 export interface MiaClient {
@@ -28,8 +35,9 @@ export async function connectMia(c: MiaConnection): Promise<MiaClient> {
     },
     async call(name, args = {}) {
       const r = await client.callTool({ name, arguments: args });
-      const structured = r.structuredContent as Omit<ToolReply, "text">;
       const text = (r.content as { type: string; text?: string }[]).find((x) => x.type === "text")?.text ?? "";
+      const structured = r.structuredContent as Omit<ToolReply, "text"> | undefined;
+      if (r.isError || !structured || !Array.isArray(structured.say)) throw new MiaToolError(name, text);
       return { ...structured, text };
     },
     async proactive() {
