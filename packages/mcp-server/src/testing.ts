@@ -5,16 +5,17 @@ import { StoreAlertSink } from "./alerts";
 import { createHttpApp } from "./http";
 import { LocalAesCipher } from "./store/crypto";
 import { SqliteStore } from "./store/sqliteStore";
+import type { WeatherProvider } from "./weather";
 
 /** An in-memory Mia server for tests in any package: real tools, real encryption, no network. */
-export async function inMemoryMia(o: { now: () => Date; profile?: Profile }) {
+export async function inMemoryMia(o: { now: () => Date; profile?: Profile; weather?: WeatherProvider }) {
   const store = new SqliteStore(":memory:", new LocalAesCipher(randomBytes(32)));
   const profile = o.profile ?? rose();
   await store.putProfile(profile);
   const token = "test-token-0123456789abcdef";
   const app: Hono = createHttpApp({
     tokens: new Map([[token, profile.id]]),
-    makeContext: (id) => ({ store, profileId: id, now: o.now, alerts: new StoreAlertSink(store) }),
+    makeContext: (id) => ({ store, profileId: id, now: o.now, alerts: new StoreAlertSink(store), weather: o.weather }),
   });
   const fetchFn = (async (url: string | URL | Request, init?: RequestInit) =>
     app.request(url instanceof Request ? url : url.toString(), init)) as typeof fetch;

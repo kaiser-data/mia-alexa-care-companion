@@ -7,6 +7,7 @@ import { StoreAlertSink } from "./alerts";
 import { createHttpApp } from "./http";
 import { LocalAesCipher, loadOrCreateLocalKey } from "./store/crypto";
 import { SqliteStore } from "./store/sqliteStore";
+import type { WeatherProvider } from "./weather";
 
 export const MIN_TOKEN_LENGTH = 24;
 
@@ -18,7 +19,7 @@ export function checkDevToken(token: string | undefined): string {
   return token;
 }
 
-export interface LocalMiaOptions { token: string; profileId: SeedId; dataDir: string; port: number }
+export interface LocalMiaOptions { token: string; profileId: SeedId; dataDir: string; port: number; weather?: WeatherProvider }
 
 /** Starts the Mia MCP server in local mode (SQLite + local AES key) on 127.0.0.1. Port 0 picks a free port. */
 export async function startLocalMia(o: LocalMiaOptions): Promise<{ url: string; close(): Promise<void> }> {
@@ -28,7 +29,7 @@ export async function startLocalMia(o: LocalMiaOptions): Promise<{ url: string; 
   if (!(await store.getProfile(o.profileId))) await store.putProfile(SEED_PROFILES[o.profileId]());
   const app = createHttpApp({
     tokens: new Map([[o.token, o.profileId]]),
-    makeContext: (id) => ({ store, profileId: id, now: () => new Date(), alerts: new StoreAlertSink(store) }),
+    makeContext: (id) => ({ store, profileId: id, now: () => new Date(), alerts: new StoreAlertSink(store), weather: o.weather }),
   });
   const { server, port } = await new Promise<{ server: ReturnType<typeof serve>; port: number }>((resolve) => {
     const s = serve({ fetch: app.fetch, port: o.port, hostname: "127.0.0.1" }, (info: AddressInfo) => resolve({ server: s, port: info.port }));

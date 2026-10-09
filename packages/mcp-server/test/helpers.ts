@@ -6,14 +6,15 @@ import { StoreAlertSink } from "../src/alerts";
 import { createMiaServer } from "../src/server";
 import { LocalAesCipher } from "../src/store/crypto";
 import { SqliteStore } from "../src/store/sqliteStore";
+import type { ToolContext } from "../src/tools/runtime";
 
 export interface ToolReply { say: string[]; facts: any; verbatim: boolean; text: string }
 
-export async function connect(now: Date, profile: Profile = rose()) {
+export async function connect(now: Date, profile: Profile = rose(), extra: Partial<ToolContext> = {}) {
   const store = new SqliteStore(":memory:", new LocalAesCipher(randomBytes(32)));
   await store.putProfile(profile);
   let clock = now;
-  const server = createMiaServer({ store, profileId: profile.id, now: () => clock, alerts: new StoreAlertSink(store) });
+  const server = createMiaServer({ store, profileId: profile.id, now: () => clock, alerts: new StoreAlertSink(store), ...extra });
   const [serverSide, clientSide] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: "mia-test", version: "0.0.0" });
   await Promise.all([server.connect(serverSide), client.connect(clientSide)]);

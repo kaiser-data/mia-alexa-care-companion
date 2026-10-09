@@ -5,6 +5,7 @@ import {
   type Profile,
 } from "@mia/shared";
 import { appointmentLine, capText, logEvent, OUTPUT_SHAPE, run, type MiaResult, type ToolContext } from "./runtime";
+import { weatherLine } from "../weather";
 
 export async function todayResult(ctx: ToolContext, p: Profile): Promise<MiaResult> {
   const T = templates(p.locale);
@@ -75,7 +76,14 @@ export function registerOrientationTools(server: McpServer, ctx: ToolContext): v
     const items = n.appointment.checklist.slice(s * 2, s * 2 + 2);
     if (!items.length) return { facts: { hasMore: false }, say: [T.thatsAll()], verbatim: true };
     const hasMore = n.appointment.checklist.length > s * 2 + 2;
-    return { facts: { appointment: n.appointment.name, items, nextStep: s + 1, hasMore }, say: [T.take(items)], verbatim: true };
+    const weather = s === 0 && p.location && ctx.weather
+      ? weatherLine(await ctx.weather.today(p.location.latitude, p.location.longitude, n.date), p.locale)
+      : null;
+    return {
+      facts: { appointment: n.appointment.name, items, nextStep: s + 1, hasMore, weather },
+      say: weather ? [weather, T.take(items)] : [T.take(items)],
+      verbatim: true,
+    };
   }));
 
   server.registerTool("night_reassurance", {

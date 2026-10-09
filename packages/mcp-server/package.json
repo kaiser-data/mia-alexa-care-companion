@@ -8,7 +8,8 @@
   },
   "exports": {
     "./local": "./src/local.ts",
-    "./testing": "./src/testing.ts"
+    "./testing": "./src/testing.ts",
+    "./weather": "./src/weather.ts"
   },
   "dependencies": {
     "@hono/node-server": "2.1.3",
