@@ -76,7 +76,11 @@ describe("get_next_appointment", () => {
   });
   it("Monday 08:05: yes, today", async () => {
     const r = await (await connect(at("2026-10-12T08:05:00"))).call("get_next_appointment", { name: "group" });
-    expect(r.say).toEqual(["Yes, Maple Grove Day Club is today.", "You leave for Maple Grove Day Club at twenty to ten."]);
+    expect(r.say).toEqual(["Yes, Maple Grove Day Club is today.", "You leave at twenty to ten."]);
+  });
+  it("German Monday 08:05: the group is named only once", async () => {
+    const r = await (await connect(at("2026-10-12T08:05:00"), roseDe())).call("get_next_appointment", { name: "Gruppe" });
+    expect(r.say).toEqual(["Ja, Tagesgruppe ist heute.", "Du gehst um zwanzig vor zehn los."]);
   });
   it("Monday 15:00 after the group: next is Tuesday", async () => {
     const r = await (await connect(at("2026-10-12T15:00:00"))).call("get_next_appointment", { name: "group" });

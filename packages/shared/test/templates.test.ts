@@ -68,4 +68,11 @@ describe("roseDe", () => {
     expect(p.appointments[0]!.weekdays).toEqual(rose().appointments[0]!.weekdays);
     expect(p.people[0]!.relationship).toBe("dein Sohn");
   });
+  it("leaveAt does not name the appointment", () => {
+    expect(templates("en-US").leaveAt("twenty to ten")).toBe("You leave at twenty to ten.");
+    expect(templates("de-DE").leaveAt("zwanzig vor zehn")).toBe("Du gehst um zwanzig vor zehn los.");
+  });
+  it("German medAtAppt starts with the day", () => {
+    expect(templates("de-DE").medAtAppt("deine Mittagstablette", "Tagesgruppe")).toBe("Heute bekommst du deine Mittagstablette dort: Tagesgruppe.");
+  });
 });

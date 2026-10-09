@@ -44,6 +44,7 @@ export function registerComfortTools(server: McpServer, ctx: ToolContext): void 
     annotations: { readOnlyHint: false },
   }, async () => run(ctx, async (p) => {
     await logEvent(ctx, "lonely");
+    if (!p.lifeStory.length) return { facts: { topics: [] }, say: [templates(p.locale).callOffer(p.carerName)], verbatim: true };
     const dayIndex = Math.floor(Date.parse(`${localParts(ctx.now(), p.timezone).date}T00:00:00Z`) / 86_400_000);
     const suggestedTopic = p.lifeStory[dayIndex % p.lifeStory.length] ?? "";
     return {

@@ -25,7 +25,8 @@ export const VERBATIM_GUIDANCE =
 
 export const CHAT_GUIDANCE =
   "Have a warm, simple conversation about the suggested topic. Use short sentences of at most twelve words. " +
-  "Ask one easy yes/no question at a time. Never correct her. End by offering to ask the carer to call.";
+  "Ask one easy yes/no question at a time. Never correct her. End by offering to ask the carer to call. " +
+  "Use only the facts in topics; never add names, dates or events.";
 
 export const OUTPUT_SHAPE = {
   facts: z.record(z.string(), z.unknown()),
@@ -68,9 +69,11 @@ export async function run(
 }
 
 /** One sentence about an appointment today, depending on the time. */
-export function appointmentLine(a: Appointment, nowMinutes: number, locale: Locale): string {
+export function appointmentLine(a: Appointment, nowMinutes: number, locale: Locale, { named = true }: { named?: boolean } = {}): string {
   const T = templates(locale);
-  if (a.travelMode === "alone" && a.leaveBy && nowMinutes < toMinutes(a.leaveBy)) return T.leaveFor(a.name, timeWords(a.leaveBy, locale));
+  if (a.travelMode === "alone" && a.leaveBy && nowMinutes < toMinutes(a.leaveBy)) {
+    return named ? T.leaveFor(a.name, timeWords(a.leaveBy, locale)) : T.leaveAt(timeWords(a.leaveBy, locale));
+  }
   if (nowMinutes < toMinutes(a.start)) return T.apptAt(a.name, timeWords(a.start, locale));
   return T.apptUntil(a.name, timeWords(a.end, locale));
 }

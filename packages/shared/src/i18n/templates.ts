@@ -5,6 +5,7 @@ export interface Templates {
   todayIs(dateText: string): string;
   repeatDay(weekday: string): string;
   leaveFor(name: string, time: string): string;
+  leaveAt(time: string): string;
   apptAt(name: string, time: string): string;
   apptUntil(name: string, time: string): string;
   apptTodayYes(name: string): string;
@@ -48,6 +49,7 @@ const EN: Templates = {
   todayIs: (d) => `Today is ${d}.`,
   repeatDay: (w) => `Today is ${w}.`,
   leaveFor: (n, t) => `You leave for ${n} at ${t}.`,
+  leaveAt: (t) => `You leave at ${t}.`,
   apptAt: (n, t) => `${n} starts at ${t}.`,
   apptUntil: (n, t) => `${n} goes until ${t}.`,
   apptTodayYes: (n) => `Yes, ${n} is today.`,
@@ -91,6 +93,7 @@ const DE: Templates = {
   todayIs: (d) => `Heute ist ${d}.`,
   repeatDay: (w) => `Heute ist ${w}.`,
   leaveFor: (n, t) => `${n} ist heute. Du gehst um ${t} los.`,
+  leaveAt: (t) => `Du gehst um ${t} los.`,
   apptAt: (n, t) => `${n} beginnt um ${t}.`,
   apptUntil: (n, t) => `${n} geht bis ${t}.`,
   apptTodayYes: (n) => `Ja, ${n} ist heute.`,
@@ -110,7 +113,7 @@ const DE: Templates = {
   medIs: (d) => `Das ist ${d}.`,
   medTaken: (n, t) => `Ja. Du hast ${n} um ${t} genommen.`,
   medNextAt: (t) => `Die nächsten Tabletten sind um ${t}.`,
-  medAtAppt: (n, a) => `${n} bekommst du heute dort: ${a}.`,
+  medAtAppt: (n, a) => `Heute bekommst du ${n} dort: ${a}.`,
   medUnsure: (n) => `Ich weiß nicht sicher, ob du ${n} schon hattest.`,
   askCarerFirst: (c) => `Wir fragen zuerst ${c}.`,
   medNoneToday: () => "Heute sind keine Tabletten mehr dran.",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { roseDe } from "@mia/shared";
+import { rose, roseDe } from "@mia/shared";
 import { at } from "@mia/shared/testing";
 import { connect } from "./helpers";
 
@@ -50,6 +50,20 @@ describe("comfort", () => {
     expect(r.facts.topics).toContain(r.facts.suggestedTopic);
     expect(r.text).toContain(r.facts.suggestedTopic);
     expect((await lastEvent(m))?.type).toBe("lonely");
+  });
+});
+
+describe("chat_about_life without a life story", () => {
+  it("offers a call from the carer instead of inventing topics", async () => {
+    const p = rose(); p.lifeStory = [];
+    const r = await (await connect(at("2026-10-14T15:00:00"), p)).call("chat_about_life");
+    expect(r.verbatim).toBe(true);
+    expect(r.say).toEqual(["Shall I ask Tom to call you?"]);
+  });
+  it("the chat guidance forbids invented facts", async () => {
+    const m = await connect(at("2026-10-14T15:00:00"));
+    const raw = await m.client.callTool({ name: "chat_about_life", arguments: {} });
+    expect((raw.structuredContent as { guidance: string }).guidance).toContain("Use only the facts in topics; never add names, dates or events.");
   });
 });
 

@@ -53,7 +53,7 @@ export function registerOrientationTools(server: McpServer, ctx: ToolContext): v
     const facts = { found: true, name: n.appointment.name, date: n.date, weekday: n.weekday, daysAway: n.daysAway, travelMode: n.appointment.travelMode };
     if (n.daysAway === 0) {
       const minutes = localParts(now, p.timezone).minutes;
-      return { facts, say: [T.apptTodayYes(n.appointment.name), appointmentLine(n.appointment, minutes, p.locale)], verbatim: true };
+      return { facts, say: [T.apptTodayYes(n.appointment.name), appointmentLine(n.appointment, minutes, p.locale, { named: false })], verbatim: true };
     }
     const day = weekdayName(n.weekday, p.locale);
     return { facts, say: [T.apptNotToday(n.appointment.name, day), T.onDay(day)], verbatim: true };
