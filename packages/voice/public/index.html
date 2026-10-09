@@ -1,3 +1,23 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Mia</title></head>
-<body><p>LOCAL MODE — not production</p></body></html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mia</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="banner">LOCAL MODE — not production · fictional demo persona</div>
+  <main>
+    <button id="ring" class="ring" data-state="idle" aria-label="Talk to Mia"><span class="glow"></span></button>
+    <p id="status" class="status" aria-live="polite"></p>
+    <section id="captions" class="captions" aria-live="polite"></section>
+    <form id="type-form" class="type-form">
+      <input id="typed" autocomplete="off" placeholder="…or type here">
+      <button type="submit">Send</button>
+    </form>
+    <label class="toggle"><input id="captions-toggle" type="checkbox" checked> Captions</label>
+  </main>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
