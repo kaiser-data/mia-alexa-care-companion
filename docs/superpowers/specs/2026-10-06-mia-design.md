@@ -79,7 +79,7 @@ So Mia consists of:
  Browser "Echo" simulator (big glowing ring, optional captions)
      │ mic PCM 16 kHz / audio out — WebSocket
      ▼
- ┌──────────── Mia Voice gateway (Node 22 / TS) ─────────────┐
+ ┌──────────── Mia Voice gateway (Node 24 / TS) ─────────────┐
  │  asr/      Amazon Transcribe streaming (locale, custom     │
  │            vocabulary, calibrated end-of-turn)             │
  │  brain/    Claude on Bedrock — MCP CLIENT ("Alexa+ role"), │
@@ -89,7 +89,7 @@ So Mia consists of:
  └───────────────────────┬────────────────────────────────────┘
                          │ MCP Streamable HTTP + OAuth bearer
                          ▼
- ┌──────────── Mia MCP server (Node 22 / TS) ────────────────┐
+ ┌──────────── Mia MCP server (Node 24 / TS) ────────────────┐
  │  /mcp  tools §6     /oauth  OAuth 2.1 + PKCE               │
  │  /carer  carer page + API     /ack/:id  alert acknowledge  │
  └──────┬──────────────────┬──────────────────┬───────────────┘
@@ -153,13 +153,14 @@ Tool descriptions are written so the assistant selects them from natural, vague 
 | `get_preparation_steps` | "What do I need?" | Short checklist, max 2 items per turn, "and then?" continues | — |
 | `report_leaving` | "I'm going to my group now." | Confirms, reminds keys; starts expected-return timer | `left_home` |
 | `report_home` | "I'm home." | Welcome; stops timer; asks how it was (yes/no) | `arrived_home` |
-| `get_medication_status` | "Did I take my pills?" | Per dose: taken (time) / due now (plain description) / not yet. Only from log | `med_asked` |
+| `get_medication_status` | "Did I take my pills?" | Per dose: taken (time) / due now (plain description) / not yet. Only from log. A dose given at an appointment when attendance is unknown is **unsure**, as is a dose more than 2 h overdue, one she reported early, or a group dose when she came home before it: never "take it" — "I'm not sure if you had your noon pill yet. Let's ask Tom first." | `med_asked` / `med_unsure` |
 | `confirm_medication` | "I took them." | Logs. Already confirmed → "You took those at ten past eight. No more needed." | `med_confirmed` / `med_duplicate_attempt` |
 | `comfort_me` | "I'm scared." | Comfort notes, anchors, offer to call carer | `anxious` |
 | `night_reassurance` | 00:00–05:00, "Is it time for work?" | "It's the middle of the night. You're safe at home." | `night_awake` |
 | `who_is` | "Who is Tom?" | Person, relationship, next contact | `person_asked` |
 | `chat_about_life` | "I'm lonely." | Life-story topic, offer to call carer | `lonely` |
-| `report_problem` | "Help!" "I fell." "Hilfe!" | Immediate distress alarm; "I've let {carerName} know." | `distress` |
+| `report_problem` | "Help!" "I fell." "Hilfe!" | Immediate distress alarm; "I've let {carerName} know." The alarm is raised before anything else and never depends on reading the log; if it cannot be sent: "I couldn't reach {carerName}. Please call for help." | `distress` |
+| `request_call` | "Yes, ask Tom to call." | Add-ons cannot place calls: logs and alerts the carer (medium) to call back | `call_requested` |
 | `repeat_last` | "Pardon?" "Wie bitte?" | Last `say` verbatim; voice layer slows 10 % | `repeat_asked` |
 
 ### 6.1 Automatic start — no name, no learning
@@ -250,6 +251,8 @@ Rules on events (immediate) and EventBridge Scheduler (every 5 min; `local`: in-
 | Rule | Condition (defaults, configurable) | Severity |
 |---|---|---|
 | Missed medication | Not confirmed 45 min after time, not `takenElsewhere` | medium |
+| Unsure dose (overdue / early self-report / came home early) | `med_unsure` with `reason`; dedupe: one alert per dose per day | medium |
+| Unsure dose | `med_unsure`, or a dose given at an appointment is still unresolved (no `left_home` / `stayed_home`) 45 min after its time. Carer answers on the carer page: "she went" (dose counted) or "she stayed home" (dose due at home) | medium |
 | Duplicate dose attempt | Confirm on already-confirmed dose | low (medium if ≥ 2/day) |
 | Distress | `report_problem` | high |
 | Not home on time | `left_home`, no `arrived_home` by expected-return + 30 min (`alone` only) | high |
@@ -299,7 +302,7 @@ Limit stated in README: synthetic speech catches regressions and timing bugs, no
 - Carer login: email one-time code + mandatory TOTP
 - Secrets in Secrets Manager (`aws`) / gitignored `.env` (`local`); `.env.example` only in repo
 - Audit log of every carer and MCP access
-- No audio, no transcripts stored; events TTL 90 days; export + full delete
+- No audio, no transcripts stored; events TTL 90 days; export + full delete. Only exceptions, encrypted and for the carer: her words when she asks for help (≤ 200 chars) and an unanswered question (≤ 80 chars)
 - Fictional "Rose" profile only in repo, tests and video
 
 ## 14. Language

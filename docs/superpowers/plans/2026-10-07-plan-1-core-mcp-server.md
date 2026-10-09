@@ -1999,18 +1999,53 @@ describe("confirm_medication", () => {
     expect(r.say).toEqual(["Not yet.", "Your next pills are at eight o'clock in the morning."]);
     expect(await types(m)).toEqual(["med_not_due_attempt"]);
   });
-  it("noon pill on a group day is given at the group", async () => {
+  it("noon pill on a group day is given at the group when she went", async () => {
     const m = await connect(at("2026-10-12T08:05:00"));
     await m.call("confirm_medication");
+    await m.store.addEvent({ profileId: "rose", type: "left_home", at: "2026-10-12T13:38:00Z", detail: { appointmentId: "maple-grove" } });
     m.setNow(at("2026-10-12T21:00:00"));
-    await m.call("confirm_medication");
+    expect((await m.call("confirm_medication")).say).toEqual(["Thank you. I've noted your evening pill."]);
     const r = await m.call("get_medication_status");
     expect(r.say[1]).toBe("There are no more pills today.");
+  });
+  it("noon pill is due at home when the carer noted she stayed home", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"));
+    await m.call("confirm_medication");
+    await m.store.addEvent({ profileId: "rose", type: "stayed_home", at: "2026-10-12T14:00:00Z", detail: { appointmentId: "maple-grove" } });
+    m.setNow(at("2026-10-12T12:30:00"));
+    const r = await m.call("get_medication_status");
+    expect(r.say).toEqual(["Not yet.", "Now it's time for your noon pill.", "That's the little yellow one."]);
+  });
+});
+
+describe("unsure noon pill (no word whether she went to the group)", () => {
+  it("never says take it: not sure, ask the carer first, logs med_unsure", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"));
+    await m.call("confirm_medication");
+    m.setNow(at("2026-10-12T14:45:00"));
+    const r = await m.call("get_medication_status");
+    expect(r.say).toEqual(["I'm not sure if you had your noon pill yet.", "Let's ask Tom first."]);
+    expect(await types(m)).toEqual(["med_confirmed", "med_asked", "med_unsure"]);
+  });
+  it("German", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"), roseDe());
+    await m.call("confirm_medication");
+    m.setNow(at("2026-10-12T14:45:00"));
+    const r = await m.call("get_medication_status");
+    expect(r.say).toEqual(["Ich weiß nicht sicher, ob du deine Mittagstablette schon hattest.", "Wir fragen zuerst Tom."]);
+  });
+  it("if she says she took it, it is recorded (safe direction)", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"));
+    await m.call("confirm_medication");
+    m.setNow(at("2026-10-12T14:45:00"));
+    expect((await m.call("confirm_medication")).say).toEqual(["Thank you. I've noted your noon pill."]);
+    const events = await m.store.eventsSince("rose", "2026-10-01T00:00:00Z");
+    expect(events.at(-1)).toMatchObject({ type: "med_confirmed", detail: { medicationId: "noon-pill", doseTime: "12:00" } });
   });
 });
 ```
 
-Note: the last test also confirms the evening pill at 21:00 (due since 19:30), then expects "no more pills today" — the noon pill was `at_appointment`, not due.
+Note: since Task 7c, the noon pill on a group day is `at_appointment` before the group starts or if `left_home` was logged for it (not after now); `due` at home only if `stayed_home` was logged (carer page, Plan 3); otherwise `unsure`. Mia never says "take it" for an unsure dose — she says she is not sure and that we ask the carer first; `med_unsure` triggers a carer alert (spec §11). A self-report "I took it" is recorded, because recording a dose can only prevent a second one.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -2033,6 +2068,7 @@ function split(s: DoseStatus[]) {
     taken: s.filter((d) => d.state === "taken"),
     upcoming: s.filter((d) => d.state === "upcoming"),
     atAppointment: s.filter((d) => d.state === "at_appointment"),
+    unsure: s.filter((d) => d.state === "unsure"),
   };
 }
 
@@ -2050,11 +2086,14 @@ export function registerMedicationTools(server: McpServer, ctx: ToolContext): vo
   }, async () => run(ctx, async (p, events): Promise<MiaResult> => {
     const T = templates(p.locale);
     const s = doseStatuses(p, events, ctx.now());
-    const { due, taken, upcoming, atAppointment } = split(s);
+    const { due, taken, upcoming, atAppointment, unsure } = split(s);
     await logEvent(ctx, "med_asked");
     let say: string[];
     if (due.length) {
       say = [T.notYet(), T.medDue(names(due, p)), T.medIs(joinList(due.map((d) => d.description), p.locale))];
+    } else if (unsure.length) {
+      for (const d of unsure) await logEvent(ctx, "med_unsure", { medicationId: d.medicationId, doseTime: d.time });
+      say = [T.medUnsure(names(unsure, p)), T.askCarerFirst(p.carerName)];
     } else if (taken.length) {
       const last = taken.at(-1)!;
       say = [
@@ -2082,10 +2121,12 @@ export function registerMedicationTools(server: McpServer, ctx: ToolContext): vo
   }, async () => run(ctx, async (p, events): Promise<MiaResult> => {
     const T = templates(p.locale);
     const s = doseStatuses(p, events, ctx.now());
-    const { due, taken, upcoming } = split(s);
-    if (due.length) {
-      for (const d of due) await logEvent(ctx, "med_confirmed", { medicationId: d.medicationId, doseTime: d.time });
-      return { facts: { confirmed: due.map((d) => d.medicationId) }, say: [T.medConfirmed(names(due, p))], verbatim: true };
+    const { due, taken, upcoming, unsure } = split(s);
+    // A self-report of an unsure dose is recorded: recording can only prevent a second dose.
+    const toConfirm = due.length ? due : unsure;
+    if (toConfirm.length) {
+      for (const d of toConfirm) await logEvent(ctx, "med_confirmed", { medicationId: d.medicationId, doseTime: d.time });
+      return { facts: { confirmed: toConfirm.map((d) => d.medicationId) }, say: [T.medConfirmed(names(toConfirm, p))], verbatim: true };
     }
     if (taken.length) {
       const last = taken.at(-1)!;
