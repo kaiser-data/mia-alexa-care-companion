@@ -77,7 +77,7 @@ export function registerOrientationTools(server: McpServer, ctx: ToolContext): v
     if (!items.length) return { facts: { hasMore: false }, say: [T.thatsAll()], verbatim: true };
     const hasMore = n.appointment.checklist.length > s * 2 + 2;
     const weather = s === 0 && p.location && ctx.weather
-      ? weatherLine(await ctx.weather.today(p.location.latitude, p.location.longitude, n.date), p.locale)
+      ? weatherLine(await ctx.weather.today(p.location.latitude, p.location.longitude, n.date).catch(() => null), p.locale)
       : null;
     return {
       facts: { appointment: n.appointment.name, items, nextStep: s + 1, hasMore, weather },
