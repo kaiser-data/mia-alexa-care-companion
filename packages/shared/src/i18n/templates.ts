@@ -43,6 +43,18 @@ export interface Templates {
   distressFailed(carer: string): string;
   systemError(carer: string): string;
   personIs(name: string, relationship: string): string;
+  listening(): string;
+  musicStart(artist: string): string;
+  weatherCold(): string;
+  weatherRain(): string;
+  proMedAsk(name: string): string;
+  proPrepAsk(): string;
+  proAreYouHome(name: string): string;
+  proBedtime(time: string): string;
+  proDoorAsk(): string;
+  proMusicAsk(artist: string): string;
+  proHello(name: string): string;
+  proChatAsk(): string;
 }
 
 const EN: Templates = {
@@ -87,6 +99,18 @@ const EN: Templates = {
   distressFailed: (c) => `I couldn't reach ${c}. Please call for help.`,
   systemError: (c) => `I can't check right now. ${c} can help.`,
   personIs: (n, r) => `${n} is your ${r}.`,
+  listening: () => "I'm listening.",
+  musicStart: (a) => `Here is some ${a}.`,
+  weatherCold: () => "It's cold today. Wear your warm coat.",
+  weatherRain: () => "It may rain today. Take your umbrella.",
+  proMedAsk: (n) => `Have you taken ${n} yet?`,
+  proPrepAsk: () => "Shall I tell you what to take?",
+  proAreYouHome: (n) => `Are you back home, ${n}?`,
+  proBedtime: (t) => `It's ${t}. Time to get ready for bed.`,
+  proDoorAsk: () => "Is the front door locked?",
+  proMusicAsk: (a) => `Shall I play some ${a}?`,
+  proHello: (n) => `Hello, ${n}.`,
+  proChatAsk: () => "Shall we have a little chat?",
 };
 
 const DE: Templates = {
@@ -131,6 +155,18 @@ const DE: Templates = {
   distressFailed: (c) => `Ich konnte ${c} nicht erreichen. Bitte ruf um Hilfe.`,
   systemError: (c) => `Ich kann das gerade nicht nachsehen. ${c} hilft dir.`,
   personIs: (n, r) => `${n} ist ${r}.`,
+  listening: () => "Ich höre zu.",
+  musicStart: (a) => `Hier ist etwas von ${a}.`,
+  weatherCold: () => "Heute ist es kalt. Zieh deinen warmen Mantel an.",
+  weatherRain: () => "Heute regnet es vielleicht. Nimm deinen Schirm mit.",
+  proMedAsk: (n) => `Hast du ${n} schon genommen?`,
+  proPrepAsk: () => "Soll ich dir sagen, was du mitnimmst?",
+  proAreYouHome: (n) => `Bist du wieder zu Hause, ${n}?`,
+  proBedtime: (t) => `Es ist ${t}. Bald ist Schlafenszeit.`,
+  proDoorAsk: () => "Ist die Haustür abgeschlossen?",
+  proMusicAsk: (a) => `Soll ich etwas von ${a} spielen?`,
+  proHello: (n) => `Hallo, ${n}.`,
+  proChatAsk: () => "Wollen wir ein bisschen plaudern?",
 };
 
 export function templates(locale: Locale): Templates {

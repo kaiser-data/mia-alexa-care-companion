@@ -23,7 +23,7 @@ export function rose(): Profile {
       { time: "15:00", label: "tea" },
       { time: "18:00", label: "supper" },
       { time: "19:00", label: "Tom's call" },
-      { time: "21:30", label: "bedtime" },
+      { time: "21:30", label: "bedtime", kind: "bedtime" },
     ],
     medications: [
       { id: "morning-pills", name: "your morning pills", description: "the small white pill and the round pink one", times: ["08:00"] },
@@ -65,6 +65,9 @@ export function rose(): Profile {
       "Your apple pie is the best on Linden Street.",
     ],
     speech: defaultSpeech(),
+    location: { latitude: 39.9612, longitude: -82.9988 },
+    favouriteMusic: "Frank Sinatra",
+    checkInTime: "15:30",
   };
 }
 
@@ -82,7 +85,7 @@ export function roseDe(): Profile {
       { time: "15:00", label: "Kaffee und Kuchen" },
       { time: "18:00", label: "Abendbrot" },
       { time: "19:00", label: "Toms Anruf" },
-      { time: "21:30", label: "Schlafenszeit" },
+      { time: "21:30", label: "Schlafenszeit", kind: "bedtime" },
     ],
     medications: [
       { id: "morning-pills", name: "deine Morgentabletten", description: "die kleine weiße und die runde rosa Tablette", times: ["08:00"] },
@@ -116,3 +119,7 @@ export function roseDe(): Profile {
     ],
   };
 }
+
+export const SEED_PROFILES = { rose, "rose-de": roseDe } as const;
+export type SeedId = keyof typeof SEED_PROFILES;
+export const isSeedId = (s: string): s is SeedId => Object.hasOwn(SEED_PROFILES, s);

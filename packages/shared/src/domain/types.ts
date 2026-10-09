@@ -4,7 +4,7 @@ export type Weekday = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 /** 24 h local time, "08:00" */
 export type HHMM = string;
 
-export interface RoutineItem { time: HHMM; label: string }
+export interface RoutineItem { time: HHMM; label: string; kind?: "bedtime" }
 
 export interface Medication {
   id: string;
@@ -75,13 +75,19 @@ export interface Profile {
   comfortNotes: string[];
   lifeStory: string[];
   speech: SpeechSettings;
+  /** for the weather sentence on the way out */
+  location?: { latitude: number; longitude: number };
+  /** offered in the late afternoon: "Shall I play some Frank Sinatra?" */
+  favouriteMusic?: string;
+  /** daily gentle check-in for loneliness, e.g. "15:30" */
+  checkInTime?: HHMM;
 }
 
 export const EVENT_TYPES = [
   "orientation_asked", "left_home", "arrived_home", "stayed_home",
   "med_asked", "med_confirmed", "med_duplicate_attempt", "med_not_due_attempt", "med_unsure",
   "anxious", "night_awake", "person_asked", "lonely", "call_requested",
-  "distress", "repeat_asked", "unknown_question",
+  "distress", "repeat_asked", "unknown_question", "proactive_spoken", "music_played",
 ] as const;
 export type EventType = (typeof EVENT_TYPES)[number];
 
