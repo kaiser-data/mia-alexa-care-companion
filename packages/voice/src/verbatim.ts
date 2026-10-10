@@ -48,7 +48,7 @@ export const MED_WORDS = [
 /** Weekdays, months and clock words: an LLM sentence with these (or a digit) states a date or time. */
 export const DATE_WORDS = [
   "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
-  "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december",
+  "january", "february", "april", "june", "july", "august", "september", "october", "november", "december",
   "montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag", "sonnabend", "sonntag",
   "januar", "februar", "märz", "mai", "juni", "juli", "oktober", "dezember",
   "o'clock", "uhr",
@@ -59,11 +59,14 @@ const words = (s: string) => s.toLowerCase().replace(/[‘’`]/g, "'").split(/[
 /**
  * Owner policy: Mia never states a fact she did not get from a tool.
  * For an LLM answer that used no verbatim tool, names the tool whose answer must be spoken instead, or null.
- * Questions ("Do you mean your pills?") are allowed.
+ * Questions ("Do you mean your pills?") are allowed. A statement answering her question about pills counts as a
+ * medication fact even without a pill word ("Yes, you took them."). ("May" and "March" are left out of the
+ * date words: they are ordinary English words.)
  */
-export function factGuard(sentences: string[]): "get_medication_status" | "get_today" | null {
+export function factGuard(sentences: string[], userText = ""): "get_medication_status" | "get_today" | null {
   const statements = sentences.filter((s) => !s.trim().endsWith("?"));
-  if (statements.some((s) => words(s).some((w) => MED_WORDS.includes(w)))) return "get_medication_status";
+  const aboutMeds = (s: string) => words(s).some((w) => MED_WORDS.includes(w));
+  if (statements.some(aboutMeds) || (statements.length > 0 && aboutMeds(userText))) return "get_medication_status";
   if (statements.some((s) => /\d/.test(s) || words(s).some((w) => DATE_WORDS.includes(w)))) return "get_today";
   return null;
 }

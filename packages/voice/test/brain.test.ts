@@ -125,10 +125,14 @@ describe("Brain.turn", () => {
     }
   });
   it("an LLM fact about pills without a tool is replaced by the medication status", async () => {
-    const s = await setup("2026-10-12T08:05:00", [text("Yes, you took your pills at eight. You can relax.")]);
+    const s = await setup("2026-10-12T08:05:00", [text("Yes, you took them at eight. You can relax.")]);
     const r = await s.brain.turn({ text: "Did I take my pills?" });
     expect(r.sentences).toEqual(PILLS);
     expect(r.tools).toEqual(["get_medication_status"]);
+  });
+  it("'may' and 'march' are ordinary words, not dates", async () => {
+    const s = await setup("2026-10-14T15:00:00", [text("You may rest a little.")]);
+    expect((await s.brain.turn({ text: "I'm tired" })).sentences).toEqual(["You may rest a little."]);
   });
   it("an LLM date without a tool is replaced by today", async () => {
     const s = await setup("2026-10-12T08:05:00", [text("It's Tuesday today.")]);

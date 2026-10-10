@@ -157,7 +157,7 @@ export class Brain {
 
     let sentences = enforceVerbatim(finalText, says, p.locale, p.preferredName);
     if (!says.length) {
-      const guard = factGuard(sentences);
+      const guard = factGuard(sentences, text);
       if (guard) return this.direct(text, guard, {}, used);
     }
     if (!sentences.length) sentences = [templates(p.locale).callOffer(p.carerName)];
