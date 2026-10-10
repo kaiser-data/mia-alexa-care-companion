@@ -50,6 +50,45 @@ describe("createTurnTaker", () => {
     t.fire();
     expect(turns).toEqual([]);
   });
+  it("hasPending is true after words, false after finish and after reset", () => {
+    const t = fakeTimers();
+    const taker = createTurnTaker({ timeoutMs: 1800, onTurn: () => {}, setTimer: t.setTimer, clearTimer: t.clearTimer });
+    expect(taker.hasPending()).toBe(false);
+    taker.heard({ text: "hello", isFinal: false });
+    expect(taker.hasPending()).toBe(true);
+    t.fire();
+    expect(taker.hasPending()).toBe(false);
+    taker.heard({ text: "again", isFinal: true });
+    expect(taker.hasPending()).toBe(true);
+    taker.reset();
+    expect(taker.hasPending()).toBe(false);
+  });
+  it("an empty interim result does not arm the timer", () => {
+    const t = fakeTimers();
+    const taker = createTurnTaker({ timeoutMs: 1800, onTurn: () => {}, setTimer: t.setTimer, clearTimer: t.clearTimer });
+    taker.heard({ text: "   ", isFinal: false });
+    expect(t.pending()).toBe(0);
+    expect(taker.hasPending()).toBe(false);
+  });
+  it("a later interim replaces the earlier one (only the latest is sent)", () => {
+    const t = fakeTimers();
+    const turns: unknown[] = [];
+    const taker = createTurnTaker({ timeoutMs: 1800, onTurn: (x) => turns.push(x), setTimer: t.setTimer, clearTimer: t.clearTimer });
+    taker.heard({ text: "is it", isFinal: false });
+    taker.heard({ text: "is it group", isFinal: false });
+    t.fire();
+    expect(turns).toEqual([{ text: "is it group" }]);
+  });
+  it("the timer resets on each result: two results, one fire, one turn", () => {
+    const t = fakeTimers();
+    const turns: unknown[] = [];
+    const taker = createTurnTaker({ timeoutMs: 1800, onTurn: (x) => turns.push(x), setTimer: t.setTimer, clearTimer: t.clearTimer });
+    taker.heard({ text: "one", isFinal: true });
+    taker.heard({ text: "two", isFinal: true });
+    expect(t.pending()).toBe(1);
+    t.fire();
+    expect(turns).toEqual([{ text: "one two" }]);
+  });
 });
 
 describe("speechPlan", () => {

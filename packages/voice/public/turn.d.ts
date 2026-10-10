@@ -1,6 +1,6 @@
 export interface HeardResult { text: string; isFinal: boolean; confidence?: number }
 export interface Turn { text: string; confidence?: number }
-export interface TurnTaker { heard(r: HeardResult): void; reset(): void }
+export interface TurnTaker { heard(r: HeardResult): void; reset(): void; hasPending(): boolean }
 export function createTurnTaker(o: {
   timeoutMs: number;
   onTurn: (t: Turn) => void;

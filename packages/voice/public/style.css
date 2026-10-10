@@ -22,3 +22,5 @@ main { display: flex; flex-direction: column; align-items: center; gap: 24px; pa
 .type-form button, .toggle { font-size: 16px; }
 .type-form button { padding: 10px 16px; border-radius: 10px; border: 0; background: #2a3446; color: var(--fg); }
 .toggle { color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .ring .glow { animation: none !important; } }
+.ring:focus-visible { outline: 4px solid var(--warm); outline-offset: 6px; }

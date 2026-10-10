@@ -28,6 +28,7 @@ export function createTurnTaker({ timeoutMs, onTurn, setTimer = setTimeout, clea
 
   return {
     heard({ text, isFinal, confidence }) {
+      if (!isFinal && !text.trim()) return; // an empty interim result must not arm the timer
       if (isFinal) {
         parts.push(text.trim());
         interim = "";
@@ -37,6 +38,9 @@ export function createTurnTaker({ timeoutMs, onTurn, setTimer = setTimeout, clea
       }
       clear();
       timer = setTimer(finish, timeoutMs);
+    },
+    hasPending() {
+      return parts.length > 0 || interim !== "";
     },
     reset() {
       clear();
