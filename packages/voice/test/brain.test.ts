@@ -299,6 +299,14 @@ describe("'Pardon?' never repeats a filler", () => {
 });
 
 describe("Brain.proactive", () => {
+  it("after a proactive pill prompt, 'take them' without the pill tool is replaced", async () => {
+    const s = await setup("2026-10-12T08:00:00", [text("Take them now.")]);
+    await s.brain.proactive();
+    s.setNow("2026-10-12T08:02:00");
+    const r = await s.brain.turn({ text: "yes" });
+    expect(r.tools).toEqual(["get_medication_status"]);
+    expect(r.sentences[0]).toBe("Not yet.");
+  });
   it("Mia speaks first, and 'yes' is understood in that context", async () => {
     const s = await setup("2026-10-12T08:00:00", [tool("confirm_medication"), text("")]);
     const p = await s.brain.proactive();

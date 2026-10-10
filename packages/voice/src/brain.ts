@@ -70,7 +70,10 @@ export class Brain {
         if (!prompt) return null;
         this.misses = 0;
         this.remember(SPEAKS_FIRST_MARKER, prompt.say);
-        return this.reply(prompt.say, []);
+        const r = this.reply(prompt.say, []);
+        // A pill prompt makes the next answer a pill answer ("yes" → "Take them now." must go through the tool).
+        if (prompt.kind === "medication") this.lastWasMedication = true;
+        return r;
       } catch (err) {
         console.error("[mia-voice] proactive failed:", err);
         return null;
