@@ -16,7 +16,7 @@ The spec spans several subsystems, so it is built as **six sub-plans**. Each pro
 | — | Buffer | Oct 23 until 21:00 CEST | Submit on Devpost | — |
 
 **Added 2026-10-07 (approved by the author):**
-- **Family voice messages** — carer records short messages on the carer page (Plan 3); Mia Voice plays them at a set time or from `comfort_me` (Plan 2). Audio is family content, stored encrypted, deleted with the profile.
+- **Family voice messages** — carer records short messages on the carer page (Plan 3); Mia Voice plays them at a set time or from `comfort_me` (Plan 2). Recording and playback both ship in Plan 3 (recording needs the carer page); Mia Voice plays them from Plan 3 on.
 - **Weather on the way out** — `get_preparation_steps` adds "It's cold today. Take your coat." from a free weather API (Open-Meteo, no key) using the profile location (Plan 2/4).
 - **Favourite music offer** — late afternoon (sundowning) or from `comfort_me`: "Shall I play Frank Sinatra?" → simulator plays a royalty-free stand-in; on real Alexa+ this hands off to Alexa music (Plan 2).
 - **Unsure noon pill (best practice: never risk a double dose)** — if Mia cannot know whether she went to the group, the noon pill is *unsure*: Mia says "I'm not sure… Let's ask Tom first." and alerts the carer (medium). Carer page (Plan 3) gets two buttons: "she went" / "she stayed home" (logs `left_home` / `stayed_home`).

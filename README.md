@@ -6,15 +6,20 @@ Built for the [Build, Ship, Shape: Amazon Developer Hackathon](https://amazonapp
 
 ## Run locally (no AWS needed)
 
-Requires Node 24 and pnpm 10.
+Requires Node 24, pnpm 10, Chrome or Edge (for speech), and an Anthropic API key.
 
     pnpm install
-    cp .env.example .env        # then set MIA_DEV_TOKEN to a long random string
-    pnpm dev:mcp                # MCP endpoint on http://127.0.0.1:8787/mcp
+    cp .env.example .env              # set MIA_DEV_TOKEN to a long random string
+    export ANTHROPIC_API_KEY=…        # from your secret store; never commit it
+    pnpm dev                          # Mia Voice on http://127.0.0.1:8788 (starts the Mia MCP server too)
 
-Connect any MCP client (e.g. `npx @modelcontextprotocol/inspector`) with Streamable HTTP and header `Authorization: Bearer <MIA_DEV_TOKEN>`.
+Tap the circle once and talk — no name, no wake word. Mia also speaks first at pill time, when it's time to leave for the group, at bedtime and for an afternoon chat. You can type instead of speaking.
 
-Local mode stores data in SQLite under `.mia-data/`, encrypted with a generated AES-256-GCM key. It is **not** production; AWS mode (DynamoDB + KMS, OAuth 2.1) follows.
+To run only the MCP server (e.g. for the MCP Inspector): `pnpm dev:mcp` → `http://127.0.0.1:8787/mcp` with header `Authorization: Bearer <MIA_DEV_TOKEN>`.
+
+Local mode stores data in SQLite under `.mia-data/`, encrypted with a generated AES-256-GCM key. It is **not** production; AWS mode (DynamoDB + KMS, OAuth 2.1, Transcribe/Polly/Bedrock) follows.
+
+**"Care Mode" (a proposal for Alexa+):** in Mia Voice, care topics reach Mia without its name, and Mia may speak first at agreed times (`GET /proactive`). Today's Alexa+ add-ons cannot do this; the demo shows how it would help.
 
 ## Tests
 
