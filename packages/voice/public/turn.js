@@ -74,3 +74,9 @@ export function createTurnQueue() {
     has() { return slot !== null; },
   };
 }
+
+/** A server reply Mia can speak: at least one non-empty sentence. Anything else gets the local fallback. */
+export function isPlayableReply(reply) {
+  return Boolean(reply) && Array.isArray(reply.sentences) && reply.sentences.length > 0 &&
+    reply.sentences.every((s) => typeof s === "string" && s.trim().length > 0);
+}

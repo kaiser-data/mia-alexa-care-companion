@@ -1,4 +1,4 @@
-import { createTurnQueue, createTurnTaker, speechPlan } from "./turn.js";
+import { createTurnQueue, createTurnTaker, isPlayableReply, speechPlan } from "./turn.js";
 
 const $ = (id) => document.getElementById(id);
 const ring = $("ring");
@@ -10,6 +10,7 @@ const LABELS = {
   "en-US": { idle: "Tap the circle to talk to Mia", listening: "I'm listening…", thinking: "One moment…", speaking: "", noMic: "Speech needs Chrome or Edge. You can type below.", fallback: ["Sorry, one moment.", "I'm still here."], unreachable: "Mia's server is not reachable.", placeholder: "…or type here", typed: "Type a message", music: "stand-in tune for the demo", musicSkipped: "no audio available for the tune", send: "Send", captions: "Captions", ring: "Talk to Mia" },
   "de-DE": { idle: "Tippe auf den Kreis, um mit Mia zu sprechen", listening: "Ich höre zu…", thinking: "Einen Moment…", speaking: "", noMic: "Sprache braucht Chrome oder Edge. Du kannst unten tippen.", fallback: ["Einen Moment bitte.", "Ich bin noch da."], unreachable: "Mias Server ist nicht erreichbar.", placeholder: "…oder hier tippen", typed: "Nachricht eingeben", music: "Ersatzmelodie für die Demo", musicSkipped: "kein Ton für die Melodie verfügbar", send: "Senden", captions: "Untertitel", ring: "Mit Mia sprechen" },
 };
+const TURN_FETCH_TIMEOUT_MS = 15000;
 const PROACTIVE_POLL_MS = 20000;
 
 const FALLBACK_CONFIG = { locale: "en-US", endOfTurnTimeoutMs: 1800, rate: 0.9, breakMs: 700 };
@@ -208,9 +209,13 @@ async function send(turn) {
     caption("rose", turn.text);
     let reply = null;
     try {
-      const res = await fetch("/api/turn", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(turn) });
+      const res = await fetch("/api/turn", {
+        method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(turn),
+        signal: AbortSignal.timeout(TURN_FETCH_TIMEOUT_MS), // the server answers within 10 s
+      });
       if (!res.ok) throw new Error(String(res.status));
-      reply = await res.json();
+      const body = await res.json();
+      reply = isPlayableReply(body) ? body : null;
       serverDown = false;
     } catch {
       serverDown = true;
@@ -251,8 +256,9 @@ setInterval(async () => {
   const epoch = turnEpoch;
   let reply = null;
   try {
-    const res = await fetch("/api/proactive");
+    const res = await fetch("/api/proactive", { signal: AbortSignal.timeout(TURN_FETCH_TIMEOUT_MS) });
     if (res.ok) ({ reply } = await res.json());
+    if (!isPlayableReply(reply)) reply = null;
   } catch { /* try again at the next poll */ }
   proactiveInFlight = false;
   if (!reply || busy || epoch !== turnEpoch || (wantListening && (taker.hasPending() || Date.now() - lastHeardAt < LISTEN_GRACE_MS))) return;

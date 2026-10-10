@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createTurnQueue, createTurnTaker, speechPlan } from "../public/turn.js";
+import { createTurnQueue, createTurnTaker, isPlayableReply, speechPlan } from "../public/turn.js";
 
 function fakeTimers() {
   let next = 1;
@@ -121,5 +121,16 @@ describe("createTurnQueue", () => {
     q.push({ text: "a" });
     q.push({ text: "b" });
     expect(q.take()).toEqual({ text: "a b" });
+  });
+});
+
+describe("isPlayableReply", () => {
+  it("only a reply with at least one sentence string is played", () => {
+    expect(isPlayableReply({ sentences: ["Hello."], rate: 0.9, breakMs: 700 })).toBe(true);
+    expect(isPlayableReply({})).toBe(false);
+    expect(isPlayableReply({ sentences: [] })).toBe(false);
+    expect(isPlayableReply({ sentences: [""] })).toBe(false);
+    expect(isPlayableReply({ sentences: "Hello." })).toBe(false);
+    expect(isPlayableReply(null)).toBe(false);
   });
 });
