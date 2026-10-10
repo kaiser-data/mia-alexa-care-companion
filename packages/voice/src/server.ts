@@ -1,9 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { splitSentences, templates } from "@mia/shared";
 import { Hono } from "hono";
-import type { Brain, TurnInput, VoiceProfile } from "./brain";
+import { bodyLimit } from "hono/body-limit";
+import type { Brain, Reply, TurnInput, VoiceProfile } from "./brain";
 
 export const MAX_TURN_CHARS = 500;
+export const MAX_TURN_BODY_BYTES = 4 * 1024;
 
 const FILES: Record<string, { file: string; type: string }> = {
   "/": { file: "index.html", type: "text/html; charset=utf-8" },
@@ -21,9 +24,25 @@ function parseTurn(body: unknown): TurnInput | null {
   return confidence === undefined ? { text } : { text, confidence };
 }
 
-export function createVoiceApp(deps: { brain: Pick<Brain, "turn" | "proactive">; profile: VoiceProfile; publicDir: string }): Hono {
+export interface VoiceAppDeps { brain: Pick<Brain, "turn" | "proactive">; profile: VoiceProfile; publicDir: string; port: number }
+
+export function createVoiceApp(deps: VoiceAppDeps): Hono {
   const app = new Hono();
-  const { speech, locale } = deps.profile;
+  const { speech, locale, carerName } = deps.profile;
+  const hosts = [`127.0.0.1:${deps.port}`, `localhost:${deps.port}`];
+  const origins = hosts.map((h) => `http://${h}`);
+
+  // The gateway only answers its own page: no other site, no DNS rebinding, no form posts.
+  app.use("/api/*", async (c, next) => {
+    if (!hosts.includes(c.req.header("host") ?? "")) return c.json({ error: "forbidden" }, 403);
+    const origin = c.req.header("origin");
+    if (origin !== undefined && !origins.includes(origin)) return c.json({ error: "forbidden" }, 403);
+    if (c.req.method === "POST" && !(c.req.header("content-type") ?? "").toLowerCase().startsWith("application/json")) {
+      return c.json({ error: "unsupported media type" }, 415);
+    }
+    await next();
+  });
+  app.use("/api/turn", bodyLimit({ maxSize: MAX_TURN_BODY_BYTES, onError: (c) => c.json({ error: "too large" }, 413) }));
 
   app.get("/api/config", (c) => c.json({
     locale, endOfTurnTimeoutMs: speech.endOfTurnTimeoutMs, rate: speech.speechRate / 100, breakMs: speech.sentenceBreakMs, mode: "local",
@@ -32,7 +51,16 @@ export function createVoiceApp(deps: { brain: Pick<Brain, "turn" | "proactive">;
   app.post("/api/turn", async (c) => {
     const turn = parseTurn(await c.req.json().catch(() => null));
     if (!turn) return c.json({ error: "bad request" }, 400);
-    return c.json(await deps.brain.turn(turn));
+    try {
+      return c.json(await deps.brain.turn(turn));
+    } catch (err) {
+      console.error("[mia-voice] turn failed:", err);
+      const fallback: Reply = {
+        sentences: splitSentences(templates(locale).systemError(carerName), locale),
+        rate: speech.speechRate / 100, breakMs: speech.sentenceBreakMs, tools: [],
+      };
+      return c.json(fallback);
+    }
   });
 
   app.get("/api/proactive", async (c) => {
@@ -45,9 +73,16 @@ export function createVoiceApp(deps: { brain: Pick<Brain, "turn" | "proactive">;
   });
 
   for (const [route, { file, type }] of Object.entries(FILES)) {
-    app.get(route, async (c) => c.body(await readFile(join(deps.publicDir, file), "utf8"), 200, {
-      "content-type": type, "content-security-policy": CSP, "cache-control": "no-store",
-    }));
+    app.get(route, async (c) => {
+      let body: string;
+      try {
+        body = await readFile(join(deps.publicDir, file), "utf8");
+      } catch (err) {
+        console.error(`[mia-voice] cannot read ${file}:`, err);
+        return c.notFound();
+      }
+      return c.body(body, 200, { "content-type": type, "content-security-policy": CSP, "cache-control": "no-store" });
+    });
   }
 
   return app;

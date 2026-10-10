@@ -27,8 +27,7 @@ const miaUrl = process.env.MIA_MCP_URL ?? (await startLocalMia({
 const mia = await connectMia({ url: miaUrl, token });
 const llm = new AnthropicLlm(new Anthropic({ apiKey }), process.env.MIA_MODEL ?? DEFAULT_MODEL);
 const brain = new Brain({ mia, llm, profile, now: () => new Date() });
-const app = createVoiceApp({ brain, profile, publicDir: resolve(import.meta.dirname, "../public") });
-
 const voicePort = Number(process.env.VOICE_PORT ?? 8788);
+const app = createVoiceApp({ brain, profile, publicDir: resolve(import.meta.dirname, "../public"), port: voicePort });
 serve({ fetch: app.fetch, port: voicePort, hostname: "127.0.0.1" });
 console.log(`[mia-voice] LOCAL MODE — not production. Open http://127.0.0.1:${voicePort} in Chrome or Edge (profile: ${profileId}, Mia: ${miaUrl}).`);
