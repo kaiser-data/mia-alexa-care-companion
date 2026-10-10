@@ -19,9 +19,12 @@ const CSP = "default-src 'self'; script-src 'self'; style-src 'self'; connect-sr
 function parseTurn(body: unknown): TurnInput | null {
   if (typeof body !== "object" || body === null) return null;
   const { text, confidence } = body as Record<string, unknown>;
-  if (typeof text !== "string" || text.length > MAX_TURN_CHARS) return null;
+  if (typeof text !== "string") return null;
   if (confidence !== undefined && (typeof confidence !== "number" || confidence < 0 || confidence > 1)) return null;
-  return confidence === undefined ? { text } : { text, confidence };
+  // A long turn is cut, not refused: the last words are what she said most recently, where a cry for help would be.
+  const chars = Array.from(text);
+  const kept = chars.length > MAX_TURN_CHARS ? chars.slice(-MAX_TURN_CHARS).join("") : text;
+  return confidence === undefined ? { text: kept } : { text: kept, confidence };
 }
 
 export interface VoiceAppDeps { brain: Pick<Brain, "turn" | "proactive">; profile: VoiceProfile; publicDir: string; port: number }
@@ -37,6 +40,9 @@ export function createVoiceApp(deps: VoiceAppDeps): Hono {
     if (!hosts.includes(c.req.header("host") ?? "")) return c.json({ error: "forbidden" }, 403);
     const origin = c.req.header("origin");
     if (origin !== undefined && !origins.includes(origin)) return c.json({ error: "forbidden" }, 403);
+    // Browsers send Sec-Fetch-Site even on GETs without Origin: only the own page (or typing the URL) may pass.
+    const site = c.req.header("sec-fetch-site");
+    if (site !== undefined && site !== "same-origin" && site !== "none") return c.json({ error: "forbidden" }, 403);
     if (c.req.method === "POST" && !(c.req.header("content-type") ?? "").toLowerCase().startsWith("application/json")) {
       return c.json({ error: "unsupported media type" }, 415);
     }

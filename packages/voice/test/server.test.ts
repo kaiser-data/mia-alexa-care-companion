@@ -42,8 +42,32 @@ describe("voice gateway", () => {
     expect(await r.json()).toEqual(reply);
     expect(a.turns).toEqual([{ text: "What day is it?", confidence: 0.9 }]);
   });
-  it.each([{}, { text: 5 }, { text: "x".repeat(501) }, { text: "hi", confidence: 2 }, { text: "hi", confidence: "high" }])(
+  it.each([{}, { text: 5 }, { text: "hi", confidence: 2 }, { text: "hi", confidence: "high" }])(
     "rejects %j", async (body) => expect((await post(app().app, body)).status).toBe(400));
+  it("a long turn is cut to its last words, not refused", async () => {
+    const a = app();
+    const r = await post(a.app, { text: "x".repeat(501) });
+    expect(r.status).toBe(200);
+    const b = app();
+    expect((await post(b.app, { text: `${"a".repeat(600)} I fell` })).status).toBe(200);
+    const got = (b.turns[0] as { text: string }).text;
+    expect(got.endsWith("I fell")).toBe(true);
+    expect(Array.from(got).length).toBeLessThanOrEqual(500);
+  });
+  it("another site may not reach the API, even without an Origin header", async () => {
+    let calls = 0;
+    const a = createVoiceApp({
+      brain: { turn: async () => reply, proactive: async () => { calls += 1; return reply; } },
+      profile: rose(), publicDir: tmpdir(), port: 8788,
+    });
+    const get = (site: string) => a.request("/api/proactive", { headers: { host: "127.0.0.1:8788", "sec-fetch-site": site } });
+    expect((await get("cross-site")).status).toBe(403);
+    expect((await get("same-site")).status).toBe(403);
+    expect(calls).toBe(0);
+    expect((await get("same-origin")).status).toBe(200);
+    expect((await get("none")).status).toBe(200);
+    expect(calls).toBe(2);
+  });
   it("proactive", async () => {
     expect(await (await app(reply).app.request("/api/proactive")).json()).toEqual({ reply });
     expect(await (await app(null).app.request("/api/proactive")).json()).toEqual({ reply: null });

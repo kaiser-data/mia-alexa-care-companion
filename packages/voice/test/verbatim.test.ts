@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { enforceVerbatim, LEAD_INS } from "../src/verbatim";
+import { enforceVerbatim, factGuard, LEAD_INS, NUMBER_WORDS, RELATIVE_DAY_WORDS, TAKE_VERBS } from "../src/verbatim";
 
 const SAY = ["Not yet.", "Now it's time for your morning pills.", "That's the small white pill and the round pink one."];
 
@@ -49,5 +49,32 @@ describe("enforceVerbatim", () => {
     expect(enforceVerbatim("Of course.", five, "en-US")).toEqual(["One.", "Two.", "Three.", "Four."]);
     expect(enforceVerbatim("Sure.", ["One.", "Two.", "Three."], "en-US")).toEqual(["Sure.", "One.", "Two.", "Three."]);
     expect(enforceVerbatim(five.join(" "), [], "en-US")).toHaveLength(4);
+  });
+});
+
+describe("factGuard", () => {
+  const plain = { chatTool: false, lastWasMedication: false };
+  it("a checking question with only a pill word stays", () => {
+    expect(factGuard(["Do you mean your pills?"], "pils", plain)).toBeNull();
+  });
+  it("a taking verb is a pill fact in a pill context, also in a question", () => {
+    expect(factGuard(["Shall you take it now?"], "Should I take it?", plain)).toBe("get_medication_status");
+    expect(factGuard(["Take it now."], "And now?", { ...plain, lastWasMedication: true })).toBe("get_medication_status");
+    expect(factGuard(["Take it easy."], "I'm tired", plain)).toBeNull();
+  });
+  it("greetings are not times of day", () => {
+    expect(factGuard(["Good night, Rose."], "Good night", plain)).toBeNull();
+    expect(factGuard(["Gute Nacht, Rose."], "Gute Nacht", plain)).toBeNull();
+    expect(factGuard(["See you tomorrow morning."], "Bye", plain)).toBe("get_today");
+  });
+  it("a digit in a question is a date fact; a chat tool allows dates but never pills", () => {
+    expect(factGuard(["Is it at 9?"], "When?", plain)).toBe("get_today");
+    expect(factGuard(["You married in 1966."], "Talk to me", { ...plain, chatTool: true })).toBeNull();
+    expect(factGuard(["Your pills are done."], "Talk to me", { ...plain, chatTool: true })).toBe("get_medication_status");
+  });
+  it("word lists hold both languages", () => {
+    expect(TAKE_VERBS).toEqual(expect.arrayContaining(["took", "genommen"]));
+    expect(NUMBER_WORDS).toEqual(expect.arrayContaining(["twelve", "zwölf", "quarter", "viertel"]));
+    expect(RELATIVE_DAY_WORDS).toEqual(expect.arrayContaining(["tonight", "morgen"]));
   });
 });

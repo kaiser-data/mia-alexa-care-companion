@@ -11,6 +11,9 @@ const ALWAYS = [
   "gestürzt", "hingefallen", "umgefallen", "bin gefallen", "ausgerutscht", "komme nicht hoch", "komme nicht mehr hoch",
   "kann nicht aufstehen", "kann nicht mehr aufstehen", "keine luft", "weh", "schmerzen",
   "notarzt", "krankenwagen", "notfall", "blute", "blutet", "hilfe holen",
+  // Too many or the wrong pills is a possible emergency, never a question for the pill tool.
+  "too many pills", "too many tablets", "took too many", "double dose", "overdose", "wrong pills",
+  "zu viele tabletten", "zu viel genommen", "doppelt genommen", "falsche tabletten", "überdosis",
 ];
 /** Only alarming on their own: "help" in a long sentence is usually an ordinary request. */
 const SHORT_ONLY = ["help", "help me", "please help", "help please", "hilfe", "hilf mir", "bitte hilfe", "hilfe bitte"];

@@ -1,7 +1,7 @@
 import { detectDistress, localParts, NIGHT_END_MINUTES, splitSentences, templates, type Profile } from "@mia/shared";
 import type { ChatMessage, Llm } from "./llm";
 import { MiaToolError, type MiaClient, type ToolReply } from "./mcp";
-import { enforceVerbatim, factGuard } from "./verbatim";
+import { enforceVerbatim, factGuard, isFactFree, MAX_SENTENCES } from "./verbatim";
 
 export type VoiceProfile = Pick<Profile, "locale" | "timezone" | "speech" | "carerName" | "preferredName">;
 export interface Reply { sentences: string[]; rate: number; breakMs: number; tools: string[]; action?: { type: "play_music"; artist: string } }
@@ -20,6 +20,11 @@ export const NIGHT_REPEAT_MINUTES = 10;
 export const TURN_DEADLINE_MS = 10_000;
 export const NOT_UNDERSTOOD_MARKER = "(not understood)";
 export const SPEAKS_FIRST_MARKER = "(Mia started the conversation by herself.)";
+/** Tools whose answer makes the next turn a pill context for the fact guard. */
+const MEDICATION_TOOLS = ["get_medication_status", "confirm_medication"];
+
+/** answer: a real answer; repeat: a repeated answer; filler: "I'm listening." or the calm fallback, never repeated. */
+type ReplyKind = "answer" | "repeat" | "filler";
 
 export function systemPrompt(p: VoiceProfile): string {
   const language = p.locale === "de-DE" ? "German, using \"du\" and simple words" : "English";
@@ -35,12 +40,13 @@ export function systemPrompt(p: VoiceProfile): string {
 }
 
 /** What one LLM turn has collected so far; kept outside the loop so a failure or timeout can still speak it. */
-interface TurnState { says: string[]; seenSays: Set<string>; used: string[]; action?: Reply["action"]; finished: boolean }
+interface TurnState { says: string[]; seenSays: Set<string>; used: string[]; chatTool: boolean; action?: Reply["action"]; finished: boolean }
 
 export class Brain {
   private history: ChatMessage[] = [];
   private misses = 0;
   private lastSpoken: string[] = [];
+  private lastWasMedication = false;
   private lastNightAt?: Date;
   private queue: Promise<unknown> = Promise.resolve();
 
@@ -52,7 +58,7 @@ export class Brain {
         return await this.handleTurn(input);
       } catch (err) {
         console.error("[mia-voice] turn failed:", err);
-        return this.reply(this.systemError(), []);
+        return this.reply(this.systemError(), [], undefined, "filler");
       }
     });
   }
@@ -96,7 +102,7 @@ export class Brain {
 
     if (!text || (input.confidence !== undefined && input.confidence < UNUSABLE_CONFIDENCE)) {
       this.misses += 1;
-      if (this.misses < 2) return this.reply([T.listening()], []);
+      if (this.misses < 2) return this.reply([T.listening()], [], undefined, "filler");
       this.misses = 0;
       const today = await mia.call("get_today");
       const said = [...today.say, T.callOffer(p.carerName)];
@@ -118,16 +124,17 @@ export class Brain {
     return this.deps.now().getTime() - this.lastNightAt.getTime() < NIGHT_REPEAT_MINUTES * 60_000;
   }
 
-  private async direct(text: string, tool: string, args: Record<string, unknown>, used: string[] = []): Promise<Reply> {
+  /** Calls one tool and speaks its answer, then `extra` sentences (fact-free questions), at most four in all. */
+  private async direct(text: string, tool: string, args: Record<string, unknown>, used: string[] = [], extra: string[] = []): Promise<Reply> {
     const r = await this.deps.mia.call(tool, args);
-    const said = enforceVerbatim("", r.say, this.deps.profile.locale);
+    const said = [...enforceVerbatim("", r.say, this.deps.profile.locale), ...extra].slice(0, MAX_SENTENCES);
     this.remember(text, said);
     return this.reply(said, [...used, tool]);
   }
 
   private async llmTurn(text: string, confidence: number | undefined): Promise<Reply> {
     const { profile: p } = this.deps;
-    const state: TurnState = { says: [], seenSays: new Set(), used: [], finished: false };
+    const state: TurnState = { says: [], seenSays: new Set(), used: [], chatTool: false, finished: false };
     const deadlineMs = this.deps.turnDeadlineMs ?? TURN_DEADLINE_MS;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const deadline = new Promise<"timeout">((resolve) => { timer = setTimeout(() => resolve("timeout"), deadlineMs); });
@@ -152,13 +159,14 @@ export class Brain {
     const { says, used, action } = state;
     if (used.includes("repeat_last") && this.lastSpoken.length) {
       this.remember(text, this.lastSpoken);
-      return this.reply(this.lastSpoken, used, action, true);
+      return this.reply(this.lastSpoken, used, action, "repeat");
     }
 
     let sentences = enforceVerbatim(finalText, says, p.locale, p.preferredName);
     if (!says.length) {
-      const guard = factGuard(sentences, text);
-      if (guard) return this.direct(text, guard, {}, used);
+      const guard = factGuard(sentences, text, { chatTool: state.chatTool, lastWasMedication: this.lastWasMedication });
+      // The tool speaks instead; a question of the LLM's that states nothing (a call offer) may follow.
+      if (guard) return this.direct(text, guard, {}, used, sentences.filter((s) => s.trim().endsWith("?") && isFactFree(s)));
     }
     if (!sentences.length) sentences = [templates(p.locale).callOffer(p.carerName)];
     this.remember(text, sentences);
@@ -167,7 +175,7 @@ export class Brain {
 
   /** The LLM failed or ran out of time: speak what the tools already said, else the calm fallback. */
   private fallback(text: string, state: TurnState): Reply {
-    if (!state.says.length) return this.reply(this.systemError(), [...state.used]);
+    if (!state.says.length) return this.reply(this.systemError(), [...state.used], undefined, "filler");
     const said = enforceVerbatim("", state.says, this.deps.profile.locale);
     this.remember(text, said);
     return this.reply(said, [...state.used], state.action);
@@ -199,6 +207,7 @@ export class Brain {
           continue;
         }
         state.used.push(call.name);
+        if (!r.verbatim) state.chatTool = true;
         // The same answer twice (the LLM called a tool again) is spoken once.
         const key = r.say.join("\n");
         if (r.verbatim && !state.seenSays.has(key)) { state.seenSays.add(key); state.says.push(...r.say); }
@@ -215,11 +224,15 @@ export class Brain {
     this.history = this.history.slice(-HISTORY_MESSAGES);
   }
 
-  private reply(said: string[], tools: string[], action?: Reply["action"], isRepeat = false): Reply {
+  private reply(said: string[], tools: string[], action?: Reply["action"], kind: ReplyKind = "answer"): Reply {
     const { speech, locale } = this.deps.profile;
-    const rate = (speech.speechRate / 100) * (isRepeat || tools.includes("repeat_last") ? REPEAT_SLOWER : 1);
+    const rate = (speech.speechRate / 100) * (kind === "repeat" || tools.includes("repeat_last") ? REPEAT_SLOWER : 1);
     const sentences = said.flatMap((s) => splitSentences(s, locale));
-    if (!isRepeat) this.lastSpoken = sentences;
+    // "Pardon?" repeats the last real answer; a filler or a repeat leaves it, and the pill context, as they were.
+    if (kind === "answer") {
+      this.lastSpoken = sentences;
+      this.lastWasMedication = tools.some((t) => MEDICATION_TOOLS.includes(t));
+    }
     this.lastNightAt = tools.includes("night_reassurance") ? this.deps.now() : undefined;
     return { sentences, rate, breakMs: speech.sentenceBreakMs, tools, ...(action ? { action } : {}) };
   }

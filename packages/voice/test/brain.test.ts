@@ -209,6 +209,95 @@ describe("Brain.turn", () => {
   });
 });
 
+describe("fact guard v2", () => {
+  const MON = "2026-10-12T08:05:00";
+  it("'Should I take it now?' is answered by the pill tool, never by the LLM", async () => {
+    const s = await setup(MON, [text("Yes, take it now.")]);
+    const r = await s.brain.turn({ text: "Should I take it now?" });
+    expect(r.tools).toEqual(["get_medication_status"]);
+    expect(r.sentences[0]).toBe("Not yet.");
+  });
+  it("German: 'Soll ich sie jetzt nehmen?'", async () => {
+    const s = await setup(MON, [text("Ja, nimm sie jetzt.")], roseDe());
+    expect((await s.brain.turn({ text: "Soll ich sie jetzt nehmen?" })).tools).toEqual(["get_medication_status"]);
+  });
+  it("'Have I had them?'", async () => {
+    const s = await setup(MON, [text("Yes, you had them at eight.")]);
+    expect((await s.brain.turn({ text: "Have I had them?" })).tools).toEqual(["get_medication_status"]);
+  });
+  it("a fact hidden in a question is still a fact", async () => {
+    const s = await setup(MON, [text("You took your pills at 8, didn't you?")]);
+    expect((await s.brain.turn({ text: "pills?" })).tools).toEqual(["get_medication_status"]);
+  });
+  it("a relative day and a number word are a date", async () => {
+    const s = await setup("2026-10-14T15:00:00", [text("Your group is tomorrow at nine.")]);
+    expect((await s.brain.turn({ text: "When is my group?" })).tools).toEqual(["get_today"]);
+  });
+  it("German: 'Heute kommt Tom.'", async () => {
+    const s = await setup(MON, [text("Heute kommt Tom.")], roseDe());
+    expect((await s.brain.turn({ text: "Kommt Tom?" })).tools).toEqual(["get_today"]);
+  });
+  it("a greeting is not a time of day", async () => {
+    const s = await setup(MON, [text("Good morning, Rose! How are you?")]);
+    expect(await s.brain.turn({ text: "Good morning" })).toMatchObject({ sentences: ["Good morning, Rose!", "How are you?"], tools: [] });
+    const de = await setup(MON, [text("Guten Morgen, Rose! Wie geht es dir?")], roseDe());
+    expect(await de.brain.turn({ text: "Guten Morgen" })).toMatchObject({ sentences: ["Guten Morgen, Rose!", "Wie geht es dir?"], tools: [] });
+  });
+  it("chatting about her life story may name years", async () => {
+    const said = "You married Frank in 1966. Shall we talk about it?";
+    const s = await setup(MON, [tool("chat_about_life"), text(said)]);
+    const r = await s.brain.turn({ text: "Talk to me" });
+    expect(r.sentences).toEqual(["You married Frank in 1966.", "Shall we talk about it?"]);
+    expect(r.tools).toEqual(["chat_about_life"]);
+  });
+  it("small talk stays", async () => {
+    const s = await setup(MON, [text("You're welcome, Rose.")]);
+    expect(await s.brain.turn({ text: "Thank you" })).toMatchObject({ sentences: ["You're welcome, Rose."], tools: [] });
+  });
+  it("after a pill answer, 'Take it now.' goes back to the pill tool", async () => {
+    const s = await setup(MON, [tool("get_medication_status"), text(""), text("Take it now.")]);
+    await s.brain.turn({ text: "Did I take my pills?" });
+    const r = await s.brain.turn({ text: "And now?" });
+    expect(r.tools).toEqual(["get_medication_status"]);
+    expect(r.sentences).toEqual(PILLS);
+  });
+  it("too many pills alerts Tom at once, without the LLM", async () => {
+    const s = await setup(MON, []);
+    const r = await s.brain.turn({ text: "I took too many pills" });
+    expect(r.tools).toEqual(["report_problem"]);
+    expect(s.llm.requests).toHaveLength(0);
+    expect(await s.store.listAlerts("rose")).toMatchObject([{ severity: "high" }]);
+  });
+  it("the guard keeps a call offer that states no fact", async () => {
+    const s = await setup(MON, [text("Oh dear. Shall I ask Tom to call you?")]);
+    const r = await s.brain.turn({ text: "I feel odd about my pills" });
+    expect(r.tools).toEqual(["get_medication_status"]);
+    expect(r.sentences).toEqual([...PILLS, "Shall I ask Tom to call you?"]);
+  });
+});
+
+describe("'Pardon?' never repeats a filler", () => {
+  it("repeats the earlier real answer, not 'I'm listening.'", async () => {
+    const s = await setup("2026-10-12T11:00:00", [text("Lovely weather."), tool("repeat_last"), text("")]);
+    await s.brain.turn({ text: "Nice day" });
+    expect((await s.brain.turn({ text: "" })).sentences).toEqual(["I'm listening."]);
+    expect((await s.brain.turn({ text: "Pardon?" })).sentences).toEqual(["Lovely weather."]);
+  });
+  it("with no earlier answer, repeat_last answers by itself", async () => {
+    const s = await setup("2026-10-12T11:00:00", [tool("repeat_last"), text("")]);
+    await s.brain.turn({ text: "" });
+    const r = await s.brain.turn({ text: "Pardon?" });
+    expect(r.sentences[0]).toBe("Today is Monday, October 12.");
+    expect(r.sentences).not.toContain("I'm listening.");
+  });
+  it("the calm fallback is not repeated either", async () => {
+    const s = await setup("2026-10-12T11:00:00", [text("Lovely weather."), new Error("down"), tool("repeat_last"), text("")]);
+    await s.brain.turn({ text: "Nice day" });
+    expect((await s.brain.turn({ text: "Hello" })).sentences).toEqual(["I can't check right now.", "Tom can help."]);
+    expect((await s.brain.turn({ text: "Pardon?" })).sentences).toEqual(["Lovely weather."]);
+  });
+});
+
 describe("Brain.proactive", () => {
   it("Mia speaks first, and 'yes' is understood in that context", async () => {
     const s = await setup("2026-10-12T08:00:00", [tool("confirm_medication"), text("")]);
