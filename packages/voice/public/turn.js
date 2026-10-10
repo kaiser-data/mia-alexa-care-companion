@@ -59,3 +59,18 @@ export function speechPlan(reply) {
     pauseAfterMs: i < reply.sentences.length - 1 ? reply.breakMs : 0,
   }));
 }
+
+/** One-slot queue for a turn that arrives while Mia is busy: at most one pending turn, later words are appended, never dropped. */
+export function createTurnQueue() {
+  let slot = null;
+  return {
+    push(turn) {
+      if (!slot) { slot = { ...turn }; return; }
+      const text = `${slot.text} ${turn.text}`.replace(/\s+/g, " ").trim();
+      const c = [slot.confidence, turn.confidence].filter((x) => typeof x === "number");
+      slot = c.length ? { text, confidence: Math.min(...c) } : { text };
+    },
+    take() { const t = slot; slot = null; return t; },
+    has() { return slot !== null; },
+  };
+}

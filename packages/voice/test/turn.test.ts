@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createTurnTaker, speechPlan } from "../public/turn.js";
+import { createTurnQueue, createTurnTaker, speechPlan } from "../public/turn.js";
 
 function fakeTimers() {
   let next = 1;
@@ -97,5 +97,29 @@ describe("speechPlan", () => {
       { text: "Not yet.", rate: 0.9, pauseAfterMs: 700 },
       { text: "Now it's time.", rate: 0.9, pauseAfterMs: 0 },
     ]);
+  });
+});
+
+describe("createTurnQueue", () => {
+  it("holds one pending turn and hands it over once", () => {
+    const q = createTurnQueue();
+    expect(q.has()).toBe(false);
+    expect(q.take()).toBeNull();
+    q.push({ text: "hello", confidence: 0.9 });
+    expect(q.has()).toBe(true);
+    expect(q.take()).toEqual({ text: "hello", confidence: 0.9 });
+    expect(q.has()).toBe(false);
+  });
+  it("a second turn is merged into the slot so no words are lost", () => {
+    const q = createTurnQueue();
+    q.push({ text: "where is", confidence: 0.9 });
+    q.push({ text: "my tea", confidence: 0.7 });
+    expect(q.take()).toEqual({ text: "where is my tea", confidence: 0.7 });
+  });
+  it("merges turns without confidence (typed text)", () => {
+    const q = createTurnQueue();
+    q.push({ text: "a" });
+    q.push({ text: "b" });
+    expect(q.take()).toEqual({ text: "a b" });
   });
 });

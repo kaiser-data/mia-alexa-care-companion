@@ -9,3 +9,5 @@ export function createTurnTaker(o: {
 }): TurnTaker;
 export interface Utterance { text: string; rate: number; pauseAfterMs: number }
 export function speechPlan(reply: { sentences: string[]; rate: number; breakMs: number }): Utterance[];
+export interface TurnQueue { push(t: Turn): void; take(): Turn | null; has(): boolean }
+export function createTurnQueue(): TurnQueue;
