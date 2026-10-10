@@ -2,16 +2,16 @@ import { describe, expect, it } from "vitest";
 import { inMemoryMia } from "@mia/mcp-server/testing";
 import { rose, roseDe, type Profile } from "@mia/shared";
 import { at } from "@mia/shared/testing";
-import { Brain, HISTORY_MESSAGES, SPEAKS_FIRST_MARKER } from "../src/brain";
+import { Brain, HISTORY_MESSAGES, NIGHT_REPEAT_MINUTES, SPEAKS_FIRST_MARKER, TURN_DEADLINE_MS } from "../src/brain";
 import { connectMia } from "../src/mcp";
-import { ScriptedLlm, text, tool } from "./fakes";
+import { hang, ScriptedLlm, text, tool } from "./fakes";
 
-async function setup(time: string, steps: ConstructorParameters<typeof ScriptedLlm>[0], profile: Profile = rose()) {
+async function setup(time: string, steps: ConstructorParameters<typeof ScriptedLlm>[0], profile: Profile = rose(), turnDeadlineMs?: number) {
   let now = at(time);
   const m = await inMemoryMia({ now: () => now, profile });
   const mia = await connectMia({ url: m.url, token: m.token, fetch: m.fetch });
   const llm = new ScriptedLlm(steps);
-  const brain = new Brain({ mia, llm, profile, now: () => now });
+  const brain = new Brain({ mia, llm, profile, now: () => now, ...(turnDeadlineMs ? { turnDeadlineMs } : {}) });
   return { brain, mia, llm, store: m.store, setNow: (t: string) => { now = at(t); } };
 }
 
@@ -114,6 +114,94 @@ describe("Brain.turn", () => {
     const mia = { ...s.mia, call: async (n: string) => { if (n === "night_reassurance") throw new Error("boom"); return s.mia.call(n); } };
     const brain = new Brain({ mia, llm: s.llm, profile: rose(), now: () => at("2026-10-13T03:10:00") });
     expect((await brain.turn({ text: "hello" })).sentences).toEqual(["I can't check right now.", "Tom can help."]);
+  });
+  it("a quiet, badly heard 'I fell' still alerts Tom", async () => {
+    for (const [t, c] of [["I fell", 0.2], ["help", 0.25]] as const) {
+      const s = await setup("2026-10-12T11:00:00", []);
+      const r = await s.brain.turn({ text: t, confidence: c });
+      expect(r.tools).toEqual(["report_problem"]);
+      expect(r.sentences).toEqual(["I've let Tom know right away.", "Tom will get in touch with you."]);
+      expect(await s.store.listAlerts("rose")).toMatchObject([{ severity: "high" }]);
+    }
+  });
+  it("an LLM fact about pills without a tool is replaced by the medication status", async () => {
+    const s = await setup("2026-10-12T08:05:00", [text("Yes, you took your pills at eight. You can relax.")]);
+    const r = await s.brain.turn({ text: "Did I take my pills?" });
+    expect(r.sentences).toEqual(PILLS);
+    expect(r.tools).toEqual(["get_medication_status"]);
+  });
+  it("an LLM date without a tool is replaced by today", async () => {
+    const s = await setup("2026-10-12T08:05:00", [text("It's Tuesday today.")]);
+    const r = await s.brain.turn({ text: "What day is it?" });
+    expect(r.tools).toEqual(["get_today"]);
+    expect(r.sentences[0]).toBe("Today is Monday, October 12.");
+  });
+  it("German: an LLM statement about pills without a tool is replaced too", async () => {
+    const s = await setup("2026-10-12T08:05:00", [text("Du hast deine Tabletten schon genommen.")], roseDe());
+    expect((await s.brain.turn({ text: "Habe ich meine Tabletten genommen?" })).tools).toEqual(["get_medication_status"]);
+  });
+  it("a checking question about pills stays", async () => {
+    const s = await setup("2026-10-12T08:05:00", [text("Do you mean your pills?")]);
+    expect(await s.brain.turn({ text: "pils" })).toMatchObject({ sentences: ["Do you mean your pills?"], tools: [] });
+  });
+  it("'Pardon?' repeats what Mia really said last, not the last tool answer", async () => {
+    const s = await setup("2026-10-12T08:05:00", [tool("get_medication_status"), text(""), text("Lovely weather."), tool("repeat_last"), text("")]);
+    await s.brain.turn({ text: "Did I take my pills?" });
+    s.setNow("2026-10-12T11:00:00");
+    expect((await s.brain.turn({ text: "Nice day" })).sentences).toEqual(["Lovely weather."]);
+    const again = await s.brain.turn({ text: "Pardon?" });
+    expect(again.sentences).toEqual(["Lovely weather."]);
+    expect(again.rate).toBeCloseTo(0.81);
+  });
+  it("after two misses, 'yes' reaches the LLM with the call offer in history", async () => {
+    const s = await setup("2026-10-12T08:05:00", [text("")]);
+    await s.brain.turn({ text: "" });
+    await s.brain.turn({ text: "" });
+    await s.brain.turn({ text: "yes" });
+    const assistant = s.llm.requests[0]!.messages.filter((m) => m.role === "assistant");
+    expect(assistant.at(-1)!.text.endsWith("Shall I ask Tom to call you?")).toBe(true);
+  });
+  it("Mia speaking first resets the misses", async () => {
+    const s = await setup("2026-10-12T08:00:00", []);
+    await s.brain.turn({ text: "" });
+    expect(await s.brain.proactive()).not.toBeNull();
+    expect((await s.brain.turn({ text: "" })).sentences).toEqual(["I'm listening."]);
+  });
+  it("at night, reassurance first; a follow-up within ten minutes goes to the LLM", async () => {
+    expect(NIGHT_REPEAT_MINUTES).toBe(10);
+    const s = await setup("2026-10-13T03:10:00", [tool("request_call"), text("")]);
+    expect((await s.brain.turn({ text: "Is it morning?" })).tools).toEqual(["night_reassurance"]);
+    expect(s.llm.requests).toHaveLength(0);
+    s.setNow("2026-10-13T03:12:00");
+    const r = await s.brain.turn({ text: "Can Tom call me?" });
+    expect(r.tools).toEqual(["request_call"]);
+    expect(r.sentences).toEqual(["I've asked Tom to call you."]);
+    s.setNow("2026-10-13T03:30:00");
+    expect((await s.brain.turn({ text: "Is it morning?" })).tools).toEqual(["night_reassurance"]);
+    expect(s.llm.requests).toHaveLength(2);
+  });
+  it("if the LLM fails after a tool answered, the tool answer is still spoken", async () => {
+    const s = await setup("2026-10-12T11:00:00", [tool("report_problem", { what: "I fell" }), new Error("down")]);
+    expect((await s.brain.turn({ text: "I am not well" })).sentences).toEqual(["I've let Tom know right away.", "Tom will get in touch with you."]);
+  });
+  it("an LLM that never answers ends in a calm fallback at the deadline", async () => {
+    expect(TURN_DEADLINE_MS).toBe(10_000);
+    const s = await setup("2026-10-12T11:00:00", [hang()], rose(), 50);
+    expect((await s.brain.turn({ text: "What day is it?" })).sentences).toEqual(["I can't check right now.", "Tom can help."]);
+  });
+  it("a tool error goes back to the LLM so it can recover", async () => {
+    const s = await setup("2026-10-12T11:00:00", [tool("no_such_tool"), text("Shall I ask Tom to call you?")]);
+    expect((await s.brain.turn({ text: "Do the thing" })).sentences).toEqual(["Shall I ask Tom to call you?"]);
+    const results = s.llm.requests[1]!.messages.at(-1) as { role: string; results: { content: string }[] };
+    expect(results.role).toBe("tool_results");
+    expect(JSON.parse(results.results[0]!.content)).toHaveProperty("error");
+  });
+  it("never more than four sentences", async () => {
+    const both = { kind: "tools" as const, text: "", calls: [{ id: "a", name: "get_today", input: {} }, { id: "b", name: "get_medication_status", input: {} }] };
+    const s = await setup("2026-10-12T08:05:00", [both, text("Of course.")]);
+    const r = await s.brain.turn({ text: "Tell me everything" });
+    expect(r.sentences).toHaveLength(4);
+    expect(r.sentences[0]).toBe("Today is Monday, October 12.");
   });
 });
 

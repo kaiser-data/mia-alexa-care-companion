@@ -1,32 +1,69 @@
 import { splitSentences, type Locale } from "@mia/shared";
 
 export const MAX_LEAD_IN_WORDS = 5;
+/** Spec §8: at most four short sentences per answer. */
+export const MAX_SENTENCES = 4;
 
-/** Words that make a lead-in state a fact (yes/no, done/not done); only the tools' templates may say these. */
-export const FACT_WORDS: Record<"en" | "de", string[]> = {
-  en: ["yes", "no", "not", "yet", "did", "didn't", "took", "taken", "already", "never", "done"],
-  de: ["ja", "nein", "nicht", "noch", "schon", "genommen", "hast", "hattest", "keine", "erledigt"],
+/** The only openers a lead-in may use: warm, and free of any fact. */
+export const LEAD_INS: Record<"en" | "de", string[]> = {
+  en: ["of course", "sure", "alright", "all right", "okay", "let me see", "let me check", "gladly", "good"],
+  de: ["natürlich", "gern", "gerne", "klar", "einen moment", "lass mich schauen", "gut"],
 };
+/** Forms of address that may follow the opener, besides her preferred name. */
+const ADDRESS: Record<"en" | "de", string[]> = { en: ["dear", "love"], de: ["meine Liebe"] };
 
-function statesFact(s: string, locale: Locale): boolean {
-  if (/\d/.test(s)) return true;
-  const list = new Set(FACT_WORDS[locale === "de-DE" ? "de" : "en"]);
-  return s.toLowerCase().split(/\s+/).some((w) => list.has(w.replace(/^[^\p{L}']+|[^\p{L}']+$/gu, "")));
+const lang = (locale: Locale) => (locale === "de-DE" ? "de" : "en");
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+function isLeadIn(s: string, locale: Locale, preferredName?: string): boolean {
+  const l = lang(locale);
+  const address = [...ADDRESS[l], ...(preferredName ? [preferredName] : [])].map(escape).join("|");
+  const re = new RegExp(`^(?:${LEAD_INS[l].map(escape).join("|")})(?:,\\s*(?:${address}))?[.!]$`, "iu");
+  return s.trim().split(/\s+/).length <= MAX_LEAD_IN_WORDS && re.test(s.trim());
 }
 
 const norm = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
 
 /**
  * Spec §8 rule 6: critical sentences come from the tools' templates, word for word.
- * The LLM may add one warm lead-in of at most five words; anything else it wrote is dropped.
+ * The LLM may add one allow-listed warm lead-in; anything else it wrote is dropped.
+ * Never more than four sentences: the lead-in is dropped first.
  */
-export function enforceVerbatim(llmText: string, says: string[], locale: Locale): string[] {
+export function enforceVerbatim(llmText: string, says: string[], locale: Locale, preferredName?: string): string[] {
   const llmSentences = splitSentences(llmText, locale);
-  if (!says.length) return llmSentences;
+  if (!says.length) return llmSentences.slice(0, MAX_SENTENCES);
   const templateSentences = says.flatMap((s) => splitSentences(s, locale));
   const first = llmSentences[0];
   const isTemplate = (s: string) => templateSentences.some((t) => norm(t) === norm(s));
-  const words = first ? first.split(/\s+/).filter(Boolean).length : 0;
-  const leadIn = first && !isTemplate(first) && words <= MAX_LEAD_IN_WORDS && !first.endsWith("?") && !statesFact(first, locale) ? [first] : [];
-  return [...leadIn, ...templateSentences];
+  const leadIn = first && !isTemplate(first) && isLeadIn(first, locale, preferredName) ? [first] : [];
+  const all = [...leadIn, ...templateSentences];
+  return (all.length > MAX_SENTENCES ? templateSentences : all).slice(0, MAX_SENTENCES);
+}
+
+/** Words that make an LLM sentence about her medication (both languages: she may switch). */
+export const MED_WORDS = [
+  "pill", "pills", "tablet", "tablets", "medicine", "medication", "medications", "dose",
+  "tablette", "tabletten", "pille", "pillen", "medikament", "medikamente",
+];
+/** Weekdays, months and clock words: an LLM sentence with these (or a digit) states a date or time. */
+export const DATE_WORDS = [
+  "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+  "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december",
+  "montag", "dienstag", "mittwoch", "donnerstag", "freitag", "samstag", "sonnabend", "sonntag",
+  "januar", "februar", "märz", "mai", "juni", "juli", "oktober", "dezember",
+  "o'clock", "uhr",
+];
+
+const words = (s: string) => s.toLowerCase().replace(/[‘’`]/g, "'").split(/[^\p{L}\p{N}']+/u).filter(Boolean);
+
+/**
+ * Owner policy: Mia never states a fact she did not get from a tool.
+ * For an LLM answer that used no verbatim tool, names the tool whose answer must be spoken instead, or null.
+ * Questions ("Do you mean your pills?") are allowed.
+ */
+export function factGuard(sentences: string[]): "get_medication_status" | "get_today" | null {
+  const statements = sentences.filter((s) => !s.trim().endsWith("?"));
+  if (statements.some((s) => words(s).some((w) => MED_WORDS.includes(w)))) return "get_medication_status";
+  if (statements.some((s) => /\d/.test(s) || words(s).some((w) => DATE_WORDS.includes(w)))) return "get_today";
+  return null;
 }
