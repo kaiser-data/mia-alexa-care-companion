@@ -45,6 +45,11 @@ export function capText(s: string, n: number): string {
   return Array.from(s).slice(0, n).join("");
 }
 
+/** Keep the last n characters (without splitting an emoji): the most recent words matter most. */
+export function capTextEnd(s: string, n: number): string {
+  return Array.from(s).slice(-n).join("");
+}
+
 export async function logEvent(ctx: ToolContext, type: EventType, detail?: Record<string, string>): Promise<void> {
   await ctx.store.addEvent({ profileId: ctx.profileId, type, at: ctx.now().toISOString(), ...(detail ? { detail } : {}) });
 }

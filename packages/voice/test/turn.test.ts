@@ -63,6 +63,19 @@ describe("createTurnTaker", () => {
     taker.reset();
     expect(taker.hasPending()).toBe(false);
   });
+  it("flush sends what was heard at once and disarms the timer; with nothing heard it sends nothing", () => {
+    const t = fakeTimers();
+    const turns: unknown[] = [];
+    const taker = createTurnTaker({ timeoutMs: 1800, onTurn: (x) => turns.push(x), setTimer: t.setTimer, clearTimer: t.clearTimer });
+    taker.flush();
+    expect(turns).toEqual([]);
+    taker.heard({ text: "where is", isFinal: true, confidence: 0.8 });
+    taker.heard({ text: "my tea", isFinal: false });
+    taker.flush();
+    expect(turns).toEqual([{ text: "where is my tea", confidence: 0.8 }]);
+    expect(t.pending()).toBe(0);
+    expect(taker.hasPending()).toBe(false);
+  });
   it("an empty interim result does not arm the timer", () => {
     const t = fakeTimers();
     const taker = createTurnTaker({ timeoutMs: 1800, onTurn: () => {}, setTimer: t.setTimer, clearTimer: t.clearTimer });

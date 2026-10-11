@@ -14,7 +14,19 @@ const FILES: Record<string, { file: string; type: string }> = {
   "/turn.js": { file: "turn.js", type: "text/javascript; charset=utf-8" },
   "/style.css": { file: "style.css", type: "text/css; charset=utf-8" },
 };
-const CSP = "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; media-src 'self'";
+const CSP = "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; media-src 'self'; "
+  + "frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+export const DEFAULT_VOICE_PORT = 8788;
+
+/** VOICE_PORT from the environment: an integer 1–65535, or the default when unset. */
+export function parseVoicePort(raw: string | undefined): number {
+  if (raw === undefined || raw.trim() === "") return DEFAULT_VOICE_PORT;
+  const port = Number(raw);
+  if (!/^\d+$/.test(raw.trim()) || !Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new Error(`VOICE_PORT must be a whole number from 1 to 65535, got "${raw}"`);
+  }
+  return port;
+}
 
 function parseTurn(body: unknown): TurnInput | null {
   if (typeof body !== "object" || body === null) return null;
@@ -34,6 +46,12 @@ export function createVoiceApp(deps: VoiceAppDeps): Hono {
   const { speech, locale, carerName } = deps.profile;
   const hosts = [`127.0.0.1:${deps.port}`, `localhost:${deps.port}`];
   const origins = hosts.map((h) => `http://${h}`);
+
+  // Every response, errors included: the browser must never guess a content type.
+  app.use("*", async (c, next) => {
+    await next();
+    c.res.headers.set("x-content-type-options", "nosniff");
+  });
 
   // The gateway only answers its own page: no other site, no DNS rebinding, no form posts.
   app.use("/api/*", async (c, next) => {

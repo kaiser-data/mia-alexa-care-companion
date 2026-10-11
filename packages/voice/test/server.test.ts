@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { rose } from "@mia/shared";
 import type { Reply } from "../src/brain";
-import { createVoiceApp } from "../src/server";
+import { createVoiceApp, DEFAULT_VOICE_PORT, parseVoicePort } from "../src/server";
 
 const reply: Reply = { sentences: ["Hello, Rose."], rate: 0.9, breakMs: 700, tools: [] };
 
@@ -75,10 +75,24 @@ describe("voice gateway", () => {
   it("serves the page with a strict content security policy", async () => {
     const r = await app().app.request("/");
     expect(r.headers.get("content-type")).toContain("text/html");
-    expect(r.headers.get("content-security-policy")).toContain("default-src 'self'");
+    const csp = r.headers.get("content-security-policy")!;
+    expect(csp).toContain("default-src 'self'");
+    for (const d of ["frame-ancestors 'none'", "base-uri 'none'", "form-action 'self'"]) expect(csp).toContain(d);
     expect(await r.text()).toContain("LOCAL MODE");
     expect((await app().app.request("/app.js")).headers.get("content-type")).toContain("text/javascript");
     expect((await app().app.request("/../package.json")).status).toBe(404);
+  });
+  it("every response says nosniff, errors included", async () => {
+    const a = app().app;
+    for (const r of [
+      await a.request("/"), await a.request("/app.js"), await a.request("/api/config"), await a.request("/nope"),
+      await post(a, { text: "hi" }, { origin: "https://evil.example" }),
+    ]) expect(r.headers.get("x-content-type-options")).toBe("nosniff");
+  });
+  it("VOICE_PORT must be a whole number from 1 to 65535", () => {
+    expect(parseVoicePort(undefined)).toBe(DEFAULT_VOICE_PORT);
+    expect(parseVoicePort("9000")).toBe(9000);
+    for (const bad of ["0", "65536", "abc", "80.5", "-1", "8788x"]) expect(() => parseVoicePort(bad)).toThrow(/VOICE_PORT/);
   });
   it("a POST that is not JSON is refused", async () => {
     expect((await post(app().app, { text: "hi" }, { "content-type": "text/plain" })).status).toBe(415);

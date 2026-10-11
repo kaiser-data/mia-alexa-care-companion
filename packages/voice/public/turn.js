@@ -39,6 +39,11 @@ export function createTurnTaker({ timeoutMs, onTurn, setTimer = setTimeout, clea
       clear();
       timer = setTimer(finish, timeoutMs);
     },
+    /** Sends what was heard so far at once (before Mia speaks), instead of dropping it. */
+    flush() {
+      clear();
+      finish();
+    },
     hasPending() {
       return parts.length > 0 || interim !== "";
     },

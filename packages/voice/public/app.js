@@ -114,9 +114,11 @@ function listen() {
   setState("listening");
   try { recognition.start(); } catch { /* already running */ }
 }
+// Only Mia's own speech closes the mic (no self-echo). Words heard so far are sent, never dropped:
+// while Mia is busy they wait in the turn queue and go out after the reply.
 function stopListening() {
   wantListening = false;
-  taker.reset();
+  taker.flush();
   try { recognition?.stop(); } catch { /* not running */ }
 }
 
@@ -177,6 +179,7 @@ async function waitSpeechIdle() {
 }
 
 async function play(reply) {
+  stopListening();
   setState("speaking");
   speechSynthesis.cancel();
   try {
@@ -204,7 +207,7 @@ async function send(turn) {
   busy = true;
   turnEpoch++; // her turn wins over any proactive fetch still in flight
   try {
-    stopListening();
+    // The mic stays on while Mia thinks: what she says meanwhile is queued (merged) and sent after the reply.
     setState("thinking");
     caption("rose", turn.text);
     let reply = null;
@@ -264,7 +267,6 @@ setInterval(async () => {
   if (!reply || busy || epoch !== turnEpoch || (wantListening && (taker.hasPending() || Date.now() - lastHeardAt < LISTEN_GRACE_MS))) return;
   busy = true;
   try {
-    stopListening();
     await play(reply);
   } catch { /* keep going */ } finally {
     release();

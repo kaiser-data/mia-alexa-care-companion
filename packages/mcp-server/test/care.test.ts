@@ -133,13 +133,15 @@ describe("report_problem failure paths", () => {
 });
 
 describe("data minimisation", () => {
-  it("a long distress text is capped at 200 characters in alert and log", async () => {
+  it("a long distress text keeps its last 200 characters in alert and log", async () => {
     const m = await connect(at("2026-10-12T11:00:00"));
-    await m.call("report_problem", { what: "x".repeat(500) });
+    const what = `start ${"x".repeat(500)} I fell`;
+    await m.call("report_problem", { what });
     const [alert] = await m.store.listAlerts("rose");
-    expect(alert!.message).toContain("x".repeat(200));
-    expect(alert!.message).not.toContain("x".repeat(201));
-    expect((await lastEvent(m))?.detail?.what).toHaveLength(200);
+    expect(alert!.message).toContain(`${"x".repeat(193)} I fell`);
+    expect(alert!.message).not.toContain("start");
+    expect(alert!.message).not.toContain("x".repeat(194));
+    expect((await lastEvent(m))?.detail?.what).toBe(what.slice(-200));
   });
   it("an unknown-question query is capped at 80 characters", async () => {
     const m = await connect(at("2026-10-12T10:00:00"));
