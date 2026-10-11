@@ -1,4 +1,4 @@
-import { createTurnQueue, createTurnTaker, isPlayableReply, speechPlan } from "./turn.js";
+import { createTurnQueue, createTurnTaker, isPlayableReply, releasePlan, speechPlan } from "./turn.js";
 
 const $ = (id) => document.getElementById(id);
 const ring = $("ring");
@@ -198,8 +198,14 @@ async function play(reply) {
 function release() {
   busy = false;
   const next = queue.take();
-  if (next) { send(next); return; }
-  if (started) listen();
+  const plan = releasePlan({ queued: Boolean(next), started, micDead });
+  // play() closed the mic: reopen it without leaving "thinking", so she is heard while the queued turn is answered.
+  if (plan.rearm && recognition) {
+    wantListening = true;
+    try { recognition.start(); } catch { /* already running */ }
+  }
+  if (plan.replay) { send(next); return; }
+  if (plan.listen) listen();
 }
 
 async function send(turn) {

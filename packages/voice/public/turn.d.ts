@@ -12,3 +12,4 @@ export function speechPlan(reply: { sentences: string[]; rate: number; breakMs: 
 export interface TurnQueue { push(t: Turn): void; take(): Turn | null; has(): boolean }
 export function createTurnQueue(): TurnQueue;
 export function isPlayableReply(reply: unknown): boolean;
+export function releasePlan(o: { queued: boolean; started: boolean; micDead: boolean }): { rearm: boolean; replay: boolean; listen: boolean };

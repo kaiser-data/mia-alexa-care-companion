@@ -85,3 +85,11 @@ export function isPlayableReply(reply) {
   return Boolean(reply) && Array.isArray(reply.sentences) && reply.sentences.length > 0 &&
     reply.sentences.every((s) => typeof s === "string" && s.trim().length > 0);
 }
+
+/**
+ * What to do when Mia has finished a reply. A queued turn is replayed; the mic is re-armed first, because
+ * play() closed it, so what she says while Mia thinks about the queued turn is heard too.
+ */
+export function releasePlan({ queued, started, micDead }) {
+  return { rearm: queued && started && !micDead, replay: queued, listen: !queued && started };
+}

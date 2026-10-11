@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createTurnQueue, createTurnTaker, isPlayableReply, speechPlan } from "../public/turn.js";
+import { createTurnQueue, createTurnTaker, isPlayableReply, releasePlan, speechPlan } from "../public/turn.js";
 
 function fakeTimers() {
   let next = 1;
@@ -145,5 +145,19 @@ describe("isPlayableReply", () => {
     expect(isPlayableReply({ sentences: [""] })).toBe(false);
     expect(isPlayableReply({ sentences: "Hello." })).toBe(false);
     expect(isPlayableReply(null)).toBe(false);
+  });
+});
+
+describe("releasePlan", () => {
+  it("a queued turn is replayed with the mic re-armed, so she is heard while Mia thinks again (M3)", () => {
+    expect(releasePlan({ queued: true, started: true, micDead: false })).toEqual({ rearm: true, replay: true, listen: false });
+  });
+  it("no mic re-arm when the mic is dead or she has not started", () => {
+    expect(releasePlan({ queued: true, started: true, micDead: true })).toEqual({ rearm: false, replay: true, listen: false });
+    expect(releasePlan({ queued: true, started: false, micDead: false })).toEqual({ rearm: false, replay: true, listen: false });
+  });
+  it("nothing queued: back to listening once started", () => {
+    expect(releasePlan({ queued: false, started: true, micDead: false })).toEqual({ rearm: false, replay: false, listen: true });
+    expect(releasePlan({ queued: false, started: false, micDead: false })).toEqual({ rearm: false, replay: false, listen: false });
   });
 });
