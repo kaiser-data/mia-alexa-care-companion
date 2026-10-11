@@ -41,15 +41,20 @@ describe("comfort", () => {
     expect(r.say).toEqual(["I've asked Tom to call you."]);
     expect(await m.store.listAlerts("rose")).toMatchObject([{ rule: "call_requested", severity: "medium", message: "Rose would like a call." }]);
   });
-  it("chat_about_life: not verbatim, suggests a life-story topic", async () => {
+  it("chat_about_life: speaks the day's life-story topic verbatim, then asks if she remembers", async () => {
     const m = await connect(at("2026-10-14T15:00:00"));
     const r = await m.call("chat_about_life");
-    expect(r.verbatim).toBe(false);
-    expect(r.say).toEqual([]);
+    expect(r.verbatim).toBe(true);
+    expect(r.say).toEqual(["You grew up in Dayton, the youngest of four sisters.", "Do you remember that?"]);
     expect(r.facts.topics).toHaveLength(6);
-    expect(r.facts.topics).toContain(r.facts.suggestedTopic);
-    expect(r.text).toContain(r.facts.suggestedTopic);
+    expect(r.facts.suggestedTopic).toBe(r.say[0]);
+    expect(r.facts.carerName).toBe("Tom");
     expect((await lastEvent(m))?.type).toBe("lonely");
+  });
+  it("chat_about_life in German", async () => {
+    const r = await (await connect(at("2026-10-15T15:00:00"), roseDe())).call("chat_about_life");
+    expect(r.verbatim).toBe(true);
+    expect(r.say).toEqual(["Du liebst deinen Rosengarten, besonders die gelbe Kletterrose.", "Erinnerst du dich daran?"]);
   });
 });
 
@@ -60,10 +65,10 @@ describe("chat_about_life without a life story", () => {
     expect(r.verbatim).toBe(true);
     expect(r.say).toEqual(["Shall I ask Tom to call you?"]);
   });
-  it("the chat guidance forbids invented facts", async () => {
+  it("the chat is spoken as written: verbatim guidance", async () => {
     const m = await connect(at("2026-10-14T15:00:00"));
     const raw = await m.client.callTool({ name: "chat_about_life", arguments: {} });
-    expect((raw.structuredContent as { guidance: string }).guidance).toContain("Use only the facts in topics; never add names, dates or events.");
+    expect((raw.structuredContent as { guidance: string }).guidance).toContain("exactly as written");
   });
 });
 

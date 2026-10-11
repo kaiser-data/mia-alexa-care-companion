@@ -55,6 +55,7 @@ export interface Templates {
   proMusicAsk(artist: string): string;
   proHello(name: string): string;
   proChatAsk(): string;
+  rememberAsk(): string;
 }
 
 const EN: Templates = {
@@ -111,6 +112,7 @@ const EN: Templates = {
   proMusicAsk: (a) => `Shall I play some ${a}?`,
   proHello: (n) => `Hello, ${n}.`,
   proChatAsk: () => "Shall we have a little chat?",
+  rememberAsk: () => "Do you remember that?",
 };
 
 const DE: Templates = {
@@ -167,6 +169,7 @@ const DE: Templates = {
   proMusicAsk: (a) => `Soll ich etwas von ${a} spielen?`,
   proHello: (n) => `Hallo, ${n}.`,
   proChatAsk: () => "Wollen wir ein bisschen plaudern?",
+  rememberAsk: () => "Erinnerst du dich daran?",
 };
 
 export function templates(locale: Locale): Templates {

@@ -31,6 +31,7 @@ export const PHRASES: Phrase[] = [
   { id: "check_group", kind: "question", en: "Do you mean your group?", de: "Meinst du deine Gruppe?" },
   { id: "check_music", kind: "question", en: "Would you like some music?", de: "Möchtest du etwas Musik hören?" },
   { id: "check_chat", kind: "question", en: "Shall we have a little chat?", de: "Wollen wir ein bisschen plaudern?" },
+  { id: "tell_me_more", kind: "question", en: "Will you tell me more about it?", de: "Erzählst du mir mehr davon?" },
   // closings — at most one, replaces the question
   { id: "sleep_well", kind: "closing", en: "Sleep well, {name}.", de: "Schlaf gut, {name}." },
   { id: "lovely_day", kind: "closing", en: "Have a lovely day, {name}.", de: "Hab einen schönen Tag, {name}." },

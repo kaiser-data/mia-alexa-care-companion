@@ -21,6 +21,6 @@ export const tool = (name: string, input: Record<string, unknown> = {}, id = `ca
 export const text = (t: string): LlmStep => ({ kind: "text", text: t });
 /** A step that never answers, for deadline tests. */
 export const hang = (): "hang" => "hang";
-/** The LLM's closing pick: phrase ids (and chat) for the respond tool; missing slots are "none". */
-export const respond = (choice: Partial<Record<"opener" | "feeling" | "question" | "closing" | "chat", string>> = {}, id = "call-respond"): LlmStep =>
-  ({ kind: "tools", text: "", calls: [{ id, name: "respond", input: { opener: "none", feeling: "none", question: "none", closing: "none", chat: "", ...choice } }] });
+/** The LLM's closing pick: phrase ids for the respond tool; missing slots are "none". Extra keys are passed through as-is. */
+export const respond = (choice: Partial<Record<"opener" | "feeling" | "question" | "closing", string>> & Record<string, unknown> = {}, id = "call-respond"): LlmStep =>
+  ({ kind: "tools", text: "", calls: [{ id, name: "respond", input: { opener: "none", feeling: "none", question: "none", closing: "none", ...choice } }] });

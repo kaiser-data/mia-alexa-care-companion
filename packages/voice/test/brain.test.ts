@@ -29,7 +29,7 @@ describe("Brain.turn", () => {
     expect(s.llm.requests[0]!.system).toContain("English");
   });
   it("text the LLM writes next to its tool calls is never spoken", async () => {
-    const step = { kind: "tools" as const, text: "You should take your pills now, dear.", calls: [{ id: "r", name: "respond", input: { opener: "none", feeling: "none", question: "none", closing: "none", chat: "" } }] };
+    const step = { kind: "tools" as const, text: "You should take your pills now, dear.", calls: [{ id: "r", name: "respond", input: { opener: "none", feeling: "none", question: "none", closing: "none" } }] };
     const s = await setup("2026-10-12T08:05:00", [tool("get_medication_status"), step]);
     expect((await s.brain.turn({ text: "pills?" })).sentences).toEqual(PILLS);
   });
@@ -274,33 +274,60 @@ describe("Claude picks, doesn't write", () => {
   });
 });
 
-describe("chat after chat_about_life", () => {
+describe("chat is a pick too: no LLM text is ever spoken", () => {
   const WED = "2026-10-14T15:00:00";
-  it("keeps chat sentences drawn from her life story, drops an invented year", async () => {
-    const steps: ConstructorParameters<typeof ScriptedLlm>[0] = [];
-    const s = await setup(WED, steps);
-    const topic = (await s.mia.call("chat_about_life")).facts.suggestedTopic as string;
-    expect(topic).toBeTruthy();
-    steps.push(tool("chat_about_life"), respond({ chat: `${topic} You won a prize in 1970.`, question: "offer_call" }));
+  const THU = "2026-10-15T15:00:00";
+  const TOPIC = "You grew up in Dayton, the youngest of four sisters.";
+  it("chat_about_life speaks the day's topic and asks if she remembers", async () => {
+    const s = await setup(WED, [tool("chat_about_life"), respond()]);
     const r = await s.brain.turn({ text: "Talk to me" });
     expect(r.tools).toEqual(["chat_about_life"]);
-    expect(r.sentences).toEqual([topic, "Shall I ask Tom to call you?"]);
+    expect(r.sentences).toEqual([TOPIC, "Do you remember that?"]);
   });
-  it("the brief's rose garden example passes", async () => {
-    const s = await setup(WED, [tool("chat_about_life"), respond({ chat: "You loved your rose garden. Was the yellow rose your favourite?", question: "offer_call" })]);
-    expect((await s.brain.turn({ text: "I'm lonely" })).sentences)
-      .toEqual(["You loved your rose garden.", "Was the yellow rose your favourite?", "Shall I ask Tom to call you?"]);
+  it("German: the topic from her German life story", async () => {
+    const s = await setup(THU, [tool("chat_about_life"), respond()], roseDe());
+    expect((await s.brain.turn({ text: "Mir ist langweilig." })).sentences)
+      .toEqual(["Du liebst deinen Rosengarten, besonders die gelbe Kletterrose.", "Erinnerst du dich daran?"]);
   });
-  it("chat text is allowed one turn after chat_about_life, then ignored", async () => {
-    const chat = "You loved your rose garden.";
-    const s = await setup(WED, [tool("chat_about_life"), respond({ feeling: "im_here" }), respond({ chat }), respond({ chat })]);
-    await s.brain.turn({ text: "I'm lonely" });
-    expect((await s.brain.turn({ text: "Yes, roses" })).sentences).toEqual([chat]);
-    expect((await s.brain.turn({ text: "And now?" })).sentences).toEqual(["Shall I ask Tom to call you?"]);
+  it("a respond input with an extra chat string never reaches the sentences", async () => {
+    const chat = "Frank is waiting for you at home.";
+    const s = await setup(WED, [tool("chat_about_life"), respond({ chat, question: "offer_call" }), respond({ chat, feeling: "sounds_lovely" })]);
+    const first = await s.brain.turn({ text: "I'm lonely" });
+    expect(first.sentences.join(" ")).not.toContain("Frank");
+    expect((await s.brain.turn({ text: "Yes" })).sentences.join(" ")).not.toContain("Frank");
   });
-  it("chat text without chat_about_life is ignored", async () => {
-    const s = await setup(WED, [respond({ chat: "You loved your rose garden.", feeling: "sounds_lovely" })]);
-    expect((await s.brain.turn({ text: "Roses" })).sentences).toEqual(["That sounds lovely."]);
+  it("C1 probe: chat next to the pill tool cannot say 'take them now' (en + de)", async () => {
+    const both = { kind: "tools" as const, text: "", calls: [{ id: "a", name: "get_medication_status", input: {} }, { id: "b", name: "chat_about_life", input: {} }] };
+    for (const [profile, line] of [[rose(), "You can take them now."], [roseDe(), "Du kannst sie jetzt nehmen."]] as const) {
+      const s = await setup("2026-10-12T08:30:00", [tool("confirm_medication"), respond(), both, respond({ chat: line })], profile);
+      await s.brain.turn({ text: "I took them" });
+      const r = await s.brain.turn({ text: "pills?" });
+      expect(r.tools).toEqual(["get_medication_status", "chat_about_life"]);
+      expect(r.sentences.join(" ")).not.toMatch(/take them now|sie jetzt nehmen/i);
+    }
+  });
+  it("C1 probe: the previous-turn window is gone", async () => {
+    const s = await setup("2026-10-12T08:30:00", [
+      tool("confirm_medication"), respond(),
+      tool("chat_about_life"), respond(),
+      tool("get_medication_status"), respond({ chat: "You can take them again now." }),
+    ]);
+    await s.brain.turn({ text: "I took them" });
+    await s.brain.turn({ text: "Talk to me" });
+    const r = await s.brain.turn({ text: "pills?" });
+    expect(r.sentences.join(" ")).not.toMatch(/take them/i);
+  });
+  it("C2 probe: invented facts in chat are never spoken", async () => {
+    for (const chat of ["Frank is waiting for you at home.", "Tom is coming in 38 minutes.", "You married at nineteen."]) {
+      const s = await setup(WED, [tool("chat_about_life"), respond({ chat })]);
+      expect((await s.brain.turn({ text: "Talk to me" })).sentences).toEqual([TOPIC, "Do you remember that?"]);
+    }
+  });
+  it("a chat continues with picked phrases, no tool", async () => {
+    const s = await setup(WED, [tool("chat_about_life"), respond(), respond({ feeling: "sounds_lovely", question: "tell_me_more" })]);
+    await s.brain.turn({ text: "Talk to me" });
+    expect(await s.brain.turn({ text: "Yes, we had a big garden" }))
+      .toMatchObject({ sentences: ["That sounds lovely.", "Will you tell me more about it?"], tools: [] });
   });
 });
 

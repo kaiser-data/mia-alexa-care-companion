@@ -33,6 +33,11 @@ describe("phrase catalogue", () => {
     expect(phraseText("offer_call", "de-DE", VARS)).toBe("Soll ich Tom um einen Anruf bitten?");
     expect(phraseText("of_course", "en-US", VARS)).toBe("Of course, Rose.");
   });
+  it("a chat continues with a picked follow-up question", () => {
+    expect(phraseIds("question")).toContain("tell_me_more");
+    expect(phraseText("tell_me_more", "en-US", VARS)).toBe("Will you tell me more about it?");
+    expect(phraseText("tell_me_more", "de-DE", VARS)).toBe("Erzählst du mir mehr davon?");
+  });
   it("lists the ids of one kind", () => {
     expect(phraseIds("closing")).toEqual(["sleep_well", "lovely_day", "lovely_evening"]);
     expect(phraseIds("opener")).toContain("of_course");

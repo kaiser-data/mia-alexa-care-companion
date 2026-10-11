@@ -77,6 +77,13 @@ describe("roseDe", () => {
   });
 });
 
+describe("rememberAsk", () => {
+  it("follows a life-story topic with a yes/no question", () => {
+    expect(templates("en-US").rememberAsk()).toBe("Do you remember that?");
+    expect(templates("de-DE").rememberAsk()).toBe("Erinnerst du dich daran?");
+  });
+});
+
 describe("Plan 2 templates", () => {
   it("en-US", () => {
     const T = templates("en-US");

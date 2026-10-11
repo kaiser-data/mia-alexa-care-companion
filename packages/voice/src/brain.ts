@@ -1,7 +1,7 @@
 import { detectDistress, localParts, NIGHT_END_MINUTES, splitSentences, templates, type Profile } from "@mia/shared";
 import type { ChatMessage, Llm } from "./llm";
 import { MiaToolError, type MiaClient, type ToolReply } from "./mcp";
-import { compose, readRespond, RESPOND_TOOL, type ChatFacts, type RespondInput } from "./compose";
+import { compose, readRespond, RESPOND_TOOL, type RespondInput } from "./compose";
 
 export type VoiceProfile = Pick<Profile, "locale" | "timezone" | "speech" | "carerName" | "preferredName">;
 export interface Reply { sentences: string[]; rate: number; breakMs: number; tools: string[]; action?: { type: "play_music"; artist: string } }
@@ -32,23 +32,21 @@ export function systemPrompt(p: VoiceProfile): string {
     "You never write what Mia says. You choose: Mia's tools speak the facts, and the respond tool adds short warm phrases from a fixed list.",
     "Use Mia's tools for every fact: the day, appointments, pills, people, going out, coming home, feelings, the night, music or help. Never answer these from general knowledge.",
     "Always finish your turn by calling respond. Any text you write outside a tool call is ignored and never spoken.",
-    "In respond, choose at most one opener or feeling and at most one yes/no question or closing; use \"none\" where nothing fits. Leave chat empty unless chat_about_life just ran.",
+    "In respond, choose at most one opener or feeling and at most one yes/no question or closing; use \"none\" where nothing fits.",
     "If speech recognition was unsure, call respond with a checking question, like question \"check_pills\" or \"check_day\".",
     `If she wants a person, choose question "offer_call" (ask ${p.carerName} to call). If you are unsure what she wants, choose "anything_else" or "offer_call".`,
     "If she answers yes to something Mia asked or offered, call the tool that does what was offered.",
-    "After chat_about_life, chat may hold one or two short warm sentences about the suggested topic, using only facts from that tool. No medicine, no dates.",
+    "If she wants to talk, call chat_about_life: it speaks a topic from her own life story. To keep a chat going, pick a feeling like \"sounds_lovely\" and the question \"tell_me_more\"; no tool is needed for that.",
   ].join("\n");
 }
 
 /** What one LLM turn has collected so far; kept outside the loop so a failure or timeout can still speak it. */
-interface TurnState { says: string[]; seenSays: Set<string>; used: string[]; chatFacts?: ChatFacts; choice: RespondInput | null; action?: Reply["action"]; finished: boolean }
+interface TurnState { says: string[]; seenSays: Set<string>; used: string[]; choice: RespondInput | null; action?: Reply["action"]; finished: boolean }
 
 export class Brain {
   private history: ChatMessage[] = [];
   private misses = 0;
   private lastSpoken: string[] = [];
-  /** What chat_about_life returned in the previous turn: chat text may draw on it for one more turn. */
-  private lastChatFacts?: ChatFacts;
   private lastNightAt?: Date;
   private queue: Promise<unknown> = Promise.resolve();
 
@@ -95,8 +93,6 @@ export class Brain {
     const { mia, profile: p, now } = this.deps;
     const T = templates(p.locale);
     const text = input.text.trim();
-    const previousChat = this.lastChatFacts;
-    this.lastChatFacts = undefined;
 
     // A possible fall always alerts, however unsure the speech recognition was.
     if (text && detectDistress(text)) {
@@ -120,7 +116,7 @@ export class Brain {
       return this.direct(text, "night_reassurance", {});
     }
 
-    return this.llmTurn(text, input.confidence, previousChat);
+    return this.llmTurn(text, input.confidence);
   }
 
   private nightAnsweredRecently(): boolean {
@@ -136,7 +132,7 @@ export class Brain {
     return this.reply(said, [tool]);
   }
 
-  private async llmTurn(text: string, confidence: number | undefined, previousChat: ChatFacts | undefined): Promise<Reply> {
+  private async llmTurn(text: string, confidence: number | undefined): Promise<Reply> {
     const { profile: p } = this.deps;
     const state: TurnState = { says: [], seenSays: new Set(), used: [], choice: null, finished: false };
     const deadlineMs = this.deps.turnDeadlineMs ?? TURN_DEADLINE_MS;
@@ -168,12 +164,7 @@ export class Brain {
       return this.reply(this.lastSpoken, used, action, "repeat");
     }
 
-    // Chat text may follow chat_about_life of this turn or of the turn before.
-    const chatFacts = state.chatFacts ?? previousChat;
-    this.lastChatFacts = state.chatFacts;
-    const sentences = compose(says, state.choice, {
-      locale: p.locale, name: p.preferredName, carer: p.carerName, ...(chatFacts ? { chatFacts } : {}),
-    });
+    const sentences = compose(says, state.choice, { locale: p.locale, name: p.preferredName, carer: p.carerName });
     this.remember(text, sentences);
     return this.reply(sentences, used, action);
   }
@@ -221,7 +212,6 @@ export class Brain {
           continue;
         }
         state.used.push(call.name);
-        if (call.name === "chat_about_life" && !r.verbatim) state.chatFacts = chatFactsOf(r.facts);
         // The same answer twice (the LLM called a tool again) is spoken once.
         const key = r.say.join("\n");
         if (r.verbatim && !state.seenSays.has(key)) { state.seenSays.add(key); state.says.push(...r.say); }
@@ -247,13 +237,4 @@ export class Brain {
     this.lastNightAt = tools.includes("night_reassurance") ? this.deps.now() : undefined;
     return { sentences, rate, breakMs: speech.sentenceBreakMs, tools, ...(action ? { action } : {}) };
   }
-}
-
-function chatFactsOf(facts: Record<string, unknown>): ChatFacts {
-  const topics = Array.isArray(facts.topics) ? facts.topics.filter((t): t is string => typeof t === "string") : [];
-  return {
-    topics,
-    suggestedTopic: typeof facts.suggestedTopic === "string" ? facts.suggestedTopic : "",
-    ...(typeof facts.carerName === "string" ? { carerName: facts.carerName } : {}),
-  };
 }
