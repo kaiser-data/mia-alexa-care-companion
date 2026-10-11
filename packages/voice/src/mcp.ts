@@ -10,7 +10,7 @@ export class MiaToolError extends Error {
 }
 
 export interface ToolReply { say: string[]; facts: Record<string, unknown>; verbatim: boolean; guidance: string; text: string }
-export interface ToolInfo { name: string; description: string; inputSchema: Record<string, unknown> }
+export interface ToolInfo { name: string; description: string; inputSchema: Record<string, unknown>; strict?: boolean }
 export interface MiaClient {
   tools(): Promise<ToolInfo[]>;
   call(name: string, args?: Record<string, unknown>): Promise<ToolReply>;

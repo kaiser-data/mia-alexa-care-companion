@@ -1,7 +1,7 @@
 import { detectDistress, localParts, NIGHT_END_MINUTES, splitSentences, templates, type Profile } from "@mia/shared";
 import type { ChatMessage, Llm } from "./llm";
 import { MiaToolError, type MiaClient, type ToolReply } from "./mcp";
-import { enforceVerbatim, factGuard, isFactFree, MAX_SENTENCES } from "./verbatim";
+import { compose, readRespond, RESPOND_TOOL, type ChatFacts, type RespondInput } from "./compose";
 
 export type VoiceProfile = Pick<Profile, "locale" | "timezone" | "speech" | "carerName" | "preferredName">;
 export interface Reply { sentences: string[]; rate: number; breakMs: number; tools: string[]; action?: { type: "play_music"; artist: string } }
@@ -20,8 +20,6 @@ export const NIGHT_REPEAT_MINUTES = 10;
 export const TURN_DEADLINE_MS = 10_000;
 export const NOT_UNDERSTOOD_MARKER = "(not understood)";
 export const SPEAKS_FIRST_MARKER = "(Mia started the conversation by herself.)";
-/** Tools whose answer makes the next turn a pill context for the fact guard. */
-const MEDICATION_TOOLS = ["get_medication_status", "confirm_medication"];
 
 /** answer: a real answer; repeat: a repeated answer; filler: "I'm listening." or the calm fallback, never repeated. */
 type ReplyKind = "answer" | "repeat" | "filler";
@@ -31,22 +29,26 @@ export function systemPrompt(p: VoiceProfile): string {
   return [
     `You are Mia, the voice of a care companion for ${p.preferredName}, who has dementia and lives alone. You play the role of Alexa+.`,
     `Always answer in ${language}.`,
-    "Use Mia's tools for anything about the day, appointments, pills, people, going out, coming home, feelings, the night, music or help. Never answer these from general knowledge.",
-    "When a tool returns 'say' sentences, speak them exactly as written. You may add one warm lead-in of at most five words before them.",
-    "At most four short sentences, at most twelve words each. Ask only yes/no questions. Never say she asked before. No medical advice. Never invent facts.",
-    "If speech recognition was unsure, ask one yes/no question to check, like \"Do you mean your pills?\".",
-    `If she answers yes to something Mia asked or offered, do what was offered. If she wants a person, offer to ask ${p.carerName} to call.`,
+    "You never write what Mia says. You choose: Mia's tools speak the facts, and the respond tool adds short warm phrases from a fixed list.",
+    "Use Mia's tools for every fact: the day, appointments, pills, people, going out, coming home, feelings, the night, music or help. Never answer these from general knowledge.",
+    "Always finish your turn by calling respond. Any text you write outside a tool call is ignored and never spoken.",
+    "In respond, choose at most one opener or feeling and at most one yes/no question or closing; use \"none\" where nothing fits. Leave chat empty unless chat_about_life just ran.",
+    "If speech recognition was unsure, call respond with a checking question, like question \"check_pills\" or \"check_day\".",
+    `If she wants a person, choose question "offer_call" (ask ${p.carerName} to call). If you are unsure what she wants, choose "anything_else" or "offer_call".`,
+    "If she answers yes to something Mia asked or offered, call the tool that does what was offered.",
+    "After chat_about_life, chat may hold one or two short warm sentences about the suggested topic, using only facts from that tool. No medicine, no dates.",
   ].join("\n");
 }
 
 /** What one LLM turn has collected so far; kept outside the loop so a failure or timeout can still speak it. */
-interface TurnState { says: string[]; seenSays: Set<string>; used: string[]; chatTool: boolean; action?: Reply["action"]; finished: boolean }
+interface TurnState { says: string[]; seenSays: Set<string>; used: string[]; chatFacts?: ChatFacts; choice: RespondInput | null; action?: Reply["action"]; finished: boolean }
 
 export class Brain {
   private history: ChatMessage[] = [];
   private misses = 0;
   private lastSpoken: string[] = [];
-  private lastWasMedication = false;
+  /** What chat_about_life returned in the previous turn: chat text may draw on it for one more turn. */
+  private lastChatFacts?: ChatFacts;
   private lastNightAt?: Date;
   private queue: Promise<unknown> = Promise.resolve();
 
@@ -70,10 +72,7 @@ export class Brain {
         if (!prompt) return null;
         this.misses = 0;
         this.remember(SPEAKS_FIRST_MARKER, prompt.say);
-        const r = this.reply(prompt.say, []);
-        // A pill prompt makes the next answer a pill answer ("yes" → "Take them now." must go through the tool).
-        if (prompt.kind === "medication") this.lastWasMedication = true;
-        return r;
+        return this.reply(prompt.say, []);
       } catch (err) {
         console.error("[mia-voice] proactive failed:", err);
         return null;
@@ -96,6 +95,8 @@ export class Brain {
     const { mia, profile: p, now } = this.deps;
     const T = templates(p.locale);
     const text = input.text.trim();
+    const previousChat = this.lastChatFacts;
+    this.lastChatFacts = undefined;
 
     // A possible fall always alerts, however unsure the speech recognition was.
     if (text && detectDistress(text)) {
@@ -119,7 +120,7 @@ export class Brain {
       return this.direct(text, "night_reassurance", {});
     }
 
-    return this.llmTurn(text, input.confidence);
+    return this.llmTurn(text, input.confidence, previousChat);
   }
 
   private nightAnsweredRecently(): boolean {
@@ -127,29 +128,27 @@ export class Brain {
     return this.deps.now().getTime() - this.lastNightAt.getTime() < NIGHT_REPEAT_MINUTES * 60_000;
   }
 
-  /** Calls one tool and speaks its answer, then `extra` sentences (fact-free questions), at most four in all. */
-  private async direct(text: string, tool: string, args: Record<string, unknown>, used: string[] = [], extra: string[] = []): Promise<Reply> {
+  /** Calls one tool and speaks its answer word for word. */
+  private async direct(text: string, tool: string, args: Record<string, unknown>): Promise<Reply> {
     const r = await this.deps.mia.call(tool, args);
-    const said = [...enforceVerbatim("", r.say, this.deps.profile.locale), ...extra].slice(0, MAX_SENTENCES);
+    const said = r.say.flatMap((s) => splitSentences(s, this.deps.profile.locale));
     this.remember(text, said);
-    return this.reply(said, [...used, tool]);
+    return this.reply(said, [tool]);
   }
 
-  private async llmTurn(text: string, confidence: number | undefined): Promise<Reply> {
+  private async llmTurn(text: string, confidence: number | undefined, previousChat: ChatFacts | undefined): Promise<Reply> {
     const { profile: p } = this.deps;
-    const state: TurnState = { says: [], seenSays: new Set(), used: [], chatTool: false, finished: false };
+    const state: TurnState = { says: [], seenSays: new Set(), used: [], choice: null, finished: false };
     const deadlineMs = this.deps.turnDeadlineMs ?? TURN_DEADLINE_MS;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const deadline = new Promise<"timeout">((resolve) => { timer = setTimeout(() => resolve("timeout"), deadlineMs); });
 
-    let finalText: string;
     try {
       const outcome = await Promise.race([this.llmLoop(text, confidence, state), deadline]);
       if (outcome === "timeout") {
         console.error(`[mia-voice] turn deadline of ${deadlineMs} ms reached`);
         return this.fallback(text, state);
       }
-      finalText = outcome;
     } catch (err) {
       if (!state.says.length) throw err;
       console.error("[mia-voice] LLM failed after a tool answered:", err);
@@ -165,13 +164,12 @@ export class Brain {
       return this.reply(this.lastSpoken, used, action, "repeat");
     }
 
-    let sentences = enforceVerbatim(finalText, says, p.locale, p.preferredName);
-    if (!says.length) {
-      const guard = factGuard(sentences, text, { chatTool: state.chatTool, lastWasMedication: this.lastWasMedication });
-      // The tool speaks instead; a question of the LLM's that states nothing (a call offer) may follow.
-      if (guard) return this.direct(text, guard, {}, used, sentences.filter((s) => s.trim().endsWith("?") && isFactFree(s)));
-    }
-    if (!sentences.length) sentences = [templates(p.locale).callOffer(p.carerName)];
+    // Chat text may follow chat_about_life of this turn or of the turn before.
+    const chatFacts = state.chatFacts ?? previousChat;
+    this.lastChatFacts = state.chatFacts;
+    const sentences = compose(says, state.choice, {
+      locale: p.locale, name: p.preferredName, carer: p.carerName, ...(chatFacts ? { chatFacts } : {}),
+    });
     this.remember(text, sentences);
     return this.reply(sentences, used, action);
   }
@@ -179,27 +177,36 @@ export class Brain {
   /** The LLM failed or ran out of time: speak what the tools already said, else the calm fallback. */
   private fallback(text: string, state: TurnState): Reply {
     if (!state.says.length) return this.reply(this.systemError(), [...state.used], undefined, "filler");
-    const said = enforceVerbatim("", state.says, this.deps.profile.locale);
+    const said = state.says.flatMap((s) => splitSentences(s, this.deps.profile.locale));
     this.remember(text, said);
     return this.reply(said, [...state.used], state.action);
   }
 
-  private async llmLoop(text: string, confidence: number | undefined, state: TurnState): Promise<string> {
+  private async llmLoop(text: string, confidence: number | undefined, state: TurnState): Promise<void> {
     const { mia, llm, profile: p } = this.deps;
     const userText = confidence !== undefined && confidence < p.speech.confidenceThreshold
       ? `(speech recognition unsure, confidence ${confidence.toFixed(2)}) ${text}`
       : text;
     const messages: ChatMessage[] = [...this.history, { role: "user", text: userText }];
-    const tools = await mia.tools();
+    // respond always last, so the tool list stays byte-identical across requests.
+    const tools = [...(await mia.tools()), RESPOND_TOOL];
     const system = systemPrompt(p);
 
     for (let round = 0; round < MAX_TOOL_ROUNDS && !state.finished; round++) {
       const step = await llm.next({ system, messages, tools });
-      if (step.kind === "text") return step.text;
+      // Claude picks, doesn't write: free text is never spoken, and only its length is logged.
+      if (step.text) console.log(`[mia-voice] ignored ${step.text.length} characters of LLM text`);
+      if (step.kind === "text") return;
       messages.push({ role: "assistant", text: step.text, calls: step.calls });
       const results: { id: string; content: string }[] = [];
+      let responded = false;
       for (const call of step.calls) {
-        if (state.finished) return "";
+        if (state.finished) return;
+        if (call.name === RESPOND_TOOL.name) {
+          state.choice = readRespond(call.input);
+          responded = true;
+          continue;
+        }
         let r: ToolReply;
         try {
           r = await mia.call(call.name, call.input);
@@ -210,16 +217,16 @@ export class Brain {
           continue;
         }
         state.used.push(call.name);
-        if (!r.verbatim) state.chatTool = true;
+        if (call.name === "chat_about_life" && !r.verbatim) state.chatFacts = chatFactsOf(r.facts);
         // The same answer twice (the LLM called a tool again) is spoken once.
         const key = r.say.join("\n");
         if (r.verbatim && !state.seenSays.has(key)) { state.seenSays.add(key); state.says.push(...r.say); }
         if (r.facts.action === "play_music" && typeof r.facts.artist === "string") state.action = { type: "play_music", artist: r.facts.artist };
         results.push({ id: call.id, content: JSON.stringify({ say: r.say, facts: r.facts, guidance: r.guidance }) });
       }
+      if (responded) return;
       messages.push({ role: "tool_results", results });
     }
-    return "";
   }
 
   private remember(userText: string, said: string[]): void {
@@ -232,11 +239,17 @@ export class Brain {
     const rate = (speech.speechRate / 100) * (kind === "repeat" || tools.includes("repeat_last") ? REPEAT_SLOWER : 1);
     const sentences = said.flatMap((s) => splitSentences(s, locale));
     // "Pardon?" repeats the last real answer; a filler or a repeat leaves it, and the pill context, as they were.
-    if (kind === "answer") {
-      this.lastSpoken = sentences;
-      this.lastWasMedication = tools.some((t) => MEDICATION_TOOLS.includes(t));
-    }
+    if (kind === "answer") this.lastSpoken = sentences;
     this.lastNightAt = tools.includes("night_reassurance") ? this.deps.now() : undefined;
     return { sentences, rate, breakMs: speech.sentenceBreakMs, tools, ...(action ? { action } : {}) };
   }
+}
+
+function chatFactsOf(facts: Record<string, unknown>): ChatFacts {
+  const topics = Array.isArray(facts.topics) ? facts.topics.filter((t): t is string => typeof t === "string") : [];
+  return {
+    topics,
+    suggestedTopic: typeof facts.suggestedTopic === "string" ? facts.suggestedTopic : "",
+    ...(typeof facts.carerName === "string" ? { carerName: facts.carerName } : {}),
+  };
 }
