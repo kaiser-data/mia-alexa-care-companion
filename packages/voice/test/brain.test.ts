@@ -3,6 +3,7 @@ import { inMemoryMia } from "@mia/mcp-server/testing";
 import { rose, roseDe, type Profile } from "@mia/shared";
 import { at } from "@mia/shared/testing";
 import { Brain, HISTORY_MESSAGES, NIGHT_REPEAT_MINUTES, SPEAKS_FIRST_MARKER, TURN_DEADLINE_MS } from "../src/brain";
+import { LlmError } from "../src/llm";
 import { connectMia } from "../src/mcp";
 import { hang, respond, ScriptedLlm, text, tool } from "./fakes";
 
@@ -185,6 +186,23 @@ describe("Brain.turn", () => {
     expect(TURN_DEADLINE_MS).toBe(10_000);
     const s = await setup("2026-10-12T11:00:00", [hang()], rose(), 50);
     expect((await s.brain.turn({ text: "What day is it?" })).sentences).toEqual(["I can't check right now.", "Tom can help."]);
+    // The pending request is aborted, not left running.
+    expect(s.llm.signals[0]?.aborted).toBe(true);
+  });
+  it("an LlmError (cut off, refused) after a tool answered: the tool answer is still spoken", async () => {
+    const s = await setup("2026-10-12T08:05:00", [tool("get_medication_status"), new LlmError("LLM stopped: max_tokens")]);
+    expect((await s.brain.turn({ text: "Did I take my pills?" })).sentences).toEqual(PILLS);
+    const none = await setup("2026-10-12T08:05:00", [new LlmError("LLM stopped: refusal")]);
+    expect((await none.brain.turn({ text: "Hello" })).sentences).toEqual(["I can't check right now.", "Tom can help."]);
+  });
+  it("the raw assistant content goes back unchanged within the turn, not into the history", async () => {
+    const raw = [{ type: "thinking", thinking: "pills", signature: "sig" }, { type: "tool_use", id: "t1", name: "get_medication_status", input: {} }];
+    const step = { kind: "tools" as const, text: "", calls: [{ id: "t1", name: "get_medication_status", input: {} }], raw };
+    const s = await setup("2026-10-12T08:05:00", [step, respond(), respond()]);
+    await s.brain.turn({ text: "Did I take my pills?" });
+    expect(s.llm.requests[1]!.messages.at(-2)).toMatchObject({ role: "assistant", raw });
+    await s.brain.turn({ text: "Thanks" });
+    expect(s.llm.requests[2]!.messages.some((m) => m.role === "assistant" && "raw" in m)).toBe(false);
   });
   it("a tool error goes back to the LLM so it can recover", async () => {
     const s = await setup("2026-10-12T11:00:00", [tool("no_such_tool"), respond({ question: "offer_call" })]);

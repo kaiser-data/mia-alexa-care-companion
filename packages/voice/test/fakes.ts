@@ -3,9 +3,11 @@ import type { Llm, LlmRequest, LlmStep } from "../src/llm";
 /** Plays back a fixed list of LLM steps and records every request. */
 export class ScriptedLlm implements Llm {
   readonly requests: LlmRequest[] = [];
+  readonly signals: (AbortSignal | undefined)[] = [];
   constructor(private readonly steps: (LlmStep | Error | "hang")[]) {}
-  async next(req: LlmRequest): Promise<LlmStep> {
+  async next(req: LlmRequest, signal?: AbortSignal): Promise<LlmStep> {
     this.requests.push(structuredClone(req));
+    this.signals.push(signal);
     const step = this.steps.shift();
     if (!step) throw new Error("ScriptedLlm: no more steps");
     if (step instanceof Error) throw step;

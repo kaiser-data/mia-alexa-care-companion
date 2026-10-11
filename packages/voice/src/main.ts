@@ -25,7 +25,7 @@ const miaUrl = process.env.MIA_MCP_URL ?? (await startLocalMia({
 })).url;
 
 const mia = await connectMia({ url: miaUrl, token });
-const llm = new AnthropicLlm(new Anthropic({ apiKey }), process.env.MIA_MODEL ?? DEFAULT_MODEL);
+const llm = new AnthropicLlm(new Anthropic({ apiKey, timeout: 8000, maxRetries: 0 }), process.env.MIA_MODEL ?? DEFAULT_MODEL);
 const brain = new Brain({ mia, llm, profile, now: () => new Date() });
 const voicePort = Number(process.env.VOICE_PORT ?? 8788);
 const app = createVoiceApp({ brain, profile, publicDir: resolve(import.meta.dirname, "../public"), port: voicePort });

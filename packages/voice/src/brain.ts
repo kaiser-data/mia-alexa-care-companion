@@ -141,10 +141,14 @@ export class Brain {
     const state: TurnState = { says: [], seenSays: new Set(), used: [], choice: null, finished: false };
     const deadlineMs = this.deps.turnDeadlineMs ?? TURN_DEADLINE_MS;
     let timer: ReturnType<typeof setTimeout> | undefined;
-    const deadline = new Promise<"timeout">((resolve) => { timer = setTimeout(() => resolve("timeout"), deadlineMs); });
+    // At the deadline the pending LLM request is aborted, not left running.
+    const abort = new AbortController();
+    const deadline = new Promise<"timeout">((resolve) => {
+      timer = setTimeout(() => { abort.abort(); resolve("timeout"); }, deadlineMs);
+    });
 
     try {
-      const outcome = await Promise.race([this.llmLoop(text, confidence, state), deadline]);
+      const outcome = await Promise.race([this.llmLoop(text, confidence, state, abort.signal), deadline]);
       if (outcome === "timeout") {
         console.error(`[mia-voice] turn deadline of ${deadlineMs} ms reached`);
         return this.fallback(text, state);
@@ -182,7 +186,7 @@ export class Brain {
     return this.reply(said, [...state.used], state.action);
   }
 
-  private async llmLoop(text: string, confidence: number | undefined, state: TurnState): Promise<void> {
+  private async llmLoop(text: string, confidence: number | undefined, state: TurnState, signal: AbortSignal): Promise<void> {
     const { mia, llm, profile: p } = this.deps;
     const userText = confidence !== undefined && confidence < p.speech.confidenceThreshold
       ? `(speech recognition unsure, confidence ${confidence.toFixed(2)}) ${text}`
@@ -193,11 +197,11 @@ export class Brain {
     const system = systemPrompt(p);
 
     for (let round = 0; round < MAX_TOOL_ROUNDS && !state.finished; round++) {
-      const step = await llm.next({ system, messages, tools });
+      const step = await llm.next({ system, messages, tools }, signal);
       // Claude picks, doesn't write: free text is never spoken, and only its length is logged.
       if (step.text) console.log(`[mia-voice] ignored ${step.text.length} characters of LLM text`);
       if (step.kind === "text") return;
-      messages.push({ role: "assistant", text: step.text, calls: step.calls });
+      messages.push({ role: "assistant", text: step.text, calls: step.calls, ...(step.raw ? { raw: step.raw } : {}) });
       const results: { id: string; content: string }[] = [];
       let responded = false;
       for (const call of step.calls) {
