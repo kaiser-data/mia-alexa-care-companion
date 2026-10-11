@@ -81,7 +81,7 @@ describe("Plan 2 templates", () => {
   it("en-US", () => {
     const T = templates("en-US");
     expect(T.listening()).toBe("I'm listening.");
-    expect(T.musicStart("Frank Sinatra")).toBe("Here is some Frank Sinatra.");
+    expect(T.musicStart("Ella Fitzgerald")).toBe("Here is some Ella Fitzgerald.");
     expect(T.weatherCold()).toBe("It's cold today. Wear your warm coat.");
     expect(T.weatherRain()).toBe("It may rain today. Take your umbrella.");
     expect(T.proMedAsk("your morning pills")).toBe("Have you taken your morning pills yet?");
@@ -89,14 +89,14 @@ describe("Plan 2 templates", () => {
     expect(T.proAreYouHome("Rose")).toBe("Are you back home, Rose?");
     expect(T.proBedtime("half past nine")).toBe("It's half past nine. Time to get ready for bed.");
     expect(T.proDoorAsk()).toBe("Is the front door locked?");
-    expect(T.proMusicAsk("Frank Sinatra")).toBe("Shall I play some Frank Sinatra?");
+    expect(T.proMusicAsk("Ella Fitzgerald")).toBe("Shall I play some Ella Fitzgerald?");
     expect(T.proHello("Rose")).toBe("Hello, Rose.");
     expect(T.proChatAsk()).toBe("Shall we have a little chat?");
   });
   it("de-DE", () => {
     const T = templates("de-DE");
     expect(T.listening()).toBe("Ich höre zu.");
-    expect(T.musicStart("Frank Sinatra")).toBe("Hier ist etwas von Frank Sinatra.");
+    expect(T.musicStart("Ella Fitzgerald")).toBe("Hier ist etwas von Ella Fitzgerald.");
     expect(T.weatherCold()).toBe("Heute ist es kalt. Zieh deinen warmen Mantel an.");
     expect(T.weatherRain()).toBe("Heute regnet es vielleicht. Nimm deinen Schirm mit.");
     expect(T.proMedAsk("deine Morgentabletten")).toBe("Hast du deine Morgentabletten schon genommen?");
@@ -104,7 +104,7 @@ describe("Plan 2 templates", () => {
     expect(T.proAreYouHome("Rose")).toBe("Bist du wieder zu Hause, Rose?");
     expect(T.proBedtime("halb zehn")).toBe("Es ist halb zehn. Bald ist Schlafenszeit.");
     expect(T.proDoorAsk()).toBe("Ist die Haustür abgeschlossen?");
-    expect(T.proMusicAsk("Frank Sinatra")).toBe("Soll ich etwas von Frank Sinatra spielen?");
+    expect(T.proMusicAsk("Ella Fitzgerald")).toBe("Soll ich etwas von Ella Fitzgerald spielen?");
     expect(T.proHello("Rose")).toBe("Hallo, Rose.");
     expect(T.proChatAsk()).toBe("Wollen wir ein bisschen plaudern?");
   });

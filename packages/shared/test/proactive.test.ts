@@ -56,7 +56,7 @@ describe("proactivePrompt", () => {
   });
   it("Wed 16:30: favourite music offer", () => {
     expect(proactivePrompt(rose(), [], at("2026-10-14T16:30:00"))).toEqual({
-      id: "music:2026-10-14", kind: "music", say: ["Shall I play some Frank Sinatra?"],
+      id: "music:2026-10-14", kind: "music", say: ["Shall I play some Ella Fitzgerald?"],
     });
   });
   it("Wed 20:00: evening pill only (overdue doses are not prompted)", () => {

@@ -77,7 +77,7 @@ export interface Profile {
   speech: SpeechSettings;
   /** for the weather sentence on the way out */
   location?: { latitude: number; longitude: number };
-  /** offered in the late afternoon: "Shall I play some Frank Sinatra?" */
+  /** offered in the late afternoon: "Shall I play some Ella Fitzgerald?" */
   favouriteMusic?: string;
   /** daily gentle check-in for loneliness, e.g. "15:30" */
   checkInTime?: HHMM;

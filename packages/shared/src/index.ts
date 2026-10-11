@@ -7,4 +7,5 @@ export * from "./seed/rose";
 export * from "./i18n/words";
 export * from "./i18n/templates";
 export * from "./i18n/plain";
+export * from "./i18n/phrases";
 export * from "./i18n/distress";

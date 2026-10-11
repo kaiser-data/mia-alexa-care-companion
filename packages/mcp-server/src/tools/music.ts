@@ -7,7 +7,7 @@ export function registerMusicTools(server: McpServer, ctx: ToolContext): void {
     title: "Play her favourite music",
     description:
       "Use when she says yes to music, or asks for music, a song or her favourite singer. The voice device then plays it. " +
-      "Examples: 'Yes, play some music.', 'Can I hear Frank Sinatra?', 'Spiel mir Musik vor.', 'Ja, gerne Musik.'.",
+      "Examples: 'Yes, play some music.', 'Can I hear Ella Fitzgerald?', 'Spiel mir Musik vor.', 'Ja, gerne Musik.'.",
     outputSchema: OUTPUT_SHAPE,
     annotations: { readOnlyHint: false },
   }, async () => run(ctx, async (p) => {

@@ -66,7 +66,7 @@ export function rose(): Profile {
     ],
     speech: defaultSpeech(),
     location: { latitude: 39.9612, longitude: -82.9988 },
-    favouriteMusic: "Frank Sinatra",
+    favouriteMusic: "Ella Fitzgerald",
     checkInTime: "15:30",
   };
 }

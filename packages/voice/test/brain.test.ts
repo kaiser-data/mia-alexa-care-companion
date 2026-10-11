@@ -92,8 +92,8 @@ describe("Brain.turn", () => {
   it("music: the reply carries a play action", async () => {
     const s = await setup("2026-10-14T16:31:00", [tool("play_music"), text("")]);
     const r = await s.brain.turn({ text: "Yes please" });
-    expect(r.sentences).toEqual(["Here is some Frank Sinatra."]);
-    expect(r.action).toEqual({ type: "play_music", artist: "Frank Sinatra" });
+    expect(r.sentences).toEqual(["Here is some Ella Fitzgerald."]);
+    expect(r.action).toEqual({ type: "play_music", artist: "Ella Fitzgerald" });
   });
   it("stops after four tool rounds", async () => {
     const s = await setup("2026-10-12T08:05:00", [tool("get_today"), tool("get_today"), tool("get_today"), tool("get_today")]);
