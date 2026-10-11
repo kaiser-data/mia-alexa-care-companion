@@ -146,9 +146,9 @@ describe("Brain.turn", () => {
     const s = await setup("2026-10-12T08:05:00", [tool("get_medication_status"), respond(), respond({ feeling: "sounds_lovely" }), tool("repeat_last"), respond()]);
     await s.brain.turn({ text: "Did I take my pills?" });
     s.setNow("2026-10-12T11:00:00");
-    expect((await s.brain.turn({ text: "Nice day" })).sentences).toEqual(["That sounds lovely."]);
+    expect((await s.brain.turn({ text: "Nice day" })).sentences).toEqual(["That sounds lovely.", "Shall I ask Tom to call you?"]);
     const again = await s.brain.turn({ text: "Pardon?" });
-    expect(again.sentences).toEqual(["That sounds lovely."]);
+    expect(again.sentences).toEqual(["That sounds lovely.", "Shall I ask Tom to call you?"]);
     expect(again.rate).toBeCloseTo(0.81);
   });
   it("after two misses, 'yes' reaches the LLM with the call offer in history", async () => {
@@ -211,13 +211,33 @@ describe("Brain.turn", () => {
     expect(results.role).toBe("tool_results");
     expect(JSON.parse(results.results[0]!.content)).toHaveProperty("error");
   });
-  it("tool sentences are never cut: over four, only they are spoken", async () => {
+  it("at most four: the pill answer first, the day dropped, the call offer kept (I2)", async () => {
+    const both = { kind: "tools" as const, text: "", calls: [{ id: "a", name: "get_today", input: {} }, { id: "b", name: "get_medication_status", input: {} }] };
+    const s = await setup("2026-10-12T08:05:00", [both, respond({ question: "offer_call" })]);
+    const r = await s.brain.turn({ text: "Tell me everything" });
+    expect(r.sentences).toEqual([...PILLS, "Shall I ask Tom to call you?"]);
+    expect(r.tools).toEqual(["get_today", "get_medication_status"]);
+  });
+  it("over four with an opener: the opener goes, then the lower-priority answer", async () => {
     const both = { kind: "tools" as const, text: "", calls: [{ id: "a", name: "get_today", input: {} }, { id: "b", name: "get_medication_status", input: {} }] };
     const s = await setup("2026-10-12T08:05:00", [both, respond({ opener: "of_course", question: "anything_else" })]);
-    const r = await s.brain.turn({ text: "Tell me everything" });
-    expect(r.sentences).toHaveLength(6);
-    expect(r.sentences[0]).toBe("Today is Monday, October 12.");
-    expect(r.sentences.at(-1)).toBe(PILLS.at(-1));
+    expect((await s.brain.turn({ text: "Tell me everything" })).sentences).toEqual([...PILLS, "Can I help with anything else?"]);
+  });
+  it("a cry for help is spoken before the pill answer", async () => {
+    const both = { kind: "tools" as const, text: "", calls: [{ id: "a", name: "get_medication_status", input: {} }, { id: "b", name: "report_problem", input: { what: "I feel dizzy" } }] };
+    const s = await setup("2026-10-12T08:05:00", [both, respond()]);
+    const r = await s.brain.turn({ text: "I feel dizzy, did I take my pills?" });
+    expect(r.sentences.slice(0, 2)).toEqual(["I've let Tom know right away.", "Tom will get in touch with you."]);
+    expect(r.sentences.length).toBeLessThanOrEqual(4);
+  });
+  it("'Of course' alone is never spoken as a yes (I1)", async () => {
+    const s = await setup("2026-10-12T13:00:00", [respond({ opener: "of_course" }), respond({ opener: "let_me_see" })]);
+    expect((await s.brain.turn({ text: "Can I take my pills again now?" })).sentences).toEqual(["Shall I ask Tom to call you?"]);
+    expect((await s.brain.turn({ text: "What day is it?" })).sentences).toEqual(["Shall I ask Tom to call you?"]);
+  });
+  it("'Thank you.' is not said twice (M1)", async () => {
+    const s = await setup("2026-10-12T08:05:00", [tool("confirm_medication"), respond({ feeling: "thank_you" })]);
+    expect((await s.brain.turn({ text: "I took them" })).sentences).toEqual(["Thank you.", "I've noted your morning pills."]);
   });
 });
 
@@ -336,7 +356,7 @@ describe("'Pardon?' never repeats a filler", () => {
     const s = await setup("2026-10-12T11:00:00", [respond({ feeling: "sounds_lovely" }), tool("repeat_last"), respond()]);
     await s.brain.turn({ text: "Nice day" });
     expect((await s.brain.turn({ text: "" })).sentences).toEqual(["I'm listening."]);
-    expect((await s.brain.turn({ text: "Pardon?" })).sentences).toEqual(["That sounds lovely."]);
+    expect((await s.brain.turn({ text: "Pardon?" })).sentences).toEqual(["That sounds lovely.", "Shall I ask Tom to call you?"]);
   });
   it("with no earlier answer, repeat_last answers by itself", async () => {
     const s = await setup("2026-10-12T11:00:00", [tool("repeat_last"), respond()]);
@@ -349,7 +369,7 @@ describe("'Pardon?' never repeats a filler", () => {
     const s = await setup("2026-10-12T11:00:00", [respond({ feeling: "sounds_lovely" }), new Error("down"), tool("repeat_last"), respond()]);
     await s.brain.turn({ text: "Nice day" });
     expect((await s.brain.turn({ text: "Hello" })).sentences).toEqual(["I can't check right now.", "Tom can help."]);
-    expect((await s.brain.turn({ text: "Pardon?" })).sentences).toEqual(["That sounds lovely."]);
+    expect((await s.brain.turn({ text: "Pardon?" })).sentences).toEqual(["That sounds lovely.", "Shall I ask Tom to call you?"]);
   });
 });
 

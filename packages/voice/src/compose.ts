@@ -1,7 +1,7 @@
 import { phraseIds, phraseText, splitSentences, type Locale, type PhraseKind } from "@mia/shared";
 import type { ToolInfo } from "./mcp";
 
-/** Spec §8: at most four short sentences per answer (tool sentences are never cut). */
+/** Spec §8: at most four short sentences per answer (one tool answer is never cut inside). */
 export const MAX_SENTENCES = 4;
 
 const slot = (kind: PhraseKind) => ({ type: "string", enum: ["none", ...phraseIds(kind)] });
@@ -51,25 +51,55 @@ function pick(id: string | undefined, kind: PhraseKind, ctx: ComposeContext): st
   return phraseText(id, ctx.locale, { name: ctx.name, carer: ctx.carer });
 }
 
+/** What one Mia tool call said, kept together: an answer is spoken whole or not at all. */
+export interface ToolSay { tool: string; says: string[] }
+
+/** Lower comes first: a cry for help, then pills, then comfort, then everything else in call order. */
+const PRIORITY: Record<string, number> = {
+  report_problem: 0,
+  get_medication_status: 1, confirm_medication: 1,
+  comfort_me: 2, night_reassurance: 2,
+};
+const OTHERS = 3;
+/** Openers that may stand without a tool answer: a greeting is not a "yes". */
+const GREETINGS = ["hello", "good_morning", "good_evening"];
+
 /**
- * Builds what Mia says: lead (feeling wins over opener), tool sentences verbatim,
- * then a question (or a closing if there is no question). Cap of four: the lead goes first,
- * then the question/closing; tool sentences are never cut.
- * Nothing to say → the call offer.
+ * Builds what Mia says, at most four sentences, the key answer first.
+ * - Tool answers are ordered by priority and added whole while they fit; one is never cut inside.
+ *   A question reserves its slot. If the first answer alone is too long, it is spoken alone.
+ * - The lead (feeling wins over opener) is added only if it still fits, and not when it repeats the first tool sentence.
+ * - No tool spoke: an optional feeling or greeting, then the question, closing, or a default
+ *   ("anything else" after a greeting, otherwise the call offer). "Of course" alone would sound like a yes, so it is dropped.
  */
-export function compose(toolSays: string[], choice: RespondInput | null, ctx: ComposeContext): string[] {
+export function compose(toolSays: ToolSay[], choice: RespondInput | null, ctx: ComposeContext): string[] {
   const c = choice ?? {};
-  const tools = toolSays.flatMap((s) => splitSentences(s, ctx.locale));
+  const question = pick(c.question, "question", ctx);
+  const end = question ?? pick(c.closing, "closing", ctx);
+  const phrase = (id: string) => phraseText(id, ctx.locale, { name: ctx.name, carer: ctx.carer })!;
+
+  const groups = toolSays
+    .map((g, i) => ({ i, rank: PRIORITY[g.tool] ?? OTHERS, sentences: g.says.flatMap((s) => splitSentences(s, ctx.locale)) }))
+    .filter((g) => g.sentences.length > 0)
+    .sort((a, b) => a.rank - b.rank || a.i - b.i);
+
+  if (!groups.length) {
+    const feeling = pick(c.feeling, "feeling", ctx);
+    const greeting = feeling ? null : GREETINGS.includes(c.opener ?? "") ? pick(c.opener, "opener", ctx) : null;
+    const lead = feeling ?? greeting;
+    return [...(lead ? [lead] : []), end ?? phrase(greeting ? "anything_else" : "offer_call")];
+  }
+
+  const budget = MAX_SENTENCES - (question ? 1 : 0);
+  const [first, ...rest] = groups;
+  if (first!.sentences.length > budget) return first!.sentences;
+  const tools = [...first!.sentences];
+  for (const g of rest) {
+    if (tools.length + g.sentences.length > budget) break;
+    tools.push(...g.sentences);
+  }
+  const out = end && tools.length < MAX_SENTENCES ? [...tools, end] : tools;
   const lead = pick(c.feeling, "feeling", ctx) ?? pick(c.opener, "opener", ctx);
-  const end = pick(c.question, "question", ctx) ?? pick(c.closing, "closing", ctx);
-
-  let leads = lead ? [lead] : [];
-  let ends = end ? [end] : [];
-  const total = () => leads.length + tools.length + ends.length;
-  if (total() > MAX_SENTENCES) leads = [];
-  if (total() > MAX_SENTENCES) ends = [];
-
-  const out = [...leads, ...tools, ...ends];
-  if (out.length) return out;
-  return [phraseText("offer_call", ctx.locale, { name: ctx.name, carer: ctx.carer })!];
+  if (lead && lead !== tools[0] && out.length < MAX_SENTENCES) out.unshift(lead);
+  return out;
 }

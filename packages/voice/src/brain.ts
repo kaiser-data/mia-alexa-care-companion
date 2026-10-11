@@ -1,7 +1,7 @@
 import { detectDistress, localParts, NIGHT_END_MINUTES, splitSentences, templates, type Profile } from "@mia/shared";
 import type { ChatMessage, Llm } from "./llm";
 import { MiaToolError, type MiaClient, type ToolReply } from "./mcp";
-import { compose, readRespond, RESPOND_TOOL, type RespondInput } from "./compose";
+import { compose, readRespond, RESPOND_TOOL, type RespondInput, type ToolSay } from "./compose";
 
 export type VoiceProfile = Pick<Profile, "locale" | "timezone" | "speech" | "carerName" | "preferredName">;
 export interface Reply { sentences: string[]; rate: number; breakMs: number; tools: string[]; action?: { type: "play_music"; artist: string } }
@@ -41,7 +41,7 @@ export function systemPrompt(p: VoiceProfile): string {
 }
 
 /** What one LLM turn has collected so far; kept outside the loop so a failure or timeout can still speak it. */
-interface TurnState { says: string[]; seenSays: Set<string>; used: string[]; choice: RespondInput | null; action?: Reply["action"]; finished: boolean }
+interface TurnState { says: ToolSay[]; seenSays: Set<string>; used: string[]; choice: RespondInput | null; action?: Reply["action"]; finished: boolean }
 
 export class Brain {
   private history: ChatMessage[] = [];
@@ -164,7 +164,7 @@ export class Brain {
       return this.reply(this.lastSpoken, used, action, "repeat");
     }
 
-    const sentences = compose(says, state.choice, { locale: p.locale, name: p.preferredName, carer: p.carerName });
+    const sentences = compose(says, state.choice, this.composeContext());
     this.remember(text, sentences);
     return this.reply(sentences, used, action);
   }
@@ -172,7 +172,8 @@ export class Brain {
   /** The LLM failed or ran out of time: speak what the tools already said, else the calm fallback. */
   private fallback(text: string, state: TurnState): Reply {
     if (!state.says.length) return this.reply(this.systemError(), [...state.used], undefined, "filler");
-    const said = state.says.flatMap((s) => splitSentences(s, this.deps.profile.locale));
+    // No phrases picked, but the same order and cap: the key answer first, at most four sentences.
+    const said = compose(state.says, null, this.composeContext());
     this.remember(text, said);
     return this.reply(said, [...state.used], state.action);
   }
@@ -214,13 +215,18 @@ export class Brain {
         state.used.push(call.name);
         // The same answer twice (the LLM called a tool again) is spoken once.
         const key = r.say.join("\n");
-        if (r.verbatim && !state.seenSays.has(key)) { state.seenSays.add(key); state.says.push(...r.say); }
+        if (r.verbatim && !state.seenSays.has(key)) { state.seenSays.add(key); state.says.push({ tool: call.name, says: r.say }); }
         if (r.facts.action === "play_music" && typeof r.facts.artist === "string") state.action = { type: "play_music", artist: r.facts.artist };
         results.push({ id: call.id, content: JSON.stringify({ say: r.say, facts: r.facts, guidance: r.guidance }) });
       }
       if (responded) return;
       messages.push({ role: "tool_results", results });
     }
+  }
+
+  private composeContext() {
+    const { locale, preferredName, carerName } = this.deps.profile;
+    return { locale, name: preferredName, carer: carerName };
   }
 
   private remember(userText: string, said: string[]): void {
