@@ -1,4 +1,4 @@
-import { detectDistress, localParts, NIGHT_END_MINUTES, splitSentences, templates, type Profile } from "@mia/shared";
+import { detectDistress, detectPillQuestion, localParts, NIGHT_END_MINUTES, splitSentences, templates, type Profile } from "@mia/shared";
 import type { ChatMessage, Llm } from "./llm";
 import { MiaToolError, type MiaClient, type ToolReply } from "./mcp";
 import { compose, readRespond, RESPOND_TOOL, type RespondInput, type ToolSay } from "./compose";
@@ -112,6 +112,10 @@ export class Brain {
     }
     this.misses = 0;
 
+    // A pill question is answered by the pill tool, never by the LLM: a model may answer it without calling the tool.
+    // It wins over night reassurance too: at night as by day, only the pill tool knows whether a dose is due.
+    if (detectPillQuestion(text)) return this.direct(text, "get_medication_status", {});
+
     if (localParts(now(), p.timezone).minutes < NIGHT_END_MINUTES && !this.nightAnsweredRecently()) {
       return this.direct(text, "night_reassurance", {});
     }
@@ -124,10 +128,10 @@ export class Brain {
     return this.deps.now().getTime() - this.lastNightAt.getTime() < NIGHT_REPEAT_MINUTES * 60_000;
   }
 
-  /** Calls one tool and speaks its answer word for word. */
+  /** Calls one tool and speaks its answer word for word, under the same rules as every answer (compose: cap, never silence). */
   private async direct(text: string, tool: string, args: Record<string, unknown>): Promise<Reply> {
     const r = await this.deps.mia.call(tool, args);
-    const said = r.say.flatMap((s) => splitSentences(s, this.deps.profile.locale));
+    const said = compose([{ tool, says: r.say }], null, this.composeContext());
     this.remember(text, said);
     return this.reply(said, [tool]);
   }

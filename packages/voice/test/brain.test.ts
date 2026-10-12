@@ -21,7 +21,7 @@ const PILLS = ["Now it's time for your morning pills.", "That's the small white 
 describe("Brain.turn", () => {
   it("LLM chooses the tool and a phrase; the template sentences are spoken after it", async () => {
     const s = await setup("2026-10-12T08:05:00", [tool("get_medication_status"), respond({ opener: "of_course" })]);
-    const r = await s.brain.turn({ text: "Did I take my pills?", confidence: 0.92 });
+    const r = await s.brain.turn({ text: "Tell me about my pills", confidence: 0.92 });
     expect(r).toEqual({ sentences: ["Of course, Rose.", ...PILLS], rate: 0.9, breakMs: 700, tools: ["get_medication_status"] });
     const tools = s.llm.requests[0]!.tools;
     expect(tools.map((t) => t.name)).toContain("get_medication_status");
@@ -31,7 +31,7 @@ describe("Brain.turn", () => {
   it("text the LLM writes next to its tool calls is never spoken", async () => {
     const step = { kind: "tools" as const, text: "You should take your pills now, dear.", calls: [{ id: "r", name: "respond", input: { opener: "none", feeling: "none", question: "none", closing: "none" } }] };
     const s = await setup("2026-10-12T08:05:00", [tool("get_medication_status"), step]);
-    expect((await s.brain.turn({ text: "pills?" })).sentences).toEqual(PILLS);
+    expect((await s.brain.turn({ text: "my pills" })).sentences).toEqual(PILLS);
   });
   it("'Yes, take it now.' from the LLM is ignored: nothing to say → offer a call", async () => {
     const step = { kind: "tools" as const, text: "Yes, take it now.", calls: [{ id: "r", name: "respond", input: {} }] };
@@ -42,10 +42,10 @@ describe("Brain.turn", () => {
   it("plain LLM text without respond is ignored too", async () => {
     for (const t of ["Yes, you took them at eight. You can relax.", "It's Tuesday today."]) {
       const s = await setup("2026-10-12T08:05:00", [text(t)]);
-      expect((await s.brain.turn({ text: "Did I take my pills?" })).sentences).toEqual(["Shall I ask Tom to call you?"]);
+      expect((await s.brain.turn({ text: "Tell me about my pills" })).sentences).toEqual(["Shall I ask Tom to call you?"]);
     }
     const de = await setup("2026-10-12T08:05:00", [text("Du hast deine Tabletten schon genommen.")], roseDe());
-    expect((await de.brain.turn({ text: "Habe ich meine Tabletten genommen?" })).sentences).toEqual(["Soll ich Tom um einen Anruf bitten?"]);
+    expect((await de.brain.turn({ text: "Erzähl mir von meinen Tabletten" })).sentences).toEqual(["Soll ich Tom um einen Anruf bitten?"]);
   });
   it("tool results go back to the LLM with say, facts and guidance", async () => {
     const s = await setup("2026-10-12T08:05:00", [tool("get_today"), respond()]);
@@ -144,7 +144,7 @@ describe("Brain.turn", () => {
   });
   it("'Pardon?' repeats what Mia really said last, not the last tool answer", async () => {
     const s = await setup("2026-10-12T08:05:00", [tool("get_medication_status"), respond(), respond({ feeling: "sounds_lovely" }), tool("repeat_last"), respond()]);
-    await s.brain.turn({ text: "Did I take my pills?" });
+    await s.brain.turn({ text: "Tell me about my pills" });
     s.setNow("2026-10-12T11:00:00");
     expect((await s.brain.turn({ text: "Nice day" })).sentences).toEqual(["That sounds lovely.", "Shall I ask Tom to call you?"]);
     const again = await s.brain.turn({ text: "Pardon?" });
@@ -191,7 +191,7 @@ describe("Brain.turn", () => {
   });
   it("an LlmError (cut off, refused) after a tool answered: the tool answer is still spoken", async () => {
     const s = await setup("2026-10-12T08:05:00", [tool("get_medication_status"), new LlmError("LLM stopped: max_tokens")]);
-    expect((await s.brain.turn({ text: "Did I take my pills?" })).sentences).toEqual(PILLS);
+    expect((await s.brain.turn({ text: "Tell me about my pills" })).sentences).toEqual(PILLS);
     const none = await setup("2026-10-12T08:05:00", [new LlmError("LLM stopped: refusal")]);
     expect((await none.brain.turn({ text: "Hello" })).sentences).toEqual(["I can't check right now.", "Tom can help."]);
   });
@@ -199,7 +199,7 @@ describe("Brain.turn", () => {
     const raw = [{ type: "thinking", thinking: "pills", signature: "sig" }, { type: "tool_use", id: "t1", name: "get_medication_status", input: {} }];
     const step = { kind: "tools" as const, text: "", calls: [{ id: "t1", name: "get_medication_status", input: {} }], raw };
     const s = await setup("2026-10-12T08:05:00", [step, respond(), respond()]);
-    await s.brain.turn({ text: "Did I take my pills?" });
+    await s.brain.turn({ text: "Tell me about my pills" });
     expect(s.llm.requests[1]!.messages.at(-2)).toMatchObject({ role: "assistant", raw });
     await s.brain.turn({ text: "Thanks" });
     expect(s.llm.requests[2]!.messages.some((m) => m.role === "assistant" && "raw" in m)).toBe(false);
@@ -232,7 +232,7 @@ describe("Brain.turn", () => {
   });
   it("'Of course' alone is never spoken as a yes (I1)", async () => {
     const s = await setup("2026-10-12T13:00:00", [respond({ opener: "of_course" }), respond({ opener: "let_me_see" })]);
-    expect((await s.brain.turn({ text: "Can I take my pills again now?" })).sentences).toEqual(["Shall I ask Tom to call you?"]);
+    expect((await s.brain.turn({ text: "Can I go for a walk now?" })).sentences).toEqual(["Shall I ask Tom to call you?"]);
     expect((await s.brain.turn({ text: "What day is it?" })).sentences).toEqual(["Shall I ask Tom to call you?"]);
   });
   it("'Thank you.' is not said twice (M1)", async () => {
@@ -281,7 +281,7 @@ describe("Claude picks, doesn't write", () => {
       tool("get_medication_status"), respond({ opener: "of_course" }),
       tool("get_medication_status"), respond({ opener: "of_course", question: "anything_else" }),
     ], roseDe());
-    expect((await s.brain.turn({ text: "Habe ich meine Tabletten genommen?" })).sentences).toEqual(["Natürlich, Rose.", ...DE_PILLS]);
+    expect((await s.brain.turn({ text: "Erzähl mir von meinen Tabletten" })).sentences).toEqual(["Natürlich, Rose.", ...DE_PILLS]);
     // Two pill sentences + opener + question are four: all fit.
     expect((await s.brain.turn({ text: "Und jetzt?" })).sentences).toEqual(["Natürlich, Rose.", ...DE_PILLS, "Kann ich sonst noch helfen?"]);
   });
@@ -336,9 +336,9 @@ describe("chat is a pick too: no LLM text is ever spoken", () => {
   const many = (...names: string[]) => ({ kind: "tools" as const, text: "", calls: names.map((n) => ({ id: `c-${n}`, name: n, input: {} })) });
   it("I-2: pills + request_call + offer_call: the call is confirmed, never offered again (en + de)", async () => {
     const en = await setup("2026-10-12T08:05:00", [many("get_medication_status", "request_call"), respond({ question: "offer_call" })]);
-    expect((await en.brain.turn({ text: "pills? call Tom" })).sentences).toEqual([...PILLS, "I've asked Tom to call you."]);
+    expect((await en.brain.turn({ text: "my pills, and call Tom" })).sentences).toEqual([...PILLS, "I've asked Tom to call you."]);
     const de = await setup("2026-10-12T08:05:00", [many("get_medication_status", "request_call"), respond({ question: "offer_call" })], roseDe());
-    expect((await de.brain.turn({ text: "Tabletten? Ruf Tom an" })).sentences).toEqual(["Jetzt ist Zeit für deine Morgentabletten.", "Das ist die kleine weiße und die runde rosa Tablette.", "Ich habe Tom um einen Anruf gebeten."]);
+    expect((await de.brain.turn({ text: "Meine Tabletten, und ruf Tom an" })).sentences).toEqual(["Jetzt ist Zeit für deine Morgentabletten.", "Das ist die kleine weiße und die runde rosa Tablette.", "Ich habe Tom um einen Anruf gebeten."]);
   });
   it("I-2: play_music is announced even when other answers would fill the cap", async () => {
     const s = await setup("2026-10-14T16:31:00", [many("get_today", "get_medication_status", "play_music"), respond()]);
@@ -356,7 +356,7 @@ describe("chat is a pick too: no LLM text is ever spoken", () => {
     for (const [profile, line] of [[rose(), "You can take them now."], [roseDe(), "Du kannst sie jetzt nehmen."]] as const) {
       const s = await setup("2026-10-12T08:30:00", [tool("confirm_medication"), respond(), both, respond({ chat: line })], profile);
       await s.brain.turn({ text: "I took them" });
-      const r = await s.brain.turn({ text: "pills?" });
+      const r = await s.brain.turn({ text: "my pills" });
       expect(r.tools).toEqual(["get_medication_status", "chat_about_life"]);
       expect(r.sentences.join(" ")).not.toMatch(/take them now|sie jetzt nehmen/i);
     }
@@ -369,7 +369,7 @@ describe("chat is a pick too: no LLM text is ever spoken", () => {
     ]);
     await s.brain.turn({ text: "I took them" });
     await s.brain.turn({ text: "Talk to me" });
-    const r = await s.brain.turn({ text: "pills?" });
+    const r = await s.brain.turn({ text: "my pills" });
     expect(r.sentences.join(" ")).not.toMatch(/take them/i);
   });
   it("C2 probe: invented facts in chat are never spoken", async () => {
@@ -438,5 +438,47 @@ describe("Brain.proactive", () => {
   it("nothing to say → null", async () => {
     const s = await setup("2026-10-14T11:00:00", []);
     expect(await s.brain.proactive()).toBeNull();
+  });
+});
+
+describe("a pill question goes straight to the pill tool, never to the LLM", () => {
+  const MON = "2026-10-12T08:05:00";
+  const DE_PILLS = ["Jetzt ist Zeit für deine Morgentabletten.", "Das ist die kleine weiße und die runde rosa Tablette."];
+  const NEVER = () => [new Error("the LLM must not be called for a pill question")];
+
+  it("en + de: the tool's say is spoken word for word, without an LLM request", async () => {
+    for (const [profile, q, said] of [[rose(), "Should I take my pill now?", PILLS], [roseDe(), "Soll ich jetzt meine Tablette nehmen?", DE_PILLS]] as const) {
+      const s = await setup(MON, NEVER(), profile);
+      const r = await s.brain.turn({ text: q, confidence: 0.9 });
+      expect(r).toMatchObject({ sentences: said, tools: ["get_medication_status"] });
+      expect(s.llm.requests).toHaveLength(0);
+    }
+  });
+  it("'Did I take my pills?' after the dose: the log answers, not the LLM", async () => {
+    const s = await setup("2026-10-12T08:30:00", [tool("confirm_medication"), respond(), ...NEVER()]);
+    await s.brain.turn({ text: "I took them" });
+    const r = await s.brain.turn({ text: "Did I take my pills?" });
+    expect(r.tools).toEqual(["get_medication_status"]);
+    expect(r.sentences[0]).toBe("Yes.");
+    expect(s.llm.requests).toHaveLength(2); // both from "I took them"
+  });
+  it("a self-report still goes to the LLM, which records it", async () => {
+    const s = await setup(MON, [tool("confirm_medication"), respond()]);
+    expect((await s.brain.turn({ text: "I took my pills" })).tools).toEqual(["confirm_medication"]);
+    expect(s.llm.requests.length).toBeGreaterThan(0);
+  });
+  it("distress keeps absolute priority: a pill question with a cry for help alerts Tom", async () => {
+    for (const q of ["Help, should I take my pills?", "Did I take too many pills?", "Habe ich zu viele Tabletten genommen?"]) {
+      const s = await setup(MON, NEVER());
+      const r = await s.brain.turn({ text: q });
+      expect(r.tools, q).toEqual(["report_problem"]);
+      expect(s.llm.requests).toHaveLength(0);
+    }
+  });
+  it("at night the pill tool answers a pill question, not night reassurance: it is the only source of truth on doses", async () => {
+    const s = await setup("2026-10-13T03:10:00", NEVER());
+    const r = await s.brain.turn({ text: "Should I take my pills?" });
+    expect(r.tools).toEqual(["get_medication_status"]);
+    expect(s.llm.requests).toHaveLength(0);
   });
 });
