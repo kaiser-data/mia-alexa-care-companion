@@ -106,6 +106,59 @@ describe("compose", () => {
     });
   });
 
+  describe("one question at most, always last (I-1)", () => {
+    it("a tool answer that already ends in a question gets no second question or closing", () => {
+      expect(compose([g("chat_about_life", ["You grew up in Dayton.", "Do you remember that?"])], { question: "offer_call" }, EN))
+        .toEqual(["You grew up in Dayton.", "Do you remember that?"]);
+      expect(compose([g("chat_about_life", ["Du liebst deinen Rosengarten.", "Erinnerst du dich daran?"])], { question: "offer_call", closing: "sleep_well" }, DE))
+        .toEqual(["Du liebst deinen Rosengarten.", "Erinnerst du dich daran?"]);
+    });
+    it("comfort_me already offers the call: the offer is not repeated", () => {
+      expect(compose([g("comfort_me", ["You're safe at home.", "Shall I ask Tom to call you?"])], { question: "offer_call" }, EN))
+        .toEqual(["You're safe at home.", "Shall I ask Tom to call you?"]);
+      expect(compose([g("comfort_me", ["Du bist zu Hause sicher.", "Soll ich Tom um einen Anruf bitten?"])], { question: "offer_call" }, DE))
+        .toEqual(["Du bist zu Hause sicher.", "Soll ich Tom um einen Anruf bitten?"]);
+    });
+    it("the check looks at the last kept sentence after ranking", () => {
+      expect(compose([g("chat_about_life", ["You grew up in Dayton.", "Do you remember that?"]), g("get_medication_status", PILLS.slice(0, 1))], { question: "offer_call" }, EN))
+        .toEqual(["Not yet.", "You grew up in Dayton.", "Do you remember that?"]);
+    });
+  });
+
+  describe("side-effect answers are never cut (I-2)", () => {
+    it("request_call ranks with the pills: confirmed, and no call offer is made", () => {
+      expect(compose([g("get_medication_status", PILLS), g("request_call", ["I've asked Tom to call you."])], { question: "offer_call" }, EN))
+        .toEqual([...PILLS, "I've asked Tom to call you."]);
+      expect(compose([g("get_medication_status", PILLS), g("request_call", ["Ich habe Tom um einen Anruf gebeten."])], { question: "offer_call" }, DE))
+        .toEqual([...PILLS, "Ich habe Tom um einen Anruf gebeten."]);
+    });
+    it("request_call with room left: no call offer; the closing may follow", () => {
+      expect(compose([g("request_call", ["I've asked Tom to call you."])], { question: "offer_call", closing: "lovely_day" }, EN))
+        .toEqual(["I've asked Tom to call you.", "Have a lovely day, Rose."]);
+      expect(compose([g("request_call", ["I've asked Tom to call you."])], { question: "offer_call" }, EN))
+        .toEqual(["I've asked Tom to call you."]);
+    });
+    it("request_call without any say still never gets a call offer", () => {
+      expect(compose([g("request_call", [])], { question: "offer_call" }, EN)).toEqual(["Can I help with anything else?"]);
+    });
+    it("play_music, report_leaving and report_home outrank other answers", () => {
+      for (const tool of ["play_music", "report_leaving", "report_home"])
+        expect(compose([g("get_today", TODAY), g(tool, ["Here is some Ella Fitzgerald."])], null, EN))
+          .toEqual(["Here is some Ella Fitzgerald.", ...TODAY.slice(0, 3)]);
+      expect(compose([g("who_is", ["Tom is your son.", "Tom calls you.", "Tom is kind."]), g("play_music", ["Here is some Ella Fitzgerald.", "Enjoy."])], null, EN))
+        .toEqual(["Here is some Ella Fitzgerald.", "Enjoy."]);
+    });
+    it("play_music is spoken when pills and today would fill the cap", () => {
+      expect(compose([g("get_today", TODAY), g("play_music", ["Here is some Ella Fitzgerald."]), g("get_medication_status", PILLS.slice(0, 2))], null, EN))
+        .toEqual(["Here is some Ella Fitzgerald.", "Not yet.", "Now it's time for your morning pills."]);
+    });
+    it("a group that does not fit is skipped; a later smaller one still fits (continue, not break)", () => {
+      const big = ["One is here.", "Two is here.", "Three is here."];
+      expect(compose([g("get_medication_status", PILLS.slice(0, 2)), g("who_is", big), g("get_today", ["Today is Monday."])], null, EN))
+        .toEqual(["Not yet.", "Now it's time for your morning pills.", "Today is Monday."]);
+    });
+  });
+
   it("the lead is dropped when it repeats the first tool sentence (M1)", () => {
     expect(compose([g("confirm_medication", ["Thank you.", "I've noted your morning pills."])], { feeling: "thank_you" }, EN))
       .toEqual(["Thank you.", "I've noted your morning pills."]);

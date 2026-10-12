@@ -171,7 +171,7 @@ export class Brain {
 
   /** The LLM failed or ran out of time: speak what the tools already said, else the calm fallback. */
   private fallback(text: string, state: TurnState): Reply {
-    if (!state.says.length) return this.reply(this.systemError(), [...state.used], undefined, "filler");
+    if (!state.says.some((g) => g.says.some((x) => x.trim()))) return this.reply(this.systemError(), [...state.used], undefined, "filler");
     // No phrases picked, but the same order and cap: the key answer first, at most four sentences.
     const said = compose(state.says, null, this.composeContext());
     this.remember(text, said);

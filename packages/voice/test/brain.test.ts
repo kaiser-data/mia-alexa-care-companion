@@ -313,8 +313,43 @@ describe("chat is a pick too: no LLM text is ever spoken", () => {
     const chat = "Frank is waiting for you at home.";
     const s = await setup(WED, [tool("chat_about_life"), respond({ chat, question: "offer_call" }), respond({ chat, feeling: "sounds_lovely" })]);
     const first = await s.brain.turn({ text: "I'm lonely" });
-    expect(first.sentences.join(" ")).not.toContain("Frank");
+    expect(first.sentences).toEqual([TOPIC, "Do you remember that?"]);
     expect((await s.brain.turn({ text: "Yes" })).sentences.join(" ")).not.toContain("Frank");
+  });
+  it("I-1: chat_about_life + offer_call asks one question only (en + de)", async () => {
+    const en = await setup(WED, [tool("chat_about_life"), respond({ question: "offer_call" })]);
+    expect((await en.brain.turn({ text: "I'm lonely" })).sentences).toEqual([TOPIC, "Do you remember that?"]);
+    const de = await setup(THU, [tool("chat_about_life"), respond({ question: "offer_call" })], roseDe());
+    expect((await de.brain.turn({ text: "Ich bin allein" })).sentences)
+      .toEqual(["Du liebst deinen Rosengarten, besonders die gelbe Kletterrose.", "Erinnerst du dich daran?"]);
+  });
+  it("I-1: comfort_me + offer_call does not offer the call twice (en + de)", async () => {
+    const en = await setup(WED, [tool("comfort_me"), respond({ question: "offer_call" })]);
+    const e = (await en.brain.turn({ text: "I'm scared" })).sentences;
+    expect(e.filter((x) => x === "Shall I ask Tom to call you?")).toHaveLength(1);
+    expect(e.at(-1)).toBe("Shall I ask Tom to call you?");
+    expect(e).toEqual(["You're safe at home on Linden Street.", "Shall I ask Tom to call you?"]);
+    const de = await setup(WED, [tool("comfort_me"), respond({ question: "offer_call" })], roseDe());
+    const d = (await de.brain.turn({ text: "Ich habe Angst" })).sentences;
+    expect(d).toEqual(["Du bist sicher zu Hause in der Linden Street.", "Soll ich Tom um einen Anruf bitten?"]);
+  });
+  const many = (...names: string[]) => ({ kind: "tools" as const, text: "", calls: names.map((n) => ({ id: `c-${n}`, name: n, input: {} })) });
+  it("I-2: pills + request_call + offer_call: the call is confirmed, never offered again (en + de)", async () => {
+    const en = await setup("2026-10-12T08:05:00", [many("get_medication_status", "request_call"), respond({ question: "offer_call" })]);
+    expect((await en.brain.turn({ text: "pills? call Tom" })).sentences).toEqual([...PILLS, "I've asked Tom to call you."]);
+    const de = await setup("2026-10-12T08:05:00", [many("get_medication_status", "request_call"), respond({ question: "offer_call" })], roseDe());
+    expect((await de.brain.turn({ text: "Tabletten? Ruf Tom an" })).sentences).toEqual(["Noch nicht.", "Jetzt ist Zeit für deine Morgentabletten.", "Das ist die kleine weiße und die runde rosa Tablette.", "Ich habe Tom um einen Anruf gebeten."]);
+  });
+  it("I-2: play_music is announced even when other answers would fill the cap", async () => {
+    const s = await setup("2026-10-14T16:31:00", [many("get_today", "get_medication_status", "play_music"), respond()]);
+    const r = await s.brain.turn({ text: "today, pills, music" });
+    expect(r.action).toEqual({ type: "play_music", artist: "Ella Fitzgerald" });
+    expect(r.sentences).toEqual(["I'm not sure if you had your morning pills yet.", "Let's ask Tom first.", "Here is some Ella Fitzgerald."]);
+  });
+  it("Minor: the LLM fails and every collected answer is empty: the calm system message, not a call offer", async () => {
+    const s = await setup("2026-10-12T08:05:00", [many("who_is"), new LlmError("LLM stopped: max_tokens")]);
+    (s.mia as unknown as { call: () => Promise<unknown> }).call = async () => ({ say: [" "], facts: {}, guidance: "", verbatim: true });
+    expect((await s.brain.turn({ text: "who?" })).sentences).toEqual(["I can't check right now.", "Tom can help."]);
   });
   it("C1 probe: chat next to the pill tool cannot say 'take them now' (en + de)", async () => {
     const both = { kind: "tools" as const, text: "", calls: [{ id: "a", name: "get_medication_status", input: {} }, { id: "b", name: "chat_about_life", input: {} }] };
