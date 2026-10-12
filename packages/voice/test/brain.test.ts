@@ -16,7 +16,7 @@ async function setup(time: string, steps: ConstructorParameters<typeof ScriptedL
   return { brain, mia, llm, store: m.store, setNow: (t: string) => { now = at(t); } };
 }
 
-const PILLS = ["Not yet.", "Now it's time for your morning pills.", "That's the small white pill and the round pink one."];
+const PILLS = ["Now it's time for your morning pills.", "That's the small white pill and the round pink one."];
 
 describe("Brain.turn", () => {
   it("LLM chooses the tool and a phrase; the template sentences are spoken after it", async () => {
@@ -218,10 +218,10 @@ describe("Brain.turn", () => {
     expect(r.sentences).toEqual([...PILLS, "Shall I ask Tom to call you?"]);
     expect(r.tools).toEqual(["get_today", "get_medication_status"]);
   });
-  it("over four with an opener: the opener goes, then the lower-priority answer", async () => {
+  it("over four with an opener: the lower-priority answer goes; the opener fits beside the two pill sentences", async () => {
     const both = { kind: "tools" as const, text: "", calls: [{ id: "a", name: "get_today", input: {} }, { id: "b", name: "get_medication_status", input: {} }] };
     const s = await setup("2026-10-12T08:05:00", [both, respond({ opener: "of_course", question: "anything_else" })]);
-    expect((await s.brain.turn({ text: "Tell me everything" })).sentences).toEqual([...PILLS, "Can I help with anything else?"]);
+    expect((await s.brain.turn({ text: "Tell me everything" })).sentences).toEqual(["Of course, Rose.", ...PILLS, "Can I help with anything else?"]);
   });
   it("a cry for help is spoken before the pill answer", async () => {
     const both = { kind: "tools" as const, text: "", calls: [{ id: "a", name: "get_medication_status", input: {} }, { id: "b", name: "report_problem", input: { what: "I feel dizzy" } }] };
@@ -276,14 +276,14 @@ describe("Claude picks, doesn't write", () => {
     ]);
   });
   it("German: phrases in German, the cap respected", async () => {
-    const DE_PILLS = ["Noch nicht.", "Jetzt ist Zeit für deine Morgentabletten.", "Das ist die kleine weiße und die runde rosa Tablette."];
+    const DE_PILLS = ["Jetzt ist Zeit für deine Morgentabletten.", "Das ist die kleine weiße und die runde rosa Tablette."];
     const s = await setup(MON, [
       tool("get_medication_status"), respond({ opener: "of_course" }),
       tool("get_medication_status"), respond({ opener: "of_course", question: "anything_else" }),
     ], roseDe());
     expect((await s.brain.turn({ text: "Habe ich meine Tabletten genommen?" })).sentences).toEqual(["Natürlich, Rose.", ...DE_PILLS]);
-    // Three pill sentences + opener + question would be five: the opener is dropped first.
-    expect((await s.brain.turn({ text: "Und jetzt?" })).sentences).toEqual([...DE_PILLS, "Kann ich sonst noch helfen?"]);
+    // Two pill sentences + opener + question are four: all fit.
+    expect((await s.brain.turn({ text: "Und jetzt?" })).sentences).toEqual(["Natürlich, Rose.", ...DE_PILLS, "Kann ich sonst noch helfen?"]);
   });
   it("too many pills alerts Tom at once, without the LLM", async () => {
     const s = await setup(MON, []);
@@ -338,7 +338,7 @@ describe("chat is a pick too: no LLM text is ever spoken", () => {
     const en = await setup("2026-10-12T08:05:00", [many("get_medication_status", "request_call"), respond({ question: "offer_call" })]);
     expect((await en.brain.turn({ text: "pills? call Tom" })).sentences).toEqual([...PILLS, "I've asked Tom to call you."]);
     const de = await setup("2026-10-12T08:05:00", [many("get_medication_status", "request_call"), respond({ question: "offer_call" })], roseDe());
-    expect((await de.brain.turn({ text: "Tabletten? Ruf Tom an" })).sentences).toEqual(["Noch nicht.", "Jetzt ist Zeit für deine Morgentabletten.", "Das ist die kleine weiße und die runde rosa Tablette.", "Ich habe Tom um einen Anruf gebeten."]);
+    expect((await de.brain.turn({ text: "Tabletten? Ruf Tom an" })).sentences).toEqual(["Jetzt ist Zeit für deine Morgentabletten.", "Das ist die kleine weiße und die runde rosa Tablette.", "Ich habe Tom um einen Anruf gebeten."]);
   });
   it("I-2: play_music is announced even when other answers would fill the cap", async () => {
     const s = await setup("2026-10-14T16:31:00", [many("get_today", "get_medication_status", "play_music"), respond()]);

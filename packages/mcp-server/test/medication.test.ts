@@ -7,9 +7,9 @@ const types = async (m: Awaited<ReturnType<typeof connect>>) =>
   (await m.store.eventsSince("rose", "2026-10-01T00:00:00Z")).map((e) => e.type);
 
 describe("get_medication_status", () => {
-  it("Monday 08:05, nothing taken: not yet, morning pills, description", async () => {
+  it("Monday 08:05, nothing taken: morning pills, description; no \"Not yet\" lead on a due dose", async () => {
     const r = await (await connect(at("2026-10-12T08:05:00"))).call("get_medication_status");
-    expect(r.say).toEqual(["Not yet.", "Now it's time for your morning pills.", "That's the small white pill and the round pink one."]);
+    expect(r.say).toEqual(["Now it's time for your morning pills.", "That's the small white pill and the round pink one."]);
   });
   it("after confirming: yes with time, next pills with part of day", async () => {
     const m = await connect(at("2026-10-12T08:05:00"));
@@ -24,7 +24,7 @@ describe("get_medication_status", () => {
   });
   it("German", async () => {
     const r = await (await connect(at("2026-10-12T08:05:00"), roseDe())).call("get_medication_status");
-    expect(r.say).toEqual(["Noch nicht.", "Jetzt ist Zeit für deine Morgentabletten.", "Das ist die kleine weiße und die runde rosa Tablette."]);
+    expect(r.say).toEqual(["Jetzt ist Zeit für deine Morgentabletten.", "Das ist die kleine weiße und die runde rosa Tablette."]);
   });
 });
 
@@ -119,7 +119,7 @@ describe("unsure policy: overdue and early reports", () => {
   it("Wednesday 20:00, nothing taken: only the evening pill is due; morning and noon flagged as overdue", async () => {
     const m = await connect(at("2026-10-14T20:00:00"));
     const r = await m.call("get_medication_status");
-    expect(r.say).toEqual(["Not yet.", "Now it's time for your evening pill.", "That's the white capsule."]);
+    expect(r.say).toEqual(["Now it's time for your evening pill.", "That's the white capsule."]);
     const unsure = (await events(m)).filter((e) => e.type === "med_unsure");
     expect(unsure).toHaveLength(2);
     expect(unsure).toMatchObject([

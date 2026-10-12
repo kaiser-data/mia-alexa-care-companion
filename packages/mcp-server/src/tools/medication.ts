@@ -39,8 +39,9 @@ export function registerMedicationTools(server: McpServer, ctx: ToolContext): vo
     let say: string[];
     if (due.length) {
       await flagUnsure(ctx, unsure);
-      const lead = taken.length ? T.medTaken(taken.at(-1)!.name, timeWords(taken.at(-1)!.takenAt!, p.locale)) : T.notYet();
-      say = [lead, T.medDue(names(due, p)), T.medIs(joinList(due.map((d) => d.description), p.locale))];
+      // A due dose never opens with "Not yet": it reads as "don't take it". Only an earlier dose today is named first.
+      const lead = taken.length ? [T.medTaken(taken.at(-1)!.name, timeWords(taken.at(-1)!.takenAt!, p.locale))] : [];
+      say = [...lead, T.medDue(names(due, p)), T.medIs(joinList(due.map((d) => d.description), p.locale))];
     } else if (unsure.length) {
       await flagUnsure(ctx, unsure);
       // Name only the earliest unsure dose: two names make the sentence too long to follow. The carer is told about all of them.
