@@ -82,16 +82,17 @@ describe("compose", () => {
       expect(compose([g("who_is", ["Tom is your son."]), g("get_today", ["Today is Monday."])], null, EN))
         .toEqual(["Tom is your son.", "Today is Monday."]);
     });
+    const FOUR = ["One is here.", "Two is here.", "Three is here.", "Four is here."];
     it("a question reserves its slot: a four-sentence answer is spoken alone", () => {
-      const four = [...TODAY, "Not yet."];
+      const four = FOUR;
       expect(compose([g("get_today", four)], { question: "offer_call" }, EN)).toEqual(four);
     });
     it("a closing does not reserve a slot: it is dropped when four tool sentences fill the answer", () => {
-      const four = [...TODAY, "Not yet."];
+      const four = FOUR;
       expect(compose([g("get_today", four)], { closing: "lovely_day" }, EN)).toEqual(four);
     });
     it("one answer over four is spoken whole, alone", () => {
-      const five = [...TODAY, "Not yet.", "Now it's time for your morning pills."];
+      const five = [...FOUR, "Five is here."];
       expect(compose([g("get_today", five), g("who_is", ["Tom is your son."])], { feeling: "im_glad", question: "offer_call" }, EN)).toEqual(five);
     });
     it("never cuts inside one answer", () => {
@@ -196,7 +197,7 @@ function fixtures(locale: Locale) {
     chat: [de ? "Du liebst deinen Rosengarten." : "You grew up in Dayton.", T.rememberAsk()],
     chatEmpty: [T.callOffer(C)],
     who: [T.personIs("Frank", de ? "dein Mann" : "husband")],
-    today: [T.todayIs(de ? "Montag, 12. Oktober" : "Monday, October 12"), T.leaveFor(de ? "die Tagesgruppe" : "Maple Grove Day Club", de ? "zwanzig vor zehn" : "twenty to ten")],
+    today: [T.todayIs(de ? "Montag, 12. Oktober" : "Monday, October 12"), T.leaveFor(de ? "die Tagesgruppe" : "Maple Grove Day Club", de ? "zwanzig vor zehn" : "twenty to ten"), T.repeatDay(de ? "Montag" : "Monday")],
     night: [T.nightIs(de ? "drei Uhr" : "three o'clock"), T.nightSafe()],
   };
 }
@@ -264,6 +265,30 @@ describe.each([["en", EN], ["de", DE]] as const)("pills first, one call offer at
   });
 });
 
+describe.each([["en", EN], ["de", DE]] as const)("the repeated day is the first thing given up (%s)", (_, ctx) => {
+  const T = templates(ctx.locale);
+  const de = ctx.locale === "de-DE";
+  // get_today on Sunday, October 11, in the evening: the date, the next routine (bedtime), the day repeated.
+  const sunday = [T.todayIs(de ? "Sonntag, der 11. Oktober" : "Sunday, October 11"), T.nextRoutine(de ? "Schlafenszeit" : "bedtime", de ? "halb zehn abends" : "half past nine in the evening"), T.repeatDay(de ? "Sonntag" : "Sunday")];
+  const appointment = [T.apptNotToday(de ? "Tagesgruppe" : "Maple Grove Day Club", de ? "Montag" : "Monday")];
+
+  it("get_today alone still speaks all three sentences", () => {
+    expect(compose([g("get_today", sunday)], null, ctx)).toEqual(sunday);
+    expect(compose([g("get_today", sunday)], { question: "anything_else" }, ctx)).toEqual([...sunday, phraseText("anything_else", ctx.locale, ctx)]);
+  });
+  it("get_today + get_next_appointment: the repeated day gives way, both answers fit", () => {
+    const appt = splitAll(appointment, ctx.locale);
+    expect(appt).toHaveLength(2);
+    expect(compose([g("get_today", sunday), g("get_next_appointment", appointment)], null, ctx)).toEqual([sunday[0], sunday[1], ...appt]);
+    expect(compose([g("get_next_appointment", appointment), g("get_today", sunday)], null, ctx)).toEqual([...appt, sunday[0], sunday[1]]);
+  });
+  it("the repeated day gives way to a question, and is kept before a lead or a closing", () => {
+    const who = [T.personIs("Frank", de ? "dein Mann" : "husband")];
+    expect(compose([g("get_today", sunday), g("who_is", who)], { question: "offer_call" }, ctx)).toEqual([sunday[0], sunday[1], ...who, T.callOffer("Tom")]);
+    expect(compose([g("get_today", sunday), g("who_is", who)], { opener: "of_course", closing: "lovely_day" }, ctx)).toEqual([...sunday, ...who]);
+  });
+});
+
 const splitAll = (says: string[], locale: Locale) => says.flatMap((s) => splitSentences(s, locale));
 
 /**
@@ -279,6 +304,8 @@ const splitAll = (says: string[], locale: Locale) => says.flatMap((s) => splitSe
  *    "Do you remember that?" always follows the life-story sentence it refers to.
  * 8. Every side-effect confirmation that ran is spoken whenever report_problem, the pills and all side-effect facts
  *    together fit in four: no question, picked or a tool's own, ever pushes one out.
+ * 9. get_today's repeated day ("Today is Monday.") is the first thing given up: when its answer is spoken without it,
+ *    the answer is full and holds no lead or closing.
  */
 describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool combinations (%s)", (_, ctx) => {
   const F = fixtures(ctx.locale);
@@ -295,6 +322,7 @@ describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool c
   const MEDS = ["get_medication_status", "confirm_medication"];
   const SIDE = ["request_call", "play_music", "report_leaving", "report_home"];
   const isQ = (s: string) => s.trimEnd().endsWith("?");
+  const CLOSINGS = new Set(CHOICES.flatMap((c) => (c?.closing ? [phraseText(c.closing, ctx.locale, ctx)!] : [])));
   const LEADS = new Set(CHOICES.flatMap((c) => [c?.feeling, c?.opener]).flatMap((id) => (id ? [phraseText(id, ctx.locale, ctx)!] : [])));
   const words = (s: string) => s.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
 
@@ -340,6 +368,11 @@ describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool c
           // (Facts another tool also says, like night_reassurance's "You're safe at home.", cannot tell whose answer was kept.)
           const shared = says.some((o) => o !== s && splitAll(o.says, ctx.locale).some((x) => facts.includes(x)));
           if (isQ(last) && sentences.includes(last) && facts.length && !shared && facts.some((f) => out.includes(f))) expect(facts, tag).toContain(out.at(-2));
+        }
+        if (says.some((s) => s.tool === "get_today") && out.includes(F.today[0]!) && !out.includes(F.today[2]!)) {
+          expect(out.length, tag).toBe(MAX_SENTENCES);
+          const fromTools = new Set(says.flatMap((s) => splitAll(s.says, ctx.locale)));
+          for (const s of out) if (!fromTools.has(s)) expect(LEADS.has(s) || CLOSINGS.has(s), tag).toBe(false);
         }
         const factsOf = (tools: string[]) => says.filter((s) => tools.includes(s.tool)).flatMap((s) => splitAll(s.says, ctx.locale).filter((x) => !isQ(x)));
         const sideFacts = factsOf(SIDE);

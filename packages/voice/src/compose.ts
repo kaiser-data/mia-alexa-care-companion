@@ -1,4 +1,4 @@
-import { phraseIds, phraseText, splitSentences, templates, type Locale, type PhraseKind } from "@mia/shared";
+import { phraseIds, phraseText, splitSentences, templates, weekdayName, type Locale, type PhraseKind, type Weekday } from "@mia/shared";
 import type { ToolInfo } from "./mcp";
 
 /** Spec §8: at most four short sentences per answer (one tool answer is never cut inside). */
@@ -69,6 +69,9 @@ const OTHERS = 3;
 const GREETINGS = ["hello", "good_morning", "good_evening"];
 
 const isQuestion = (s: string) => s.trimEnd().endsWith("?");
+/** get_today's closing "Today is Sunday." (the shared repeatDay template): the first thing given up when space is short. */
+const repeatDays = (locale: Locale) =>
+  new Set(([1, 2, 3, 4, 5, 6, 7] as Weekday[]).map((w) => templates(locale).repeatDay(weekdayName(w, locale))));
 
 /**
  * Builds what Mia says. Invariants (checked on every output by the table test in compose.test.ts):
@@ -88,8 +91,10 @@ const isQuestion = (s: string) => s.trimEnd().endsWith("?");
  *    (a tool question replaces the picked one), else the picked question. Otherwise no question is asked at all.
  *    After request_call no call offer is made: neither the picked offer_call nor a tool's own call offer
  *    (the shared callOffer template, e.g. from comfort_me).
- * 3. Then, only while places are free: the closing (only without a question), then the lead (feeling wins over opener;
- *    not when it repeats the first sentence).
+ * 3. Then, only while places are free: get_today's repeated day ("Today is Sunday.", the shared repeatDay template,
+ *    not counted in step 1), then the closing (only without a question), then the lead (feeling wins over opener;
+ *    not when it repeats the first sentence). So the repeated day is the first thing given up, and get_today alone
+ *    still speaks all three sentences.
  * Order: the kept answers in rank order; an answer whose question is asked moves last, whole, so its question
  * follows its own facts ("Do you remember that?" after the life-story sentence). The pills never ask, so they stay first.
  * No tool spoke: an optional feeling or greeting, then the question, closing, or a default
@@ -104,12 +109,17 @@ export function compose(toolSays: ToolSay[], choice: RespondInput | null, ctx: C
   const closing = pick(c.closing, "closing", ctx);
   const phrase = (id: string) => phraseText(id, ctx.locale, { name: ctx.name, carer: ctx.carer })!;
 
+  const repeats = repeatDays(ctx.locale);
   const groups = toolSays
     .map((g, i) => {
       const sentences = g.says.flatMap((s) => splitSentences(s, ctx.locale)).filter((s) => !(requestedCall && s === callOffer));
-      return { i, rank: PRIORITY[g.tool] ?? OTHERS, facts: sentences.filter((s) => !isQuestion(s)), question: sentences.find(isQuestion) ?? null };
+      const statements = sentences.filter((s) => !isQuestion(s));
+      return {
+        i, rank: PRIORITY[g.tool] ?? OTHERS, statements,
+        facts: statements.filter((s) => !repeats.has(s)), question: sentences.find(isQuestion) ?? null,
+      };
     })
-    .filter((g) => g.facts.length > 0 || g.question)
+    .filter((g) => g.statements.length > 0 || g.question)
     .sort((a, b) => a.rank - b.rank || a.i - b.i);
 
   if (!groups.length) {
@@ -119,7 +129,7 @@ export function compose(toolSays: ToolSay[], choice: RespondInput | null, ctx: C
     return [...(lead ? [lead] : []), picked ?? closing ?? phrase(greeting || requestedCall ? "anything_else" : "offer_call")];
   }
 
-  if (groups[0]!.facts.length > MAX_SENTENCES) return groups[0]!.facts;
+  if (groups[0]!.facts.length > MAX_SENTENCES) return groups[0]!.statements;
 
   // 1. The answers' facts.
   const kept: typeof groups = [];
@@ -135,10 +145,16 @@ export function compose(toolSays: ToolSay[], choice: RespondInput | null, ctx: C
 
   // 2. The question, if a place is free.
   const question = used < MAX_SENTENCES ? (asking?.question ?? picked) : null;
+  if (question) used++;
+  // 3. The repeated day, the closing and the lead, only into free places.
   const order = question && asking ? [...kept.filter((g) => g !== asking), asking] : kept;
-  const out = order.flatMap((g) => g.facts);
+  const out = order.flatMap((g) => g.statements.filter((s) => {
+    if (!repeats.has(s)) return true;
+    if (used >= MAX_SENTENCES) return false;
+    used++;
+    return true;
+  }));
   if (question) out.push(question);
-  // 3. Closing and lead, only into free places.
   else if (closing && out.length < MAX_SENTENCES) out.push(closing);
   const lead = pick(c.feeling, "feeling", ctx) ?? pick(c.opener, "opener", ctx);
   if (lead && lead !== out[0] && out.length < MAX_SENTENCES) out.unshift(lead);

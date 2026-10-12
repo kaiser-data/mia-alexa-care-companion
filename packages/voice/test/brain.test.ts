@@ -482,3 +482,14 @@ describe("a pill question goes straight to the pill tool, never to the LLM", () 
     expect(s.llm.requests).toHaveLength(0);
   });
 });
+
+describe("the group answer fits beside the day", () => {
+  it("'What day is it, and is it group today?': the repeated day gives way to the group answer (real tools)", async () => {
+    const both = { kind: "tools" as const, text: "", calls: [{ id: "a", name: "get_today", input: {} }, { id: "b", name: "get_next_appointment", input: { name: "group" } }] };
+    const s = await setup("2026-10-12T08:05:00", [both, respond()]);
+    expect((await s.brain.turn({ text: "What day is it, and is it group today?" })).sentences).toEqual([
+      "Today is Monday, October 12.", "You leave for Maple Grove Day Club at twenty to ten.",
+      "Yes, Maple Grove Day Club is today.", "You leave at twenty to ten.",
+    ]);
+  });
+});
