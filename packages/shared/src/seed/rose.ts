@@ -58,7 +58,7 @@ export function rose(): Profile {
     ],
     lifeStory: [
       "You were a school librarian for 38 years at Westgate Elementary.",
-      "You love your rose garden, especially the yellow climbing rose by the porch.",
+      "You love your rose garden, especially the yellow climbing rose.",
       "You love Frank Sinatra and Ella Fitzgerald.",
       "You married Frank in 1966 and went to Niagara Falls.",
       "You grew up in Dayton, the youngest of four sisters.",
