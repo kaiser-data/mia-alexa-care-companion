@@ -12,7 +12,7 @@ describe("chooseLlm", () => {
   });
   it("falls back to featherless with its default model", () => {
     const c = chooseLlm({ FEATHERLESS_API_KEY: "f" });
-    expect(c).toMatchObject({ provider: "featherless", model: "moonshotai/Kimi-K2-Instruct-0905" });
+    expect(c).toMatchObject({ provider: "featherless", model: "openai/gpt-oss-120b" });
     expect(c.llm).toBeInstanceOf(OpenAiCompatLlm);
   });
   it("MIA_MODEL overrides the model", () => {

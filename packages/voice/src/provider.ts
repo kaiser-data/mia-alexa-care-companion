@@ -8,8 +8,11 @@ export interface ChosenLlm { llm: Llm; provider: Provider; model: string }
 type Env = Record<string, string | undefined>;
 
 export const FEATHERLESS_BASE_URL = "https://api.featherless.ai/v1";
-/** Measured 2026-10-12: ~1.7 s per step with correct tool and respond picks; slower models miss the 10 s turn deadline. */
-export const FEATHERLESS_MODEL = "moonshotai/Kimi-K2-Instruct-0905";
+/**
+ * Live probe 2026-10-12: gpt-oss-120b picked the right tool 15/15 at 3–5 s per turn. Kimi K2 0905 is faster (~1.7 s per
+ * step) but answered both pill questions without calling the pill tool; it stays available via MIA_MODEL.
+ */
+export const FEATHERLESS_MODEL = "openai/gpt-oss-120b";
 
 function need(env: Env, name: string, why = ""): string {
   const v = env[name];

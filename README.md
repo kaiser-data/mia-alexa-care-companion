@@ -13,7 +13,7 @@ Requires Node 24, pnpm 10, Chrome or Edge (for speech), and an API key for one m
     export ANTHROPIC_API_KEY=…        # from your secret store; never commit it
     pnpm dev                          # Mia Voice on http://127.0.0.1:8788 (starts the Mia MCP server too)
 
-Choose the model with `LLM_PROVIDER`: `anthropic` (needs `ANTHROPIC_API_KEY`), `featherless` (needs `FEATHERLESS_API_KEY`; default model `moonshotai/Kimi-K2-Instruct-0905`) or `openai` (any OpenAI-compatible endpoint: `LLM_BASE_URL`, `LLM_API_KEY`, `MIA_MODEL`). Unset, it uses Anthropic if its key is present, otherwise Featherless. `MIA_MODEL` overrides the model. The startup log names the provider and model, never the key.
+Choose the model with `LLM_PROVIDER`: `anthropic` (needs `ANTHROPIC_API_KEY`), `featherless` (needs `FEATHERLESS_API_KEY`; default model `openai/gpt-oss-120b`, which picked the right tool 15 of 15 times at 3–5 s per turn in a live probe; `MIA_MODEL=moonshotai/Kimi-K2-Instruct-0905` is faster but less reliable: it answered pill questions without calling the pill tool) or `openai` (any OpenAI-compatible endpoint: `LLM_BASE_URL`, `LLM_API_KEY`, `MIA_MODEL`). Unset, it uses Anthropic if its key is present, otherwise Featherless. `MIA_MODEL` overrides the model. The startup log names the provider and model, never the key.
 
 Tap the circle once and talk — no name, no wake word. Mia also speaks first at pill time, when it's time to leave for the group, at bedtime and for an afternoon chat. You can type instead of speaking.
 
