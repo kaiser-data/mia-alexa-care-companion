@@ -1,7 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AnthropicLlm } from "../src/anthropic";
 import { OpenAiCompatLlm } from "../src/openai-compat";
-import { chooseLlm } from "../src/provider";
+import { chooseLlm, modelTuning } from "../src/provider";
 
 describe("chooseLlm", () => {
   it("defaults to anthropic when its key is set", () => {
@@ -40,5 +40,37 @@ describe("chooseLlm", () => {
   });
   it("never puts a key in an error message", () => {
     try { chooseLlm({ LLM_PROVIDER: "openai", LLM_API_KEY: "sk-leak" }); } catch (e) { expect((e as Error).message).not.toContain("sk-leak"); }
+  });
+  describe("gpt-oss keeps reasoning short", () => {
+    afterEach(() => vi.unstubAllGlobals());
+    /** The body chooseLlm's model would send, through a stubbed global fetch. */
+    async function bodyFor(env: Record<string, string>): Promise<Record<string, unknown>> {
+      let body: Record<string, unknown> = {};
+      vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+        body = JSON.parse(init.body as string);
+        return new Response(JSON.stringify({ choices: [{ message: { content: "ok" }, finish_reason: "stop" }] }));
+      });
+      await chooseLlm(env).llm.next({ system: "s", messages: [{ role: "user", text: "hi" }], tools: [] });
+      return body;
+    }
+    it("only a gpt-oss model gets reasoning_effort low and room for its reasoning", () => {
+      expect(modelTuning("openai/gpt-oss-120b")).toEqual({ reasoningEffort: "low", maxTokens: 1024 });
+      expect(modelTuning("openai/gpt-oss-20b")).toEqual({ reasoningEffort: "low", maxTokens: 1024 });
+      expect(modelTuning("mistralai/Mistral-Large-Instruct-2411")).toEqual({});
+      expect(modelTuning("moonshotai/Kimi-K2-Instruct-0905")).toEqual({});
+    });
+    it("featherless default (gpt-oss) sends reasoning_effort low with max_tokens 1024", async () => {
+      expect(await bodyFor({ FEATHERLESS_API_KEY: "f" })).toMatchObject({ model: "openai/gpt-oss-120b", reasoning_effort: "low", max_tokens: 1024 });
+    });
+    it("another featherless or openai-compatible model sends neither", async () => {
+      const mistral = await bodyFor({ FEATHERLESS_API_KEY: "f", MIA_MODEL: "mistralai/Mistral-Large-Instruct-2411" });
+      expect(mistral).not.toHaveProperty("reasoning_effort");
+      expect(mistral.max_tokens).toBe(400);
+      expect(await bodyFor({ LLM_PROVIDER: "openai", LLM_BASE_URL: "https://x/v1", LLM_API_KEY: "k", MIA_MODEL: "m" })).not.toHaveProperty("reasoning_effort");
+    });
+    it("gpt-oss behind LLM_PROVIDER=openai is tuned the same way", async () => {
+      const env = { LLM_PROVIDER: "openai", LLM_BASE_URL: "https://x/v1", LLM_API_KEY: "k", MIA_MODEL: "gpt-oss-120b" };
+      expect(await bodyFor(env)).toMatchObject({ reasoning_effort: "low", max_tokens: 1024 });
+    });
   });
 });

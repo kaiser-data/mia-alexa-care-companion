@@ -7,6 +7,8 @@ export interface OpenAiCompatOptions {
   fetch?: typeof globalThis.fetch;
   timeoutMs?: number;
   maxTokens?: number;
+  /** Sent as reasoning_effort only when set: a reasoning model (gpt-oss) accepts it, others reject unknown parameters. */
+  reasoningEffort?: "low" | "medium" | "high";
 }
 
 type WireMessage =
@@ -69,6 +71,7 @@ export class OpenAiCompatLlm implements Llm {
     const body = JSON.stringify({
       model: this.opts.model,
       max_tokens: this.maxTokens,
+      ...(this.opts.reasoningEffort ? { reasoning_effort: this.opts.reasoningEffort } : {}),
       messages: toOpenAi(req.system, req.messages),
       tools: req.tools.map((t) => ({ type: "function", function: { name: t.name, description: t.description, parameters: t.inputSchema } })),
       tool_choice: "auto",

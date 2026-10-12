@@ -24,6 +24,12 @@ const MIA_TOOL = { name: "get_today", description: "The day.", inputSchema: { ty
 const REQ: LlmRequest = { system: "You are Mia.", messages: [{ role: "user", text: "What day is it?" }], tools: [MIA_TOOL, { ...RESPOND_TOOL }] };
 
 describe("OpenAiCompatLlm request", () => {
+  it("sends reasoning_effort and the max_tokens it is given, when set", async () => {
+    const f = fakeFetch([{ body: choice({ content: "Hi" }) }]);
+    const llm = new OpenAiCompatLlm({ baseUrl: "https://x.test/v1", apiKey: "k", model: "m1", fetch: f.fetch, reasoningEffort: "low", maxTokens: 1024 });
+    await llm.next(REQ);
+    expect(f.calls[0]!.body).toMatchObject({ reasoning_effort: "low", max_tokens: 1024 });
+  });
   it("posts to /chat/completions with auth, model, max_tokens, tools and tool_choice", async () => {
     const { llm, calls } = llmWith([{ body: choice({ content: "Hi" }) }]);
     await llm.next(REQ);
@@ -33,6 +39,8 @@ describe("OpenAiCompatLlm request", () => {
     expect(c.init.headers).toEqual({ authorization: "Bearer sk-secret", "content-type": "application/json" });
     expect(c.body).toMatchObject({ model: "m1", max_tokens: 400, tool_choice: "auto" });
     expect(c.body).not.toHaveProperty("temperature");
+    // Models that do not reason reject unknown parameters (HTTP 400), so it is only sent when asked for.
+    expect(c.body).not.toHaveProperty("reasoning_effort");
     const tools = c.body.tools as { type: string; function: Record<string, unknown> }[];
     expect(tools[0]).toEqual({ type: "function", function: { name: "get_today", description: "The day.", parameters: MIA_TOOL.inputSchema } });
     expect(tools.every((t) => t.type === "function" && !("strict" in t.function))).toBe(true);
