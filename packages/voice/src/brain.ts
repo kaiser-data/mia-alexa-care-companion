@@ -112,7 +112,8 @@ export class Brain {
     }
     this.misses = 0;
 
-    // A pill question is answered by the pill tool, never by the LLM: a model may answer it without calling the tool.
+    // A plain pill question is answered by the pill tool, never by the LLM: a model may answer it without calling the tool.
+    // Anything less plain (a self-report, a symptom, a second request) goes to the LLM, which can record, alert or ask Tom.
     // It wins over night reassurance too: at night as by day, only the pill tool knows whether a dose is due.
     if (detectPillQuestion(text)) return this.direct(text, "get_medication_status", {});
 

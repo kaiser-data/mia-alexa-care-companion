@@ -232,7 +232,8 @@ describe("Brain.turn", () => {
   });
   it("'Of course' alone is never spoken as a yes (I1)", async () => {
     const s = await setup("2026-10-12T13:00:00", [respond({ opener: "of_course" }), respond({ opener: "let_me_see" })]);
-    expect((await s.brain.turn({ text: "Can I go for a walk now?" })).sentences).toEqual(["Shall I ask Tom to call you?"]);
+    // "again" keeps a pill question on the LLM path, where "Of course" must not be heard as "yes, take them" (M-7).
+    expect((await s.brain.turn({ text: "Can I take my pills again now?" })).sentences).toEqual(["Shall I ask Tom to call you?"]);
     expect((await s.brain.turn({ text: "What day is it?" })).sentences).toEqual(["Shall I ask Tom to call you?"]);
   });
   it("'Thank you.' is not said twice (M1)", async () => {
@@ -466,6 +467,30 @@ describe("a pill question goes straight to the pill tool, never to the LLM", () 
     const s = await setup(MON, [tool("confirm_medication"), respond()]);
     expect((await s.brain.turn({ text: "I took my pills" })).tools).toEqual(["confirm_medication"]);
     expect(s.llm.requests.length).toBeGreaterThan(0);
+  });
+  it("C-1: a self-report without 'I' goes to the LLM, which records it; Mia never says the dose is due (en + de)", async () => {
+    const DE_THANKS = ["Danke.", "Ich habe deine Morgentabletten notiert."];
+    for (const [profile, q, due, noted] of [
+      [rose(), "Had my pills already.", PILLS[0], ["Thank you.", "I've noted your morning pills."]],
+      [roseDe(), "Hab meine Tabletten schon genommen", DE_PILLS[0], DE_THANKS],
+      [roseDe(), "Hab ich doch meine Tabletten genommen", DE_PILLS[0], DE_THANKS],
+    ] as const) {
+      const s = await setup(MON, [tool("confirm_medication"), respond({ feeling: "thank_you" })], profile);
+      const r = await s.brain.turn({ text: q, confidence: 0.9 });
+      expect(s.llm.requests.length, q).toBeGreaterThan(0);
+      expect(s.llm.requests[0]!.messages.at(-1), q).toEqual({ role: "user", text: q });
+      expect(r.tools, q).toEqual(["confirm_medication"]);
+      expect(r.sentences, q).not.toContain(due);
+      expect(r.sentences, q).toEqual(noted);
+    }
+  });
+  it("I-1: a pill question with a symptom after it goes to the LLM, which can alert Tom (en + de)", async () => {
+    for (const [profile, q] of [[rose(), "Should I take a pill, I feel dizzy"], [roseDe(), "Muss ich eine Tablette nehmen, mir ist schwindelig?"]] as const) {
+      const s = await setup(MON, [tool("report_problem", { what: q }), respond()], profile);
+      const r = await s.brain.turn({ text: q });
+      expect(r.tools, q).toEqual(["report_problem"]);
+      expect(s.llm.requests.length, q).toBeGreaterThan(0);
+    }
   });
   it("distress keeps absolute priority: a pill question with a cry for help alerts Tom", async () => {
     for (const q of ["Help, should I take my pills?", "Did I take too many pills?", "Habe ich zu viele Tabletten genommen?"]) {
