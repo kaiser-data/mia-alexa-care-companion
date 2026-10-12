@@ -199,6 +199,8 @@ function fixtures(locale: Locale) {
     who: [T.personIs("Frank", de ? "dein Mann" : "husband")],
     today: [T.todayIs(de ? "Montag, 12. Oktober" : "Monday, October 12"), T.leaveFor(de ? "die Tagesgruppe" : "Maple Grove Day Club", de ? "zwanzig vor zehn" : "twenty to ten"), T.repeatDay(de ? "Montag" : "Monday")],
     night: [T.nightIs(de ? "drei Uhr" : "three o'clock"), T.nightSafe()],
+    // get_next_appointment on a day without the group: the answer and its repeated day ("On Monday.").
+    apptNot: [T.apptNotToday(de ? "Tagesgruppe" : "Maple Grove Day Club", de ? "Montag" : "Monday"), T.onDay(de ? "Montag" : "Monday")],
   };
 }
 
@@ -270,17 +272,22 @@ describe.each([["en", EN], ["de", DE]] as const)("the repeated day is the first 
   const de = ctx.locale === "de-DE";
   // get_today on Sunday, October 11, in the evening: the date, the next routine (bedtime), the day repeated.
   const sunday = [T.todayIs(de ? "Sonntag, der 11. Oktober" : "Sunday, October 11"), T.nextRoutine(de ? "Schlafenszeit" : "bedtime", de ? "halb zehn abends" : "half past nine in the evening"), T.repeatDay(de ? "Sonntag" : "Sunday")];
-  const appointment = [T.apptNotToday(de ? "Tagesgruppe" : "Maple Grove Day Club", de ? "Montag" : "Monday")];
+  // get_next_appointment on a day without the group: the real tool shape, "Not today. … is on Monday." + "On Monday.".
+  const appointment = [T.apptNotToday(de ? "Tagesgruppe" : "Maple Grove Day Club", de ? "Montag" : "Monday"), T.onDay(de ? "Montag" : "Monday")];
 
   it("get_today alone still speaks all three sentences", () => {
     expect(compose([g("get_today", sunday)], null, ctx)).toEqual(sunday);
     expect(compose([g("get_today", sunday)], { question: "anything_else" }, ctx)).toEqual([...sunday, phraseText("anything_else", ctx.locale, ctx)]);
   });
-  it("get_today + get_next_appointment: the repeated day gives way, both answers fit", () => {
+  it("get_next_appointment alone still speaks all three sentences", () => {
     const appt = splitAll(appointment, ctx.locale);
-    expect(appt).toHaveLength(2);
-    expect(compose([g("get_today", sunday), g("get_next_appointment", appointment)], null, ctx)).toEqual([sunday[0], sunday[1], ...appt]);
-    expect(compose([g("get_next_appointment", appointment), g("get_today", sunday)], null, ctx)).toEqual([...appt, sunday[0], sunday[1]]);
+    expect(appt).toHaveLength(3);
+    expect(compose([g("get_next_appointment", appointment)], null, ctx)).toEqual(appt);
+  });
+  it("get_today + get_next_appointment: both repeated days give way, both answers fit, in either call order (I-3)", () => {
+    const [notToday, isOn] = splitAll(appointment, ctx.locale);
+    expect(compose([g("get_today", sunday), g("get_next_appointment", appointment)], null, ctx)).toEqual([sunday[0], sunday[1], notToday, isOn]);
+    expect(compose([g("get_next_appointment", appointment), g("get_today", sunday)], null, ctx)).toEqual([notToday, isOn, sunday[0], sunday[1]]);
   });
   it("the repeated day gives way to a question, and is kept before a lead or a closing", () => {
     const who = [T.personIs("Frank", de ? "dein Mann" : "husband")];
@@ -302,8 +309,8 @@ const splitAll = (says: string[], locale: Locale) => says.flatMap((s) => splitSe
  * 6. No sentence is spoken twice.
  * 7. A tool's own question is spoken right after a sentence of that same tool (when the tool has any other sentence):
  *    "Do you remember that?" always follows the life-story sentence it refers to.
- * 8. Every side-effect confirmation that ran is spoken whenever report_problem, the pills and all side-effect facts
- *    together fit in four: no question, picked or a tool's own, ever pushes one out.
+ * 8. A side-effect confirmation is dropped only when report_problem, the pills and the side-effects called before it
+ *    already fill the four places with it: then nothing else is spoken, no question and no lower-ranked answer.
  * 9. get_today's repeated day ("Today is Monday.") is the first thing given up: when its answer is spoken without it,
  *    the answer is full and holds no lead or closing.
  */
@@ -313,7 +320,7 @@ describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool c
     g("report_problem", F.problem), g("get_medication_status", F.pills4), g("get_medication_status", F.pills3), g("get_medication_status", F.pills2),
     g("confirm_medication", F.confirm), g("request_call", F.call), g("play_music", F.music), g("report_leaving", F.leaving), g("report_home", F.home),
     g("comfort_me", F.comfort), g("chat_about_life", F.chat), g("chat_about_life", F.chatEmpty), g("who_is", F.who), g("get_today", F.today),
-    g("night_reassurance", F.night),
+    g("night_reassurance", F.night), g("get_next_appointment", F.apptNot),
   ];
   const CHOICES = [
     null, { question: "offer_call" }, { question: "anything_else" }, { closing: "lovely_day" },
@@ -375,8 +382,17 @@ describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool c
           for (const s of out) if (!fromTools.has(s)) expect(LEADS.has(s) || CLOSINGS.has(s), tag).toBe(false);
         }
         const factsOf = (tools: string[]) => says.filter((s) => tools.includes(s.tool)).flatMap((s) => splitAll(s.says, ctx.locale).filter((x) => !isQ(x)));
-        const sideFacts = factsOf(SIDE);
-        if (factsOf(["report_problem", ...MEDS]).length + sideFacts.length <= MAX_SENTENCES) for (const f of sideFacts) expect(out, tag).toContain(f);
+        // (8) Side-effects are walked in call order, right after report_problem and the pills.
+        const factsIn = (s: ToolSay) => splitAll(s.says, ctx.locale).filter((x) => !isQ(x));
+        const sides = says.filter((s) => SIDE.includes(s.tool));
+        const higher = new Set([...factsOf(["report_problem", ...MEDS]), ...sides.flatMap(factsIn)]);
+        for (const [k, side] of sides.entries()) {
+          const facts = factsIn(side);
+          if (facts.every((f) => out.includes(f))) continue;
+          const before = [...factsOf(["report_problem", ...MEDS]), ...sides.slice(0, k).flatMap(factsIn)].filter((f) => out.includes(f));
+          expect(before.length + facts.length, tag).toBeGreaterThan(MAX_SENTENCES);
+          for (const x of out) expect(higher.has(x), tag).toBe(true);
+        }
         checked++;
       }
     }

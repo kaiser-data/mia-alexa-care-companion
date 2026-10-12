@@ -509,6 +509,26 @@ describe("a pill question goes straight to the pill tool, never to the LLM", () 
 });
 
 describe("the group answer fits beside the day", () => {
+  it("I-3: Sunday evening, 'What day is it, and is it group today?': both answers, no repeated day (real tools, en + de, both orders)", async () => {
+    const calls = (first: string, name: string) => {
+      const today = { id: "a", name: "get_today", input: {} };
+      const group = { id: "b", name: "get_next_appointment", input: { name } };
+      return { kind: "tools" as const, text: "", calls: first === "get_today" ? [today, group] : [group, today] };
+    };
+    for (const [profile, q, day, appt] of [
+      [rose(), "What day is it, and is it group today?", ["Today is Sunday, October 11."], ["Not today.", "Maple Grove Day Club is on Monday."]],
+      [roseDe(), "Welcher Tag ist heute, und ist heute Gruppe?", ["Heute ist Sonntag, der 11. Oktober."], ["Heute nicht.", "Tagesgruppe ist am Montag."]],
+    ] as const) {
+      for (const first of ["get_today", "get_next_appointment"]) {
+        const s = await setup("2026-10-11T19:00:00", [calls(first, profile.locale === "de-DE" ? "Gruppe" : "group"), respond()], profile);
+        const r = await s.brain.turn({ text: q });
+        const tag = `${profile.locale} ${first}`;
+        expect(r.sentences, tag).toHaveLength(4);
+        expect(r.sentences[first === "get_today" ? 0 : 2], tag).toBe(day[0]);
+        expect(r.sentences.slice(first === "get_today" ? 2 : 0, first === "get_today" ? 4 : 2), tag).toEqual(appt);
+      }
+    }
+  });
   it("'What day is it, and is it group today?': the repeated day gives way to the group answer (real tools)", async () => {
     const both = { kind: "tools" as const, text: "", calls: [{ id: "a", name: "get_today", input: {} }, { id: "b", name: "get_next_appointment", input: { name: "group" } }] };
     const s = await setup("2026-10-12T08:05:00", [both, respond()]);

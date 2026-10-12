@@ -69,9 +69,15 @@ const OTHERS = 3;
 const GREETINGS = ["hello", "good_morning", "good_evening"];
 
 const isQuestion = (s: string) => s.trimEnd().endsWith("?");
-/** get_today's closing "Today is Sunday." (the shared repeatDay template): the first thing given up when space is short. */
-const repeatDays = (locale: Locale) =>
-  new Set(([1, 2, 3, 4, 5, 6, 7] as Weekday[]).map((w) => templates(locale).repeatDay(weekdayName(w, locale))));
+/**
+ * Lines that only repeat the weekday just said, the first thing given up when space is short: get_today's closing
+ * "Today is Sunday." (the shared repeatDay template) and get_next_appointment's "On Monday." (the shared onDay template).
+ */
+const repeatDays = (locale: Locale) => {
+  const T = templates(locale);
+  const days = ([1, 2, 3, 4, 5, 6, 7] as Weekday[]).map((w) => weekdayName(w, locale));
+  return new Set(days.flatMap((d) => [T.repeatDay(d), T.onDay(d)]));
+};
 
 /**
  * Builds what Mia says. Invariants (checked on every output by the table test in compose.test.ts):
@@ -91,10 +97,10 @@ const repeatDays = (locale: Locale) =>
  *    (a tool question replaces the picked one), else the picked question. Otherwise no question is asked at all.
  *    After request_call no call offer is made: neither the picked offer_call nor a tool's own call offer
  *    (the shared callOffer template, e.g. from comfort_me).
- * 3. Then, only while places are free: get_today's repeated day ("Today is Sunday.", the shared repeatDay template,
- *    not counted in step 1), then the closing (only without a question), then the lead (feeling wins over opener;
- *    not when it repeats the first sentence). So the repeated day is the first thing given up, and get_today alone
- *    still speaks all three sentences.
+ * 3. Then, only while places are free: the repeated days (get_today's "Today is Sunday." and get_next_appointment's
+ *    "On Monday.", the shared repeatDay and onDay templates, not counted in step 1), then the closing (only without a
+ *    question), then the lead (feeling wins over opener; not when it repeats the first sentence). So a repeated day is
+ *    the first thing given up, and either tool alone still speaks all three sentences.
  * Order: the kept answers in rank order; an answer whose question is asked moves last, whole, so its question
  * follows its own facts ("Do you remember that?" after the life-story sentence). The pills never ask, so they stay first.
  * No tool spoke: an optional feeling or greeting, then the question, closing, or a default
