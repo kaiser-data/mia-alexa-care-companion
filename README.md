@@ -6,12 +6,14 @@ Built for the [Build, Ship, Shape: Amazon Developer Hackathon](https://amazonapp
 
 ## Run locally (no AWS needed)
 
-Requires Node 24, pnpm 10, Chrome or Edge (for speech), and an Anthropic API key.
+Requires Node 24, pnpm 10, Chrome or Edge (for speech), and an API key for one model provider (see below).
 
     pnpm install
     cp .env.example .env              # set MIA_DEV_TOKEN to a long random string
     export ANTHROPIC_API_KEY=…        # from your secret store; never commit it
     pnpm dev                          # Mia Voice on http://127.0.0.1:8788 (starts the Mia MCP server too)
+
+Choose the model with `LLM_PROVIDER`: `anthropic` (needs `ANTHROPIC_API_KEY`), `featherless` (needs `FEATHERLESS_API_KEY`; default model `moonshotai/Kimi-K2-Instruct-0905`) or `openai` (any OpenAI-compatible endpoint: `LLM_BASE_URL`, `LLM_API_KEY`, `MIA_MODEL`). Unset, it uses Anthropic if its key is present, otherwise Featherless. `MIA_MODEL` overrides the model. The startup log names the provider and model, never the key.
 
 Tap the circle once and talk — no name, no wake word. Mia also speaks first at pill time, when it's time to leave for the group, at bedtime and for an afternoon chat. You can type instead of speaking.
 
