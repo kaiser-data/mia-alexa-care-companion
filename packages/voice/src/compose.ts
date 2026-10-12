@@ -72,41 +72,44 @@ const isQuestion = (s: string) => s.trimEnd().endsWith("?");
 
 /**
  * Builds what Mia says. Invariants (checked on every output by the table test in compose.test.ts):
- * never silence; at most four sentences; at most one question, always the last sentence;
- * never a call offer after request_call ran; the pills are never dropped or displaced by side-effect answers.
+ * never silence; at most four sentences; at most one question, always the last sentence, right after its own tool's
+ * facts; never a call offer after request_call ran; the pills are never dropped or displaced by side-effect answers;
+ * a side-effect confirmation is never dropped for a question.
  *
- * - Order: report_problem, then the pills (get_medication_status, confirm_medication), then the side-effect answers
- *   (request_call, play_music, report_leaving, report_home), then comfort_me / night_reassurance, then the rest in call order.
- * - Tool answers are added whole while they fit; a later smaller one may still fit. If the first answer alone is too long,
- *   it is spoken alone. When the pills (3) and report_home (2) cannot both fit, the pills win and report_home is dropped.
- * - One question: a tool answer's own question is taken out of its place and asked last. If several kept answers ask,
- *   only the highest-ranked one's question is asked; the others' facts are kept, their questions dropped.
- *   A tool question replaces the picked question and the closing.
- * - The question slot is reserved only when a question will really be asked. A picked (not tool) question gives its
- *   reserved slot up for the first answer and for a pills or side-effect answer that would otherwise not fit.
- *   A closing reserves nothing and follows only if there is room.
- * - After request_call no call offer is made: neither the picked offer_call nor a tool's own call offer (the shared
- *   callOffer template, e.g. from comfort_me).
- * - The lead (feeling wins over opener) is added only if it still fits, and not when it repeats the first tool sentence.
- * - No tool spoke: an optional feeling or greeting, then the question, closing, or a default
- *   ("anything else" after a greeting, otherwise the call offer). "Of course" alone would sound like a yes, so it is dropped.
+ * One rule decides what is spoken: fill four places in priority order, then say the kept parts in rank order.
+ * 1. Tool answers are walked in rank order: report_problem, the pills (get_medication_status, confirm_medication),
+ *    the side-effects (request_call, play_music, report_leaving, report_home), comfort_me / night_reassurance, then the
+ *    rest in call order. Each answer's facts (its sentences without its question) are kept whole or not at all;
+ *    a later smaller answer may still fit.
+ *    - The first answer and every answer up to the side-effects count only their facts: no question keeps them out.
+ *    - comfort and the rest must also leave the place for the question that will be asked, if any.
+ *    - If the first answer's facts alone exceed four, it is spoken alone, whole.
+ * 2. The question takes the next place if one is free: the own question of the first kept answer that has one
+ *    (a tool question replaces the picked one), else the picked question. Otherwise no question is asked at all.
+ *    After request_call no call offer is made: neither the picked offer_call nor a tool's own call offer
+ *    (the shared callOffer template, e.g. from comfort_me).
+ * 3. Then, only while places are free: the closing (only without a question), then the lead (feeling wins over opener;
+ *    not when it repeats the first sentence).
+ * Order: the kept answers in rank order; an answer whose question is asked moves last, whole, so its question
+ * follows its own facts ("Do you remember that?" after the life-story sentence). The pills never ask, so they stay first.
+ * No tool spoke: an optional feeling or greeting, then the question, closing, or a default
+ * ("anything else" after a greeting, otherwise the call offer). "Of course" alone would sound like a yes, so it is dropped.
  */
 export function compose(toolSays: ToolSay[], choice: RespondInput | null, ctx: ComposeContext): string[] {
   const c = choice ?? {};
   // A call that was just requested is never offered again.
   const requestedCall = toolSays.some((g) => g.tool === "request_call");
   const callOffer = templates(ctx.locale).callOffer(ctx.carer);
-  let picked = requestedCall && c.question === "offer_call" ? null : pick(c.question, "question", ctx);
+  const picked = requestedCall && c.question === "offer_call" ? null : pick(c.question, "question", ctx);
   const closing = pick(c.closing, "closing", ctx);
   const phrase = (id: string) => phraseText(id, ctx.locale, { name: ctx.name, carer: ctx.carer })!;
 
   const groups = toolSays
-    .map((g, i) => ({
-      i,
-      rank: PRIORITY[g.tool] ?? OTHERS,
-      sentences: g.says.flatMap((s) => splitSentences(s, ctx.locale)).filter((s) => !(requestedCall && s === callOffer)),
-    }))
-    .filter((g) => g.sentences.length > 0)
+    .map((g, i) => {
+      const sentences = g.says.flatMap((s) => splitSentences(s, ctx.locale)).filter((s) => !(requestedCall && s === callOffer));
+      return { i, rank: PRIORITY[g.tool] ?? OTHERS, facts: sentences.filter((s) => !isQuestion(s)), question: sentences.find(isQuestion) ?? null };
+    })
+    .filter((g) => g.facts.length > 0 || g.question)
     .sort((a, b) => a.rank - b.rank || a.i - b.i);
 
   if (!groups.length) {
@@ -116,26 +119,27 @@ export function compose(toolSays: ToolSay[], choice: RespondInput | null, ctx: C
     return [...(lead ? [lead] : []), picked ?? closing ?? phrase(greeting || requestedCall ? "anything_else" : "offer_call")];
   }
 
-  if (groups[0]!.sentences.length > MAX_SENTENCES) return groups[0]!.sentences;
+  if (groups[0]!.facts.length > MAX_SENTENCES) return groups[0]!.facts;
 
-  const facts: string[] = [];
-  let asked: string | null = null; // a tool's own question, asked last
+  // 1. The answers' facts.
+  const kept: typeof groups = [];
+  let used = 0;
+  let asking: (typeof groups)[number] | null = null;
   for (const [n, g] of groups.entries()) {
-    const own = g.sentences.filter(isQuestion);
-    const gFacts = g.sentences.filter((s) => !isQuestion(s));
-    const ask: string | null = asked ?? own[0] ?? null;
-    const cost = (withPicked: string | null) => facts.length + gFacts.length + (ask ?? withPicked ? 1 : 0);
-    if (cost(picked) > MAX_SENTENCES) {
-      // A merely reserved slot gives way to the first answer, the pills and a side-effect answer.
-      if (asked || !picked || !(n === 0 || g.rank <= SIDE_EFFECTS) || cost(null) > MAX_SENTENCES) continue;
-      picked = null;
-    }
-    facts.push(...gFacts);
-    asked = ask;
+    const reserve = n === 0 || g.rank <= SIDE_EFFECTS ? 0 : (asking ?? g.question ?? picked) ? 1 : 0;
+    if (used + g.facts.length + reserve > MAX_SENTENCES) continue;
+    kept.push(g);
+    used += g.facts.length;
+    if (!asking && g.question) asking = g;
   }
 
-  const question = asked ?? picked;
-  const out = question ? [...facts, question] : closing && facts.length < MAX_SENTENCES ? [...facts, closing] : facts;
+  // 2. The question, if a place is free.
+  const question = used < MAX_SENTENCES ? (asking?.question ?? picked) : null;
+  const order = question && asking ? [...kept.filter((g) => g !== asking), asking] : kept;
+  const out = order.flatMap((g) => g.facts);
+  if (question) out.push(question);
+  // 3. Closing and lead, only into free places.
+  else if (closing && out.length < MAX_SENTENCES) out.push(closing);
   const lead = pick(c.feeling, "feeling", ctx) ?? pick(c.opener, "opener", ctx);
   if (lead && lead !== out[0] && out.length < MAX_SENTENCES) out.unshift(lead);
   return out;

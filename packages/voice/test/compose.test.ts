@@ -5,7 +5,10 @@ import { compose, MAX_SENTENCES, readRespond, RESPOND_TOOL, type ToolSay } from 
 const EN = { locale: "en-US" as const, name: "Rose", carer: "Tom" };
 const DE = { locale: "de-DE" as const, name: "Rose", carer: "Tom" };
 const TODAY = ["Today is Monday, October 12.", "You leave for Maple Grove Day Club at twenty to ten.", "Today is Monday."];
-const PILLS = ["Not yet.", "Now it's time for your morning pills.", "That's the small white pill and the round pink one."];
+/** get_medication_status after an earlier dose with none due (production shape: "Yes." splits off). */
+const PILLS = ["Yes.", "You took your morning pills at eight o'clock.", "Your next pills are at six in the evening."];
+/** get_medication_status with a dose due and none taken earlier. */
+const DUE = ["Now it's time for your morning pills.", "That's the small white pill and the round pink one."];
 const PROBLEM = ["I've let Tom know right away.", "Tom will get in touch with you."];
 const g = (tool: string, says: string[]): ToolSay => ({ tool, says });
 
@@ -23,7 +26,7 @@ describe("RESPOND_TOOL", () => {
 
 describe("compose", () => {
   it("lead, tool sentences, question", () => {
-    expect(compose([g("get_medication_status", ["Not yet."])], { opener: "of_course", question: "anything_else" }, EN))
+    expect(compose([g("confirm_medication", ["Not yet."])], { opener: "of_course", question: "anything_else" }, EN))
       .toEqual(["Of course, Rose.", "Not yet.", "Can I help with anything else?"]);
   });
   it("splits tool entries into sentences", () => {
@@ -120,8 +123,9 @@ describe("compose", () => {
         .toEqual(["Du bist zu Hause sicher.", "Soll ich Tom um einen Anruf bitten?"]);
     });
     it("the check looks at the last kept sentence after ranking", () => {
-      expect(compose([g("chat_about_life", ["You grew up in Dayton.", "Do you remember that?"]), g("get_medication_status", PILLS.slice(0, 1))], { question: "offer_call" }, EN))
-        .toEqual(["Not yet.", "You grew up in Dayton.", "Do you remember that?"]);
+      const next = ["Your next pills are at six in the evening."];
+      expect(compose([g("chat_about_life", ["You grew up in Dayton.", "Do you remember that?"]), g("get_medication_status", next)], { question: "offer_call" }, EN))
+        .toEqual([...next, "You grew up in Dayton.", "Do you remember that?"]);
     });
   });
 
@@ -149,13 +153,13 @@ describe("compose", () => {
         .toEqual(["Here is some Ella Fitzgerald.", "Enjoy."]);
     });
     it("play_music is spoken when pills and today would fill the cap; the pills stay first (I-B)", () => {
-      expect(compose([g("get_today", TODAY), g("play_music", ["Here is some Ella Fitzgerald."]), g("get_medication_status", PILLS.slice(0, 2))], null, EN))
-        .toEqual(["Not yet.", "Now it's time for your morning pills.", "Here is some Ella Fitzgerald."]);
+      expect(compose([g("get_today", TODAY), g("play_music", ["Here is some Ella Fitzgerald."]), g("get_medication_status", DUE)], null, EN))
+        .toEqual(["Now it's time for your morning pills.", "That's the small white pill and the round pink one.", "Here is some Ella Fitzgerald."]);
     });
     it("a group that does not fit is skipped; a later smaller one still fits (continue, not break)", () => {
       const big = ["One is here.", "Two is here.", "Three is here."];
-      expect(compose([g("get_medication_status", PILLS.slice(0, 2)), g("who_is", big), g("get_today", ["Today is Monday."])], null, EN))
-        .toEqual(["Not yet.", "Now it's time for your morning pills.", "Today is Monday."]);
+      expect(compose([g("get_medication_status", DUE), g("who_is", big), g("get_today", ["Today is Monday."])], null, EN))
+        .toEqual(["Now it's time for your morning pills.", "That's the small white pill and the round pink one.", "Today is Monday."]);
     });
   });
 
@@ -180,7 +184,8 @@ function fixtures(locale: Locale) {
     callOffer: T.callOffer(C),
     problem: [T.distressAck(C), T.distressFollow(C)],
     pills4: [T.medTaken(de ? "deine Morgentabletten" : "your morning pills", de ? "acht Uhr" : "eight o'clock"), T.medDue(de ? "deine Abendtablette" : "your evening pill"), T.medIs(de ? "die weiße Kapsel" : "the white capsule")],
-    pills3: [T.notYet(), T.medDue(de ? "deine Morgentabletten" : "your morning pills"), T.medIs(de ? "die kleine weiße Tablette" : "the small white pill")],
+    // Production shapes of get_medication_status: taken earlier + due (4 once "Yes." splits off), taken + next (3), due (2).
+    pills3: [T.medTaken(de ? "deine Morgentabletten" : "your morning pills", de ? "acht Uhr" : "eight o'clock"), T.medNextAt(de ? "sechs Uhr abends" : "six in the evening")],
     pills2: [T.medDue(de ? "deine Abendtablette" : "your evening pill"), T.medIs(de ? "die weiße Kapsel" : "the white capsule")],
     confirm: [T.medConfirmed(de ? "deine Morgentabletten" : "your morning pills")],
     call: [T.callRequested(C)],
@@ -201,15 +206,20 @@ describe.each([["en", EN], ["de", DE]] as const)("pills first, one call offer at
   const anything = phraseText("anything_else", ctx.locale, ctx)!;
 
   it("I-B: a side-effect called before the pills never displaces them; the reserved question slot is released", () => {
+    const pills = splitAll(F.pills3, ctx.locale);
     for (const side of ["request_call", "play_music"] as const) {
       const says = side === "request_call" ? F.call : F.music;
-      expect(compose([g(side, says), g("get_medication_status", F.pills3)], { question: "anything_else" }, ctx)).toEqual([...F.pills3, ...says]);
-      expect(compose([g("get_medication_status", F.pills3), g(side, says)], { question: "anything_else" }, ctx)).toEqual([...F.pills3, ...says]);
+      expect(compose([g(side, says), g("get_medication_status", F.pills3)], { question: "anything_else" }, ctx)).toEqual([...pills, ...says]);
+      expect(compose([g("get_medication_status", F.pills3), g(side, says)], { question: "anything_else" }, ctx)).toEqual([...pills, ...says]);
     }
   });
-  it("I-B: pills (3) + report_home (2) cannot both fit: the pills win in either call order", () => {
-    expect(compose([g("report_home", F.home), g("get_medication_status", F.pills3)], null, ctx)).toEqual(F.pills3);
-    expect(compose([g("get_medication_status", F.pills3), g("report_home", F.home)], null, ctx)).toEqual(F.pills3);
+  it("I-2: pills (3) + report_home: the welcome is kept and its question dropped, in either call order", () => {
+    const pills = splitAll(F.pills3, ctx.locale);
+    expect(compose([g("report_home", F.home), g("get_medication_status", F.pills3)], null, ctx)).toEqual([...pills, F.home[0]]);
+    expect(compose([g("get_medication_status", F.pills3), g("report_home", F.home)], null, ctx)).toEqual([...pills, F.home[0]]);
+  });
+  it("pills (4) fill the answer: a side-effect confirmation cannot follow; the pills win", () => {
+    expect(compose([g("report_home", F.home), g("get_medication_status", F.pills4)], null, ctx)).toEqual(splitAll(F.pills4, ctx.locale));
   });
   it("I-B: report_problem, then the pills, then side-effects, then the rest", () => {
     expect(compose([g("play_music", F.music), g("get_medication_status", F.pills2), g("report_problem", F.problem)], { question: "anything_else" }, ctx))
@@ -217,21 +227,33 @@ describe.each([["en", EN], ["de", DE]] as const)("pills first, one call offer at
     expect(compose([g("who_is", F.who), g("play_music", F.music), g("confirm_medication", F.confirm)], { question: "anything_else" }, ctx))
       .toEqual([...splitAll(F.confirm, ctx.locale), ...F.music, anything]);
   });
-  it("I-A: comfort_me + a one-sentence fact + offer_call: the offer is spoken once, last", () => {
+  it("I-A: comfort_me + a one-sentence fact + offer_call: the offer is spoken once, last, with its own fact", () => {
     expect(compose([g("comfort_me", F.comfort), g("who_is", F.who)], { question: "offer_call" }, ctx))
-      .toEqual([F.comfort[0], ...F.who, F.callOffer]);
+      .toEqual([...F.who, ...F.comfort]);
   });
-  it("I-A: report_leaving's question mid-turn moves last; no picked question follows", () => {
+  it("I-1: report_leaving's question moves last together with its own fact; no picked question follows", () => {
     expect(compose([g("report_leaving", F.leaving), g("who_is", F.who)], { question: "anything_else" }, ctx))
-      .toEqual([F.leaving[0], ...F.who, F.leaving[1]]);
+      .toEqual([...F.who, ...F.leaving]);
   });
-  it("I-A: report_home's question mid-turn moves last; no closing follows", () => {
+  it("I-1: report_home's question moves last together with its own fact; no closing follows", () => {
     expect(compose([g("who_is", F.who), g("report_home", F.home)], { closing: "lovely_day" }, ctx))
-      .toEqual([F.home[0], ...F.who, F.home[1]]);
+      .toEqual([...F.who, ...F.home]);
   });
-  it("I-A: two tool questions: only the higher-ranked one is asked, last; both facts are kept", () => {
+  it("I-A: two tool questions: only the higher-ranked one is asked, last, after its own fact; both facts are kept", () => {
     expect(compose([g("chat_about_life", F.chat), g("comfort_me", F.comfort)], { question: "tell_me_more" }, ctx))
-      .toEqual([F.comfort[0], F.chat[0], F.callOffer]);
+      .toEqual([F.chat[0], ...F.comfort]);
+  });
+  it("I-1: chat_about_life + who_is: 'Do you remember that?' follows the life-story sentence, in either call order", () => {
+    expect(compose([g("chat_about_life", F.chat), g("who_is", F.who)], null, ctx)).toEqual([...F.who, ...F.chat]);
+    expect(compose([g("who_is", F.who), g("chat_about_life", F.chat)], null, ctx)).toEqual([...F.who, ...F.chat]);
+  });
+  it("I-2: pills (due) + report_home + request_call: the call is confirmed; the welcome-home question gives way", () => {
+    expect(compose([g("get_medication_status", F.pills2), g("report_home", F.home), g("request_call", F.call)], null, ctx))
+      .toEqual([...F.pills2, F.home[0], ...F.call]);
+  });
+  it("I-2: pills (due) + report_leaving + play_music: the music is announced; the keys question gives way", () => {
+    expect(compose([g("get_medication_status", F.pills2), g("report_leaving", F.leaving), g("play_music", F.music)], null, ctx))
+      .toEqual([...F.pills2, F.leaving[0], ...F.music]);
   });
   it("I-C: comfort_me + request_call: the call is confirmed and never offered again, in either order", () => {
     expect(compose([g("comfort_me", F.comfort), g("request_call", F.call)], { question: "offer_call" }, ctx)).toEqual([...F.call, F.comfort[0]]);
@@ -251,8 +273,12 @@ const splitAll = (says: string[], locale: Locale) => says.flatMap((s) => splitSe
  * 3. At most one question, and it is the last sentence.
  * 4. A call that request_call just made is never offered.
  * 5. The pills are never dropped or displaced by side-effect answers: right after report_problem (or first),
- *    after at most a lead; with report_problem they are kept whenever both fit in four.
+ *    after at most a lead phrase; with report_problem they are kept whenever both fit in four.
  * 6. No sentence is spoken twice.
+ * 7. A tool's own question is spoken right after a sentence of that same tool (when the tool has any other sentence):
+ *    "Do you remember that?" always follows the life-story sentence it refers to.
+ * 8. Every side-effect confirmation that ran is spoken whenever report_problem, the pills and all side-effect facts
+ *    together fit in four: no question, picked or a tool's own, ever pushes one out.
  */
 describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool combinations (%s)", (_, ctx) => {
   const F = fixtures(ctx.locale);
@@ -267,6 +293,9 @@ describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool c
     { feeling: "oh_dear", question: "offer_call" }, { opener: "of_course", closing: "sleep_well" }, { feeling: "thank_you", question: "tell_me_more" },
   ];
   const MEDS = ["get_medication_status", "confirm_medication"];
+  const SIDE = ["request_call", "play_music", "report_leaving", "report_home"];
+  const isQ = (s: string) => s.trimEnd().endsWith("?");
+  const LEADS = new Set(CHOICES.flatMap((c) => [c?.feeling, c?.opener]).flatMap((id) => (id ? [phraseText(id, ctx.locale, ctx)!] : [])));
   const words = (s: string) => s.split(/\s+/).filter((w) => /[\p{L}\p{N}]/u.test(w)).length;
 
   function* combos(): Generator<ToolSay[]> {
@@ -300,8 +329,21 @@ describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool c
           const problem = says.some((s) => s.tool === "report_problem");
           const prefix = problem ? [...F.problem, ...(F.problem.length + medS.length <= MAX_SENTENCES ? medS : [])] : medS;
           const at = out[0] === prefix[0] ? 0 : 1;
+          if (at === 1) expect(LEADS.has(out[0]!), tag).toBe(true);
           expect(out.slice(at, at + prefix.length), tag).toEqual(prefix);
         }
+        const last = out.at(-1)!;
+        for (const s of says) {
+          const sentences = splitAll(s.says, ctx.locale);
+          const facts = sentences.filter((x) => !isQ(x));
+          // (7) The question is this tool's own and its facts are spoken: the sentence before it is one of them.
+          // (Facts another tool also says, like night_reassurance's "You're safe at home.", cannot tell whose answer was kept.)
+          const shared = says.some((o) => o !== s && splitAll(o.says, ctx.locale).some((x) => facts.includes(x)));
+          if (isQ(last) && sentences.includes(last) && facts.length && !shared && facts.some((f) => out.includes(f))) expect(facts, tag).toContain(out.at(-2));
+        }
+        const factsOf = (tools: string[]) => says.filter((s) => tools.includes(s.tool)).flatMap((s) => splitAll(s.says, ctx.locale).filter((x) => !isQ(x)));
+        const sideFacts = factsOf(SIDE);
+        if (factsOf(["report_problem", ...MEDS]).length + sideFacts.length <= MAX_SENTENCES) for (const f of sideFacts) expect(out, tag).toContain(f);
         checked++;
       }
     }
