@@ -1,12 +1,15 @@
-import { describe, expect, it } from "vitest";
-import { phraseIds, phraseText, splitSentences, templates, type Locale } from "@mia/shared";
+import { beforeAll, describe, expect, it } from "vitest";
+import { inMemoryMia } from "@mia/mcp-server/testing";
+import { phraseIds, phraseText, rose, roseDe, splitSentences, templates, weekdayName, type Locale, type Weekday } from "@mia/shared";
+import { at } from "@mia/shared/testing";
 import { compose, MAX_SENTENCES, readRespond, RESPOND_TOOL, type ToolSay } from "../src/compose";
+import { connectMia } from "../src/mcp";
 
 const EN = { locale: "en-US" as const, name: "Rose", carer: "Tom" };
 const DE = { locale: "de-DE" as const, name: "Rose", carer: "Tom" };
 const TODAY = ["Today is Monday, October 12.", "You leave for Maple Grove Day Club at twenty to ten.", "Today is Monday."];
-/** get_medication_status after an earlier dose with none due (production shape: "Yes." splits off). */
-const PILLS = ["Yes.", "You took your morning pills at eight o'clock.", "Your next pills are at six in the evening."];
+/** get_medication_status after an earlier dose with none due (production shape). */
+const PILLS = ["You took your morning pills at eight o'clock.", "No more pills needed now.", "Your next pills are at six in the evening."];
 /** get_medication_status with a dose due and none taken earlier. */
 const DUE = ["Now it's time for your morning pills.", "That's the small white pill and the round pink one."];
 const PROBLEM = ["I've let Tom know right away.", "Tom will get in touch with you."];
@@ -159,8 +162,8 @@ describe("compose", () => {
     });
     it("a group that does not fit is skipped; a later smaller one still fits (continue, not break)", () => {
       const big = ["One is here.", "Two is here.", "Three is here."];
-      expect(compose([g("get_medication_status", DUE), g("who_is", big), g("get_today", ["Today is Monday."])], null, EN))
-        .toEqual(["Now it's time for your morning pills.", "That's the small white pill and the round pink one.", "Today is Monday."]);
+      expect(compose([g("get_medication_status", DUE), g("who_is", big), g("get_today", ["Today is Monday, October 12."])], null, EN))
+        .toEqual(["Now it's time for your morning pills.", "That's the small white pill and the round pink one.", "Today is Monday, October 12."]);
     });
   });
 
@@ -228,6 +231,9 @@ describe.each([["en", EN], ["de", DE]] as const)("pills first, one call offer at
     expect(compose([g("play_music", F.music), g("get_medication_status", F.pills2), g("report_problem", F.problem)], { question: "anything_else" }, ctx))
       .toEqual([...F.problem, ...F.pills2]);
     expect(compose([g("who_is", F.who), g("play_music", F.music), g("confirm_medication", F.confirm)], { question: "anything_else" }, ctx))
+      .toEqual([...splitAll(F.confirm, ctx.locale), ...F.music, ...F.who]);
+    // A picked question only takes a place no fact can use.
+    expect(compose([g("play_music", F.music), g("confirm_medication", F.confirm)], { question: "anything_else" }, ctx))
       .toEqual([...splitAll(F.confirm, ctx.locale), ...F.music, anything]);
   });
   it("I-A: comfort_me + a one-sentence fact + offer_call: the offer is spoken once, last, with its own fact", () => {
@@ -311,11 +317,28 @@ const splitAll = (says: string[], locale: Locale) => says.flatMap((s) => splitSe
  *    "Do you remember that?" always follows the life-story sentence it refers to.
  * 8. A side-effect confirmation is dropped only when report_problem, the pills and the side-effects called before it
  *    already fill the four places with it: then nothing else is spoken, no question and no lower-ranked answer.
- * 9. get_today's repeated day ("Today is Monday.") is the first thing given up: when its answer is spoken without it,
- *    the answer is full and holds no lead or closing.
+ * 9. get_today's repeated day ("Today is Monday.") is the first thing given up: when its answer is spoken without it
+ *    and no answer was skipped, the answer is full and holds no lead or closing.
+ * 10. A repeated day ("Today is Sunday.", "On Monday.") is spoken only when every answer's facts are spoken.
+ * 11. A question the LLM picked never takes a place before a fact: when it is spoken, every skipped answer without
+ *     its own question could not have fitted in four beside the facts that are spoken.
+ * The pool holds the real get_today and get_next_appointment output of a group day and a day without the group,
+ * so (6) "no sentence twice" is checked on what the tools really say.
  */
 describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool combinations (%s)", (_, ctx) => {
   const F = fixtures(ctx.locale);
+  const T = templates(ctx.locale);
+  const REPEATS = new Set(([1, 2, 3, 4, 5, 6, 7] as Weekday[]).flatMap((w) => [T.repeatDay(weekdayName(w, ctx.locale)), T.onDay(weekdayName(w, ctx.locale))]));
+  const REAL: ToolSay[] = [];
+  beforeAll(async () => {
+    // Real tool output: Monday 09:50 (group day, both tools name the group start) and Sunday 19:00 (no group).
+    for (const time of ["2026-10-12T09:50:00", "2026-10-11T19:00:00"]) {
+      const m = await inMemoryMia({ now: () => at(time), profile: ctx.locale === "de-DE" ? roseDe() : rose() });
+      const mia = await connectMia({ url: m.url, token: m.token, fetch: m.fetch });
+      REAL.push(g("get_today", (await mia.call("get_today")).say));
+      REAL.push(g("get_next_appointment", (await mia.call("get_next_appointment", { name: ctx.locale === "de-DE" ? "Gruppe" : "group" })).say));
+    }
+  });
   const POOL: ToolSay[] = [
     g("report_problem", F.problem), g("get_medication_status", F.pillsTakenDue), g("get_medication_status", F.pills3), g("get_medication_status", F.pills2),
     g("confirm_medication", F.confirm), g("request_call", F.call), g("play_music", F.music), g("report_leaving", F.leaving), g("report_home", F.home),
@@ -345,6 +368,7 @@ describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool c
   }
 
   it("hold for every combination, call order and phrase choice", () => {
+    POOL.push(...REAL);
     let checked = 0;
     for (const says of combos()) {
       for (const choice of CHOICES) {
@@ -376,20 +400,35 @@ describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool c
           const shared = says.some((o) => o !== s && splitAll(o.says, ctx.locale).some((x) => facts.includes(x)));
           if (isQ(last) && sentences.includes(last) && facts.length && !shared && facts.some((f) => out.includes(f))) expect(facts, tag).toContain(out.at(-2));
         }
-        if (says.some((s) => s.tool === "get_today") && out.includes(F.today[0]!) && !out.includes(F.today[2]!)) {
+        const factsIn = (s: ToolSay) => splitAll(s.says, ctx.locale).filter((x) => !isQ(x) && !REPEATS.has(x));
+        const skipped = says.filter((s) => factsIn(s).some((f) => !out.includes(f)));
+        // (10) A repeated day only when no answer was skipped.
+        if (skipped.length) for (const x of out) expect(REPEATS.has(x), tag).toBe(false);
+        // (11) A picked question (not a tool's own) never displaces a fact.
+        const toolQs = new Set(says.flatMap((s) => splitAll(s.says, ctx.locale).filter(isQ)));
+        if (isQ(last) && !toolQs.has(last)) {
+          const allFacts = new Set(says.flatMap(factsIn));
+          const spokenFacts = out.filter((x) => allFacts.has(x)).length;
+          for (const s of skipped) {
+            if (splitAll(s.says, ctx.locale).some(isQ)) continue;
+            const fresh = new Set(factsIn(s).filter((f) => !out.includes(f))).size;
+            expect(spokenFacts + fresh, tag).toBeGreaterThan(MAX_SENTENCES);
+          }
+        }
+        if (!skipped.length && says.some((s) => s.tool === "get_today") && out.includes(F.today[0]!) && !out.includes(F.today[2]!)) {
           expect(out.length, tag).toBe(MAX_SENTENCES);
           const fromTools = new Set(says.flatMap((s) => splitAll(s.says, ctx.locale)));
           for (const s of out) if (!fromTools.has(s)) expect(LEADS.has(s) || CLOSINGS.has(s), tag).toBe(false);
         }
         const factsOf = (tools: string[]) => says.filter((s) => tools.includes(s.tool)).flatMap((s) => splitAll(s.says, ctx.locale).filter((x) => !isQ(x)));
         // (8) Side-effects are walked in call order, right after report_problem and the pills.
-        const factsIn = (s: ToolSay) => splitAll(s.says, ctx.locale).filter((x) => !isQ(x));
+        const factsOf8 = (s: ToolSay) => splitAll(s.says, ctx.locale).filter((x) => !isQ(x));
         const sides = says.filter((s) => SIDE.includes(s.tool));
-        const higher = new Set([...factsOf(["report_problem", ...MEDS]), ...sides.flatMap(factsIn)]);
+        const higher = new Set([...factsOf(["report_problem", ...MEDS]), ...sides.flatMap(factsOf8)]);
         for (const [k, side] of sides.entries()) {
-          const facts = factsIn(side);
+          const facts = factsOf8(side);
           if (facts.every((f) => out.includes(f))) continue;
-          const before = [...factsOf(["report_problem", ...MEDS]), ...sides.slice(0, k).flatMap(factsIn)].filter((f) => out.includes(f));
+          const before = [...factsOf(["report_problem", ...MEDS]), ...sides.slice(0, k).flatMap(factsOf8)].filter((f) => out.includes(f));
           expect(before.length + facts.length, tag).toBeGreaterThan(MAX_SENTENCES);
           for (const x of out) expect(higher.has(x), tag).toBe(true);
         }
@@ -397,5 +436,5 @@ describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool c
       }
     }
     expect(checked).toBeGreaterThan(10_000);
-  });
+  }, 30_000);
 });

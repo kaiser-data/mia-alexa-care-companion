@@ -89,18 +89,20 @@ const repeatDays = (locale: Locale) => {
  * 1. Tool answers are walked in rank order: report_problem, the pills (get_medication_status, confirm_medication),
  *    the side-effects (request_call, play_music, report_leaving, report_home), comfort_me / night_reassurance, then the
  *    rest in call order. Each answer's facts (its sentences without its question) are kept whole or not at all;
- *    a later smaller answer may still fit.
+ *    a later smaller answer may still fit. A fact an earlier kept answer already says takes no place and is spoken once.
  *    - The first answer and every answer up to the side-effects count only their facts: no question keeps them out.
- *    - comfort and the rest must also leave the place for the question that will be asked, if any.
+ *    - comfort and the rest must also leave the place for a tool's own question, if one will be asked. A question
+ *      the LLM picked never keeps a place free: a fact she asked for beats "Can I help with anything else?".
  *    - If the first answer's facts alone exceed four, it is spoken alone, whole.
  * 2. The question takes the next place if one is free: the own question of the first kept answer that has one
  *    (a tool question replaces the picked one), else the picked question. Otherwise no question is asked at all.
  *    After request_call no call offer is made: neither the picked offer_call nor a tool's own call offer
  *    (the shared callOffer template, e.g. from comfort_me).
- * 3. Then, only while places are free: the repeated days (get_today's "Today is Sunday." and get_next_appointment's
- *    "On Monday.", the shared repeatDay and onDay templates, not counted in step 1), then the closing (only without a
- *    question), then the lead (feeling wins over opener; not when it repeats the first sentence). So a repeated day is
- *    the first thing given up, and either tool alone still speaks all three sentences.
+ * 3. Then, only while places are free and only when no answer was skipped: the repeated days (get_today's
+ *    "Today is Sunday." and get_next_appointment's "On Monday.", the shared repeatDay and onDay templates, not counted
+ *    in step 1); then the closing (only without a question), then the lead (feeling wins over opener; not when it
+ *    repeats the first sentence). So a repeated day is the first thing given up, and either tool alone still speaks
+ *    all three sentences. No sentence is spoken twice.
  * Order: the kept answers in rank order; an answer whose question is asked moves last, whole, so its question
  * follows its own facts ("Do you remember that?" after the life-story sentence). The pills never ask, so they stay first.
  * No tool spoke: an optional feeling or greeting, then the question, closing, or a default
@@ -137,29 +139,40 @@ export function compose(toolSays: ToolSay[], choice: RespondInput | null, ctx: C
 
   if (groups[0]!.facts.length > MAX_SENTENCES) return groups[0]!.statements;
 
-  // 1. The answers' facts.
+  // 1. The answers' facts. A fact another kept answer already says is spoken once and takes no place.
   const kept: typeof groups = [];
+  const spoken = new Set<string>();
   let used = 0;
   let asking: (typeof groups)[number] | null = null;
   for (const [n, g] of groups.entries()) {
-    const reserve = n === 0 || g.rank <= SIDE_EFFECTS ? 0 : (asking ?? g.question ?? picked) ? 1 : 0;
-    if (used + g.facts.length + reserve > MAX_SENTENCES) continue;
+    const fresh = [...new Set(g.facts.filter((s) => !spoken.has(s)))];
+    // Only a tool's own question keeps a place free; a question the LLM picked never takes a place from a fact.
+    const reserve = n === 0 || g.rank <= SIDE_EFFECTS ? 0 : (asking ?? g.question) ? 1 : 0;
+    if (used + fresh.length + reserve > MAX_SENTENCES) continue;
     kept.push(g);
-    used += g.facts.length;
+    used += fresh.length;
+    for (const s of fresh) spoken.add(s);
     if (!asking && g.question) asking = g;
   }
+  // A repeated day never takes a place that a skipped answer could not have.
+  const allKept = kept.length === groups.length;
 
   // 2. The question, if a place is free.
   const question = used < MAX_SENTENCES ? (asking?.question ?? picked) : null;
   if (question) used++;
   // 3. The repeated day, the closing and the lead, only into free places.
   const order = question && asking ? [...kept.filter((g) => g !== asking), asking] : kept;
-  const out = order.flatMap((g) => g.statements.filter((s) => {
-    if (!repeats.has(s)) return true;
-    if (used >= MAX_SENTENCES) return false;
-    used++;
-    return true;
-  }));
+  const out: string[] = [];
+  for (const g of order) {
+    for (const s of g.statements) {
+      if (out.includes(s)) continue;
+      if (repeats.has(s)) {
+        if (!allKept || used >= MAX_SENTENCES) continue;
+        used++;
+      }
+      out.push(s);
+    }
+  }
   if (question) out.push(question);
   else if (closing && out.length < MAX_SENTENCES) out.push(closing);
   const lead = pick(c.feeling, "feeling", ctx) ?? pick(c.opener, "opener", ctx);

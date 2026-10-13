@@ -211,17 +211,17 @@ describe("Brain.turn", () => {
     expect(results.role).toBe("tool_results");
     expect(JSON.parse(results.results[0]!.content)).toHaveProperty("error");
   });
-  it("at most four: the pill answer first, the day dropped, the call offer kept (I2)", async () => {
+  it("at most four: the pill answer first, then the day; the picked call offer gives way to the facts (I2, fix-5 I-1)", async () => {
     const both = { kind: "tools" as const, text: "", calls: [{ id: "a", name: "get_today", input: {} }, { id: "b", name: "get_medication_status", input: {} }] };
     const s = await setup("2026-10-12T08:05:00", [both, respond({ question: "offer_call" })]);
     const r = await s.brain.turn({ text: "Tell me everything" });
-    expect(r.sentences).toEqual([...PILLS, "Shall I ask Tom to call you?"]);
+    expect(r.sentences).toEqual([...PILLS, "Today is Monday, October 12.", "You leave for Maple Grove Day Club at twenty to ten."]);
     expect(r.tools).toEqual(["get_today", "get_medication_status"]);
   });
-  it("over four with an opener: the lower-priority answer goes; the opener fits beside the two pill sentences", async () => {
+  it("over four with an opener: the facts she asked for come first; the opener and the picked question give way", async () => {
     const both = { kind: "tools" as const, text: "", calls: [{ id: "a", name: "get_today", input: {} }, { id: "b", name: "get_medication_status", input: {} }] };
     const s = await setup("2026-10-12T08:05:00", [both, respond({ opener: "of_course", question: "anything_else" })]);
-    expect((await s.brain.turn({ text: "Tell me everything" })).sentences).toEqual(["Of course, Rose.", ...PILLS, "Can I help with anything else?"]);
+    expect((await s.brain.turn({ text: "Tell me everything" })).sentences).toEqual([...PILLS, "Today is Monday, October 12.", "You leave for Maple Grove Day Club at twenty to ten."]);
   });
   it("a cry for help is spoken before the pill answer", async () => {
     const both = { kind: "tools" as const, text: "", calls: [{ id: "a", name: "get_medication_status", input: {} }, { id: "b", name: "report_problem", input: { what: "I feel dizzy" } }] };
@@ -558,5 +558,40 @@ describe("the group answer fits beside the day", () => {
       "Today is Monday, October 12.", "You leave for Maple Grove Day Club at twenty to ten.",
       "Yes, Maple Grove Day Club is today.", "You leave at twenty to ten.",
     ]);
+  });
+
+  it("I-1: a picked question never pushes out the group answer (real tools, en + de, both orders, anything_else / offer_call)", async () => {
+    const calls = (first: string, name: string) => {
+      const today = { id: "a", name: "get_today", input: {} };
+      const group = { id: "b", name: "get_next_appointment", input: { name } };
+      return { kind: "tools" as const, text: "", calls: first === "get_today" ? [today, group] : [group, today] };
+    };
+    for (const [profile, q, day, appt] of [
+      [rose(), "What day is it, and is it group today?", ["Today is Sunday, October 11.", "Next is bedtime, at half past nine in the evening."], ["Not today.", "Maple Grove Day Club is on Monday."]],
+      [roseDe(), "Welcher Tag ist heute, und ist heute Gruppe?", ["Heute ist Sonntag, der 11. Oktober.", "Als Nächstes: Schlafenszeit, um halb zehn abends."], ["Heute nicht.", "Tagesgruppe ist am Montag."]],
+    ] as const) {
+      for (const first of ["get_today", "get_next_appointment"]) {
+        for (const question of ["anything_else", "offer_call"]) {
+          const s = await setup("2026-10-11T19:00:00", [calls(first, profile.locale === "de-DE" ? "Gruppe" : "group"), respond({ question })], profile);
+          const r = await s.brain.turn({ text: q });
+          const tag = `${profile.locale} ${first} ${question}`;
+          expect(r.sentences, tag).toEqual(first === "get_today" ? [...day, ...appt] : [...appt, ...day]);
+        }
+      }
+    }
+  });
+  it("M-2: on a group day, get_today + get_next_appointment never speak a sentence twice (real tools, en + de)", async () => {
+    for (const profile of [rose(), roseDe()]) {
+      for (const time of ["2026-10-12T09:50:00", "2026-10-12T11:00:00"]) {
+        for (const question of [null, "anything_else"]) {
+          const both = { kind: "tools" as const, text: "", calls: [{ id: "a", name: "get_today", input: {} }, { id: "b", name: "get_next_appointment", input: { name: profile.locale === "de-DE" ? "Gruppe" : "group" } }] };
+          const s = await setup(time, [both, question ? respond({ question }) : respond()], profile);
+          const r = await s.brain.turn({ text: "What day is it, and is it group today?" });
+          const tag = `${profile.locale} ${time} ${question} ${JSON.stringify(r.sentences)}`;
+          expect(new Set(r.sentences).size, tag).toBe(r.sentences.length);
+          expect(r.sentences.length, tag).toBeLessThanOrEqual(4);
+        }
+      }
+    }
   });
 });
