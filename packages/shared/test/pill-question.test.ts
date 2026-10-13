@@ -8,10 +8,9 @@ describe("detectPillQuestion", () => {
     "Did I take my pills this morning?", "Have I had my pills today?", "Have I taken my medication?", "When is my pill?",
     "When is my next pill", "When do I take my pills?", "Is it time for my tablets?", "Which pill now?",
     "Do I need to take my medicine?", "What about my meds?", "Can I take my capsule now?", "Time for my pills?", "my pills?",
-    "Should I take my tablet now?",
     "Soll ich jetzt meine Tablette nehmen?", "Soll ich meine Tabletten nehmen", "Habe ich meine Tabletten genommen?",
     "hab ich meine Morgentabletten schon genommen?", "Habe ich heute schon meine Tabletten genommen?", "Wann kommt meine Tablette?",
-    "Wann muss ich meine Medikamente nehmen", "Wann nehme ich meine Tabletten?", "Muss ich noch eine Pille nehmen?",
+    "Wann muss ich meine Medikamente nehmen", "Wann nehme ich meine Tabletten?", "Muss ich heute noch meine Tabletten nehmen?",
     "Muss ich jetzt meine Medizin nehmen?", "Welche Tablette jetzt?", "Ist es Zeit für meine Abendtablette?", "Meine Medikamente?",
   ])("a pill question: %j", (t) => expect(detectPillQuestion(t)).toBe(true));
 
@@ -58,6 +57,12 @@ describe("detectPillQuestion", () => {
     "Is the medicine cabinet locked?", "Wo sind die Kapseln für die Kaffeemaschine?", "Wo sind die Kaffeekapseln?",
     "My pillow is too soft", "Is my pillow on the bed?", "I spilled my tea, is that bad?",
     "Is it time for lunch?", "Was gibt es heute zum Mittagessen?", "", "   ", "?",
+    // I-3: another tablet ("noch eine", "noch 'ne", "noch einen", "noch mal") is a second dose: the LLM asks Tom.
+    "Soll ich noch eine Tablette nehmen?", "Kann ich noch eine nehmen?", "Muss ich noch eine Pille nehmen?",
+    "Soll ich noch 'ne Tablette nehmen?", "Soll ich noch einen Kapsel nehmen?", "Soll ich noch ne Tablette nehmen?",
+    "can I take another one", "Can I take another pill?",
+    // M-1: "tablet" (singular) is the device, even in a take-shape: "Soll ich mein Tablet nehmen?".
+    "Soll ich mein Tablet nehmen?", "Muss ich mein Tablet nehmen?", "Should I take my tablet?", "Should I take my tablet now?",
     // Too long to be only the question.
     "Should I take my morning pills now or should I wait until later today?",
   ])("not a pill question: %j", (t) => expect(detectPillQuestion(t)).toBe(false));

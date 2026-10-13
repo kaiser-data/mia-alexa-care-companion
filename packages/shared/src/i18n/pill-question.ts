@@ -11,7 +11,7 @@
  *   German drops the object in statements too ("[Die] hab ich schon genommen");
  * - one clause: no comma, no second sentence, no "and/und/aber/oder", at most nine words;
  * - her own pills only: no painkiller or sleeping pill, no symptom or feeling, nobody else's pills, no "again" or "not",
- *   and never "tablet" the device.
+ *   no other one ("another", "noch eine", "noch 'ne"), and never "tablet": singular, it is the device ("mein Tablet").
  * Both languages are always checked.
  */
 
@@ -22,8 +22,6 @@ interface Shape {
   end?: string;
   /** Only a question with its question mark ("Zeit für meine Tabletten?" could be an announcement). */
   needsQuestionMark?: boolean;
-  /** Names taking a pill, so "tablet" cannot be the device. */
-  take?: boolean;
   /** At most this many words (a bare fragment like "My pills?"). */
   maxWords?: number;
 }
@@ -32,27 +30,28 @@ const s = (start: string, more: Omit<Shape, "start"> = {}): Shape => ({ start: s
 
 const SHAPES: Shape[] = [
   // English
-  s("should i take", { take: true }), s("shall i take", { take: true }), s("can i take", { take: true }),
-  s("must i take", { take: true }), s("do i need to take", { take: true }), s("do i have to take", { take: true }),
-  s("did i take", { take: true }), s("did i have"), s("have i taken", { take: true }), s("have i had"),
+  s("should i take"), s("shall i take"), s("can i take"),
+  s("must i take"), s("do i need to take"), s("do i have to take"),
+  s("did i take"), s("did i have"), s("have i taken"), s("have i had"),
   s("is it time for"), s("time for", { needsQuestionMark: true }),
-  s("when is"), s("when's"), s("when are"), s("when do i take", { take: true }),
+  s("when is"), s("when's"), s("when are"), s("when do i take"),
   s("which"), s("what about"),
   // German
-  s("soll ich", { end: "nehmen", take: true }), s("sollte ich", { end: "nehmen", take: true }),
-  s("muss ich", { end: "nehmen", take: true }),
-  s("habe ich", { end: "genommen", needsQuestionMark: true, take: true }),
-  s("hab ich", { end: "genommen", needsQuestionMark: true, take: true }),
+  s("soll ich", { end: "nehmen" }), s("sollte ich", { end: "nehmen" }),
+  s("muss ich", { end: "nehmen" }),
+  s("habe ich", { end: "genommen", needsQuestionMark: true }),
+  s("hab ich", { end: "genommen", needsQuestionMark: true }),
   s("ist es zeit für"), s("zeit für", { needsQuestionMark: true }),
-  s("wann kommt"), s("wann kommen"), s("wann ist"), s("wann sind"), s("wann nehme ich", { take: true }),
-  s("wann muss ich", { end: "nehmen", take: true }), s("wann soll ich", { end: "nehmen", take: true }),
+  s("wann kommt"), s("wann kommen"), s("wann ist"), s("wann sind"), s("wann nehme ich"),
+  s("wann muss ich", { end: "nehmen" }), s("wann soll ich", { end: "nehmen" }),
   s("welche"),
   // "My pills?", "Meine Medikamente?"
   s("", { needsQuestionMark: true, maxWords: 2 }),
 ];
 
 const PILL_NOUNS = new Set([
-  "pill", "pills", "tablet", "tablets", "medication", "medications", "medicine", "medicines", "meds", "capsule", "capsules",
+  // Not "tablet": singular it is the device, in English and in German ("Soll ich mein Tablet nehmen?"). "tablets" is pills.
+  "pill", "pills", "tablets", "medication", "medications", "medicine", "medicines", "meds", "capsule", "capsules",
   "pille", "pillen", "tablette", "tabletten", "medikament", "medikamente", "medikamenten", "kapsel", "kapseln", "arznei", "medizin",
 ]);
 /** German compounds name her own doses ("Morgentabletten", "Herzmedikament"); never "Schmerz-", "Schlaf-" or "Kaffee-". */
@@ -76,6 +75,8 @@ const NOT_A_PLAIN_PILL_QUESTION = [
   "falsch", "falsche", "falschen", "zu", "viele", "nochmal", "mal", "andere", "nicht", "doch",
 ];
 const BLOCKED_STEMS = ["schmerz", "schlaf", "kopf", "aspirin", "ibuprofen", "paracetamol"];
+/** "noch" before these asks for another one ("Soll ich noch eine Tablette nehmen?"); "noch meine Tabletten" stays. */
+const ANOTHER_AFTER_NOCH = ["ein", "eine", "einen", "einer", "ne", "'ne", "nen", "'nen", "mal"];
 
 export const PILL_QUESTION_MAX_WORDS = 9;
 
@@ -94,6 +95,7 @@ export function detectPillQuestion(text: string): boolean {
   if (words.length > PILL_QUESTION_MAX_WORDS) return false;
   if (words.some((w) => BLOCKED_STEMS.some((b) => w.includes(b)))) return false;
   if (words.some((w) => NOT_A_PLAIN_PILL_QUESTION.includes(w))) return false;
+  if (words.some((w, i) => w === "noch" && ANOTHER_AFTER_NOCH.includes(words[i + 1] ?? ""))) return false;
   return SHAPES.some((shape) => matches(shape, words, questionMark));
 }
 
@@ -107,7 +109,5 @@ function matches(shape: Shape, words: string[], questionMark: boolean): boolean 
     rest = rest.slice(0, -1);
   }
   if (!rest.some(isPillNoun)) return false;
-  if (!rest.every((w) => isPillNoun(w) || FILLERS.has(w))) return false;
-  // "tablet" is the device unless the question is about taking it.
-  return shape.take === true || !rest.includes("tablet");
+  return rest.every((w) => isPillNoun(w) || FILLERS.has(w));
 }
