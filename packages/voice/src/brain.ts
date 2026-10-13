@@ -1,4 +1,4 @@
-import { detectDistress, detectPillQuestion, localParts, NIGHT_END_MINUTES, splitSentences, templates, type Profile } from "@mia/shared";
+import { detectCarerOrHealthRequest, detectDistress, detectPillQuestion, localParts, NIGHT_END_MINUTES, splitSentences, templates, type Profile } from "@mia/shared";
 import type { ChatMessage, Llm } from "./llm";
 import { MiaToolError, type MiaClient, type ToolReply } from "./mcp";
 import { compose, readRespond, RESPOND_TOOL, type RespondInput, type ToolSay } from "./compose";
@@ -121,7 +121,10 @@ export class Brain {
     const clear = input.confidence === undefined || input.confidence >= p.speech.confidenceThreshold;
     if (clear && detectPillQuestion(text)) return this.direct(text, "get_medication_status", {});
 
-    if (localParts(now(), p.timezone).minutes < NIGHT_END_MINUTES && !this.nightAnsweredRecently()) {
+    // Night reassurance first, then ten minutes of normal turns. A request for the carer or a health question is heard at
+    // once, even as the first thing she says (owner decision 2026-10-13): the LLM can ask Tom to call, ask him or alert him.
+    const night = localParts(now(), p.timezone).minutes < NIGHT_END_MINUTES;
+    if (night && !this.nightAnsweredRecently() && !detectCarerOrHealthRequest(text, p.carerName)) {
       return this.direct(text, "night_reassurance", {});
     }
 

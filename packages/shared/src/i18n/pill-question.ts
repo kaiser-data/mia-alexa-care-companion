@@ -64,23 +64,32 @@ const FILLERS = new Set([
   "meine", "meinen", "mein", "die", "eine", "einen", "nächste", "nächsten", "jetzt", "heute", "schon", "noch", "morgens", "abends",
 ]);
 
+/** A symptom or a medicine that is not her own (whole words); carer-request.ts uses them at night too. */
+export const HEALTH_WORDS = [
+  "pain", "painkiller", "headache", "dizzy", "sick", "ill", "hurt", "aspirin", "ibuprofen", "paracetamol",
+  "schmerz", "schmerzen", "kopfschmerz", "schwindelig", "schwindlig", "übel", "schlecht",
+];
+/** Word parts that name pain or a medicine that is not hers ("Kopfschmerzen", "Schmerztablette"). */
+export const HEALTH_STEMS = ["schmerz", "aspirin", "ibuprofen", "paracetamol"];
+
 /**
  * A second guard, in case the shapes above ever grow: a feeling, a symptom or medicine that is not her own always goes
  * to the LLM, which can alert Tom or ask him first. Broader than distress.ts, which alerts at once.
  */
 const NOT_A_PLAIN_PILL_QUESTION = [
-  "pain", "painkiller", "headache", "dizzy", "sick", "ill", "hurt", "feel", "sleeping", "aspirin", "ibuprofen", "paracetamol",
+  ...HEALTH_WORDS, "feel", "sleeping",
   "wrong", "too", "again", "another", "extra", "not", "don't", "didn't",
-  "schmerz", "schmerzen", "kopfschmerz", "schwindelig", "schwindlig", "übel", "schlecht", "müde", "schlaftablette",
+  "müde", "schlaftablette",
   "falsch", "falsche", "falschen", "zu", "viele", "nochmal", "mal", "andere", "nicht", "doch",
 ];
-const BLOCKED_STEMS = ["schmerz", "schlaf", "kopf", "aspirin", "ibuprofen", "paracetamol"];
+const BLOCKED_STEMS = [...HEALTH_STEMS, "schlaf", "kopf"];
 /** "noch" before these asks for another one ("Soll ich noch eine Tablette nehmen?"); "noch meine Tabletten" stays. */
 const ANOTHER_AFTER_NOCH = ["ein", "eine", "einen", "einer", "ne", "'ne", "nen", "'nen", "mal"];
 
 export const PILL_QUESTION_MAX_WORDS = 9;
 
-function isPillNoun(w: string): boolean {
+/** A word for pills or medicine, her own included ("tablets", "Morgentabletten"); never "tablet", the device. */
+export function isPillNoun(w: string): boolean {
   if (PILL_NOUNS.has(w)) return true;
   return OWN_COMPOUND_HEADS.some((h) => COMPOUND_TAILS.some((t) => w === h + t));
 }

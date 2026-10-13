@@ -683,3 +683,49 @@ describe("N-1: night reassurance once, then she is heard", () => {
     expect(s.llm.requests).toHaveLength(2);
   });
 });
+
+describe("at night a call for Tom or a health question is heard first", () => {
+  const NIGHT = "2026-10-13T00:45:00";
+  it("'Can Tom call me?' as the first utterance goes to the LLM, which asks Tom to call (en + de)", async () => {
+    for (const [profile, q, said, wake] of [
+      [rose(), "Can Tom call me?", ["I've asked Tom to call you."], "Is it morning?"],
+      [roseDe(), "Tom soll mich anrufen", ["Ich habe Tom um einen Anruf gebeten."], "Ist es schon Morgen?"],
+    ] as const) {
+      const s = await setup(NIGHT, [tool("request_call"), respond()], profile);
+      expect(await s.brain.turn({ text: q }), profile.locale).toMatchObject({ sentences: said, tools: ["request_call"] });
+      expect(s.llm.requests, profile.locale).toHaveLength(2);
+      expect(s.llm.requests[0]!.messages.at(-1), profile.locale).toEqual({ role: "user", text: q });
+      // No reassurance was spoken, so the next plain night question still gets it first.
+      s.setNow("2026-10-13T00:47:00");
+      expect((await s.brain.turn({ text: wake })).tools, profile.locale).toEqual(["night_reassurance"]);
+      expect(s.llm.requests, profile.locale).toHaveLength(2);
+    }
+  });
+  it("a dizzy spell from her pills goes to the LLM, which asks Tom first (en + de)", async () => {
+    for (const [profile, q, said] of [
+      [rose(), "My pills make me dizzy, should I take them?", ["I can't answer that one.", "Let's ask Tom first."]],
+      [roseDe(), "Mir ist schwindelig von den Tabletten", ["Das kann ich dir nicht sagen.", "Wir fragen zuerst Tom."]],
+    ] as const) {
+      const s = await setup(NIGHT, [tool("ask_carer_about_health", { what: q }), respond()], profile);
+      expect(await s.brain.turn({ text: q }), profile.locale).toMatchObject({ sentences: said, tools: ["ask_carer_about_health"] });
+      expect(s.llm.requests[0]!.messages.at(-1), profile.locale).toEqual({ role: "user", text: q });
+      expect(await s.store.listAlerts(profile.id)).toMatchObject([{ rule: "health_question", severity: "medium" }]);
+    }
+  });
+  it("'I can't sleep' still gets night reassurance first (en + de)", async () => {
+    for (const [profile, q, said] of [
+      [rose(), "I can't sleep", ["It's quarter to one, in the middle of the night.", "You're safe at home.", "You can go back to sleep."]],
+      [roseDe(), "Ich kann nicht schlafen", ["Es ist Viertel vor eins, mitten in der Nacht.", "Du bist sicher zu Hause.", "Du kannst weiterschlafen."]],
+    ] as const) {
+      const s = await setup(NIGHT, [new Error("the LLM must not be called")], profile);
+      expect(await s.brain.turn({ text: q }), profile.locale).toMatchObject({ sentences: said, tools: ["night_reassurance"] });
+      expect(s.llm.requests).toHaveLength(0);
+    }
+  });
+  it("distress keeps its priority above both", async () => {
+    const s = await setup(NIGHT, []);
+    const r = await s.brain.turn({ text: "I fell, call Tom" });
+    expect(r).toMatchObject({ sentences: ["I've let Tom know right away.", "Tom will get in touch with you."], tools: ["report_problem"] });
+    expect(s.llm.requests).toHaveLength(0);
+  });
+});
