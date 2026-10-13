@@ -187,6 +187,7 @@ function fixtures(locale: Locale) {
   return {
     callOffer: T.callOffer(C),
     problem: [T.distressAck(C), T.distressFollow(C)],
+    health: [T.healthAsk(), T.askCarerFirst(C)],
     // Production shapes of get_medication_status: taken earlier + due (3), taken + no more now + next (3), due (2).
     pillsTakenDue: [T.medTaken(de ? "deine Morgentabletten" : "your morning pills", de ? "acht Uhr" : "eight o'clock"), T.medDue(de ? "deine Abendtablette" : "your evening pill"), T.medIs(de ? "die weiße Kapsel" : "the white capsule")],
     pills3: [T.medTaken(de ? "deine Morgentabletten" : "your morning pills", de ? "acht Uhr" : "eight o'clock"), T.noMoreNow(), T.medNextAt(de ? "sechs Uhr abends" : "six in the evening")],
@@ -268,6 +269,24 @@ describe.each([["en", EN], ["de", DE]] as const)("pills first, one call offer at
     expect(compose([g("comfort_me", F.comfort), g("request_call", F.call)], { question: "offer_call" }, ctx)).toEqual([...F.call, F.comfort[0]]);
     expect(compose([g("request_call", F.call), g("comfort_me", F.comfort)], null, ctx)).toEqual([...F.call, F.comfort[0]]);
   });
+  it("ask_carer_about_health is never dropped beside get_today, a lead and a picked question, in either call order", () => {
+    for (const choice of [null, { opener: "of_course", question: "anything_else" }, { feeling: "oh_dear", question: "offer_call" }, { closing: "lovely_day" }]) {
+      for (const says of [[g("get_today", F.today), g("ask_carer_about_health", F.health)], [g("ask_carer_about_health", F.health), g("get_today", F.today)]]) {
+        const out = compose(says, choice, ctx);
+        // First, after at most a lead phrase.
+        const at = out.indexOf(F.health[0]!);
+        expect(at, JSON.stringify(out)).toBeGreaterThanOrEqual(0);
+        expect(at).toBeLessThanOrEqual(1);
+        expect(out.slice(at, at + 2), JSON.stringify(choice)).toEqual(F.health);
+        expect(out.length).toBeLessThanOrEqual(MAX_SENTENCES);
+      }
+    }
+  });
+  it("ask_carer_about_health comes before the pills and is never cut; the pills follow when they fit", () => {
+    expect(compose([g("get_medication_status", F.pills2), g("ask_carer_about_health", F.health)], { question: "anything_else" }, ctx)).toEqual([...F.health, ...F.pills2]);
+    expect(compose([g("get_medication_status", F.pills3), g("ask_carer_about_health", F.health)], null, ctx)).toEqual(F.health);
+    expect(compose([g("ask_carer_about_health", F.health), g("report_problem", F.problem)], null, ctx)).toEqual([...F.problem, ...F.health]);
+  });
   it("I-C: request_call + an empty-life-story chat (only a call offer): no offer", () => {
     expect(compose([g("chat_about_life", F.chatEmpty), g("request_call", F.call)], null, ctx)).toEqual(F.call);
   });
@@ -310,8 +329,9 @@ const splitAll = (says: string[], locale: Locale) => says.flatMap((s) => splitSe
  * 2. At most four sentences, each at most twelve words.
  * 3. At most one question, and it is the last sentence.
  * 4. A call that request_call just made is never offered.
- * 5. The pills are never dropped or displaced by side-effect answers: right after report_problem (or first),
- *    after at most a lead phrase; with report_problem they are kept whenever both fit in four.
+ * 5. The pills are never dropped or displaced by side-effect answers: right after report_problem and
+ *    ask_carer_about_health (or first), after at most a lead phrase; kept whenever they fit in four beside those.
+ *    ask_carer_about_health is held to the same rule, right after report_problem.
  * 6. No sentence is spoken twice.
  * 7. A tool's own question is spoken right after a sentence of that same tool (when the tool has any other sentence):
  *    "Do you remember that?" always follows the life-story sentence it refers to.
@@ -343,7 +363,7 @@ describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool c
     g("report_problem", F.problem), g("get_medication_status", F.pillsTakenDue), g("get_medication_status", F.pills3), g("get_medication_status", F.pills2),
     g("confirm_medication", F.confirm), g("request_call", F.call), g("play_music", F.music), g("report_leaving", F.leaving), g("report_home", F.home),
     g("comfort_me", F.comfort), g("chat_about_life", F.chat), g("chat_about_life", F.chatEmpty), g("who_is", F.who), g("get_today", F.today),
-    g("night_reassurance", F.night), g("get_next_appointment", F.apptNot),
+    g("night_reassurance", F.night), g("get_next_appointment", F.apptNot), g("ask_carer_about_health", F.health),
   ];
   const CHOICES = [
     null, { question: "offer_call" }, { question: "anything_else" }, { closing: "lovely_day" },
@@ -382,11 +402,15 @@ describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool c
         if (asks.length) expect(asks[0], tag).toBe(out.length - 1);
         if (says.some((s) => s.tool === "request_call")) expect(out, tag).not.toContain(F.callOffer);
         expect(new Set(out).size, tag).toBe(out.length);
-        const med = says.find((s) => MEDS.includes(s.tool));
-        if (med) {
-          const medS = splitAll(med.says, ctx.locale);
-          const problem = says.some((s) => s.tool === "report_problem");
-          const prefix = problem ? [...F.problem, ...(F.problem.length + medS.length <= MAX_SENTENCES ? medS : [])] : medS;
+        // (5) report_problem, then ask_carer_about_health, then the pills: each whole, first, or while all fit in four.
+        const top = [says.find((s) => s.tool === "report_problem"), says.find((s) => s.tool === "ask_carer_about_health"), says.find((s) => MEDS.includes(s.tool))];
+        if (top[1] || top[2]) {
+          const prefix: string[] = [];
+          for (const t of top) {
+            if (!t) continue;
+            const ts = splitAll(t.says, ctx.locale);
+            if (!prefix.length || prefix.length + ts.length <= MAX_SENTENCES) prefix.push(...ts);
+          }
           const at = out[0] === prefix[0] ? 0 : 1;
           if (at === 1) expect(LEADS.has(out[0]!), tag).toBe(true);
           expect(out.slice(at, at + prefix.length), tag).toEqual(prefix);
@@ -424,11 +448,11 @@ describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool c
         // (8) Side-effects are walked in call order, right after report_problem and the pills.
         const factsOf8 = (s: ToolSay) => splitAll(s.says, ctx.locale).filter((x) => !isQ(x));
         const sides = says.filter((s) => SIDE.includes(s.tool));
-        const higher = new Set([...factsOf(["report_problem", ...MEDS]), ...sides.flatMap(factsOf8)]);
+        const higher = new Set([...factsOf(["report_problem", "ask_carer_about_health", ...MEDS]), ...sides.flatMap(factsOf8)]);
         for (const [k, side] of sides.entries()) {
           const facts = factsOf8(side);
           if (facts.every((f) => out.includes(f))) continue;
-          const before = [...factsOf(["report_problem", ...MEDS]), ...sides.slice(0, k).flatMap(factsOf8)].filter((f) => out.includes(f));
+          const before = [...factsOf(["report_problem", "ask_carer_about_health", ...MEDS]), ...sides.slice(0, k).flatMap(factsOf8)].filter((f) => out.includes(f));
           expect(before.length + facts.length, tag).toBeGreaterThan(MAX_SENTENCES);
           for (const x of out) expect(higher.has(x), tag).toBe(true);
         }

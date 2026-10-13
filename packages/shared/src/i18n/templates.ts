@@ -28,6 +28,8 @@ export interface Templates {
   medAtAppt(name: string, appointment: string): string;
   medUnsure(name: string): string;
   askCarerFirst(carer: string): string;
+  /** A health or medicine question Mia never answers; always followed by askCarerFirst. */
+  healthAsk(): string;
   medNoneToday(): string;
   medConfirmed(names: string): string;
   medEarlyNoted(carer: string): string;
@@ -85,6 +87,7 @@ const EN: Templates = {
   medAtAppt: (n, a) => `You get ${n} at ${a} today.`,
   medUnsure: (n) => `I'm not sure if you had ${n} yet.`,
   askCarerFirst: (c) => `Let's ask ${c} first.`,
+  healthAsk: () => "I can't answer that one.",
   medNoneToday: () => "There are no more pills today.",
   medConfirmed: (n) => `Thank you. I've noted ${n}.`,
   medEarlyNoted: (c) => `Thank you. I'll tell ${c}.`,
@@ -142,6 +145,7 @@ const DE: Templates = {
   medAtAppt: (n, a) => `Heute bekommst du ${n} dort: ${a}.`,
   medUnsure: (n) => `Ich weiß nicht sicher, ob du ${n} schon hattest.`,
   askCarerFirst: (c) => `Wir fragen zuerst ${c}.`,
+  healthAsk: () => "Das kann ich dir nicht sagen.",
   medNoneToday: () => "Heute sind keine Tabletten mehr dran.",
   medConfirmed: (n) => `Danke. Ich habe ${n} notiert.`,
   medEarlyNoted: (c) => `Danke. Ich sage es ${c}.`,

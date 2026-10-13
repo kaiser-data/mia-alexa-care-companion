@@ -172,3 +172,53 @@ describe("repeat_last", () => {
     expect(r.say[0]).toBe("Today is Monday, October 12.");
   });
 });
+
+describe("ask_carer_about_health", () => {
+  it("never answers: 'I can't answer that one.', 'Let's ask Tom first.', a medium alert with her words, an unknown_question event", async () => {
+    const m = await connect(at("2026-10-12T10:00:00"));
+    const r = await m.call("ask_carer_about_health", { what: "Can I take an aspirin?" });
+    expect(r.say).toEqual(["I can't answer that one.", "Let's ask Tom first."]);
+    expect(r.verbatim).toBe(true);
+    expect(r.facts).toEqual({ alerted: true });
+    expect(await m.store.listAlerts("rose")).toMatchObject([
+      { rule: "health_question", severity: "medium", message: 'Rose has a health question: "Can I take an aspirin?".' },
+    ]);
+    expect(await lastEvent(m)).toMatchObject({ type: "unknown_question", detail: { topic: "health", query: "Can I take an aspirin?" } });
+  });
+  it("German", async () => {
+    const m = await connect(at("2026-10-12T10:00:00"), roseDe());
+    const r = await m.call("ask_carer_about_health", { what: "Darf ich eine Kopfschmerztablette nehmen?" });
+    expect(r.say).toEqual(["Das kann ich dir nicht sagen.", "Wir fragen zuerst Tom."]);
+    expect(await m.store.listAlerts(roseDe().id)).toMatchObject([{ rule: "health_question", severity: "medium", message: 'Rose has a health question: "Darf ich eine Kopfschmerztablette nehmen?".' }]);
+  });
+  it("without her words the alert still goes out", async () => {
+    const m = await connect(at("2026-10-12T10:00:00"));
+    expect((await m.call("ask_carer_about_health")).say).toEqual(["I can't answer that one.", "Let's ask Tom first."]);
+    expect(await m.store.listAlerts("rose")).toMatchObject([{ rule: "health_question", message: "Rose has a health question." }]);
+    expect(await lastEvent(m)).toMatchObject({ type: "unknown_question", detail: { topic: "health", query: "" } });
+  });
+  it("her words keep their last 200 characters in alert and log", async () => {
+    const m = await connect(at("2026-10-12T10:00:00"));
+    const what = `start ${"x".repeat(500)} dizzy`;
+    await m.call("ask_carer_about_health", { what });
+    expect((await m.store.listAlerts("rose"))[0]!.message).not.toContain("start");
+    expect((await lastEvent(m))?.detail?.query).toBe(what.slice(-200));
+  });
+  it("when the alert fails it never throws and never claims Tom was told (en + de)", async () => {
+    for (const [profile, said] of [[rose(), ["I can't answer that one.", "Let's ask Tom first."]], [roseDe(), ["Das kann ich dir nicht sagen.", "Wir fragen zuerst Tom."]]] as const) {
+      const m = await connect(at("2026-10-12T10:00:00"), profile);
+      m.store.addAlert = async () => { throw new Error("disk full"); };
+      const r = await m.call("ask_carer_about_health", { what: "my pills make me dizzy" });
+      expect(r.say).toEqual(said);
+      expect(r.facts).toEqual({ alerted: false });
+    }
+  });
+  it("the alert still goes out when the profile or the log cannot be read", async () => {
+    const m = await connect(at("2026-10-12T10:00:00"));
+    m.store.getProfile = async () => null;
+    m.store.addEvent = async () => { throw new Error("disk full"); };
+    const r = await m.call("ask_carer_about_health", { what: "Can I take an aspirin?" });
+    expect(r.say).toEqual(["I can't answer that one.", "Let's ask your family first."]);
+    expect(await m.store.listAlerts("rose")).toMatchObject([{ rule: "health_question", severity: "medium" }]);
+  });
+});

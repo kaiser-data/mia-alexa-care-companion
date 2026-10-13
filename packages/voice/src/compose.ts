@@ -54,11 +54,16 @@ function pick(id: string | undefined, kind: PhraseKind, ctx: ComposeContext): st
 /** What one Mia tool call said, kept together: an answer is spoken whole or not at all. */
 export interface ToolSay { tool: string; says: string[] }
 
-/** Lower comes first: a cry for help, then pills, then side-effects, then comfort, then everything else in call order. */
+/**
+ * Lower comes first: a cry for help, a health question for the carer, then pills, then side-effects, then comfort,
+ * then everything else in call order.
+ */
 const MEDS = 1;
 const SIDE_EFFECTS = 1.5;
 const PRIORITY: Record<string, number> = {
   report_problem: 0,
+  // "I can't answer that one. Let's ask Tom first." is a pill fact: whole, never cut, and ahead of a "take it now".
+  ask_carer_about_health: 0.5,
   get_medication_status: MEDS, confirm_medication: MEDS,
   // Answers that confirm something that already happened: right after the pills, never ahead of them.
   request_call: SIDE_EFFECTS, play_music: SIDE_EFFECTS, report_leaving: SIDE_EFFECTS, report_home: SIDE_EFFECTS,
@@ -86,7 +91,7 @@ const repeatDays = (locale: Locale) => {
  * a side-effect confirmation is never dropped for a question.
  *
  * One rule decides what is spoken: fill four places in priority order, then say the kept parts in rank order.
- * 1. Tool answers are walked in rank order: report_problem, the pills (get_medication_status, confirm_medication),
+ * 1. Tool answers are walked in rank order: report_problem, ask_carer_about_health, the pills (get_medication_status, confirm_medication),
  *    the side-effects (request_call, play_music, report_leaving, report_home), comfort_me / night_reassurance, then the
  *    rest in call order. Each answer's facts (its sentences without its question) are kept whole or not at all;
  *    a later smaller answer may still fit. A fact an earlier kept answer already says takes no place and is spoken once.

@@ -613,3 +613,32 @@ describe("the group answer fits beside the day", () => {
     }
   });
 });
+
+describe("health questions go to the carer", () => {
+  it("the system prompt sends health and medicine questions to ask_carer_about_health, a fall or pain to report_problem", async () => {
+    const s = await setup("2026-10-12T10:00:00", [respond()]);
+    await s.brain.turn({ text: "Can I take an aspirin?" });
+    const system = s.llm.requests[0]!.system;
+    expect(system).toContain("Never answer a health or medicine question yourself; call ask_carer_about_health. For a fall, pain or feeling very unwell, call report_problem.");
+    expect(s.llm.requests[0]!.tools.map((t) => t.name)).toContain("ask_carer_about_health");
+  });
+  it("both sentences are spoken whole and Tom gets a medium alert (en + de)", async () => {
+    for (const [profile, q, said] of [
+      [rose(), "My pills make me dizzy, should I take them?", ["I can't answer that one.", "Let's ask Tom first."]],
+      [roseDe(), "Darf ich eine Kopfschmerztablette nehmen?", ["Das kann ich dir nicht sagen.", "Wir fragen zuerst Tom."]],
+    ] as const) {
+      const s = await setup("2026-10-12T10:00:00", [tool("ask_carer_about_health", { what: q }), respond({ feeling: "oh_dear" })], profile);
+      const r = await s.brain.turn({ text: q });
+      expect(r.tools, profile.locale).toEqual(["ask_carer_about_health"]);
+      expect(r.sentences.slice(-2), profile.locale).toEqual(said);
+      expect(await s.store.listAlerts(profile.id)).toMatchObject([{ rule: "health_question", severity: "medium" }]);
+    }
+  });
+  it("never dropped beside get_today, an opener and a picked question", async () => {
+    const both = { kind: "tools" as const, text: "", calls: [{ id: "a", name: "get_today", input: {} }, { id: "b", name: "ask_carer_about_health", input: { what: "Can I take an aspirin?" } }] };
+    const s = await setup("2026-10-12T10:00:00", [both, respond({ opener: "of_course", question: "anything_else" })]);
+    const r = await s.brain.turn({ text: "What day is it? Can I take an aspirin?" });
+    expect(r.sentences.slice(0, 2)).toEqual(["I can't answer that one.", "Let's ask Tom first."]);
+    expect(r.sentences.length).toBeLessThanOrEqual(4);
+  });
+});

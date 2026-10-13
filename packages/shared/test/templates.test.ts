@@ -37,7 +37,7 @@ describe("templates", () => {
       T.medNextAt("eight o'clock in the evening"), T.medAtAppt("your noon pill", "Maple Grove Day Club"), T.medNoneToday(),
       T.medConfirmed("your morning pills"), T.medAlreadyTaken("your morning pills", "five past eight"), T.noMoreNow(),
       T.safeAtHome(), T.callOffer(carer), T.callRequested(carer), T.nightIs("ten past three"), T.nightSafe(),
-      T.distressAck(carer), T.distressFollow(carer), T.systemError(carer), T.personIs("Tom", "son"),
+      T.distressAck(carer), T.distressFollow(carer), T.systemError(carer), T.personIs("Tom", "son"), T.healthAsk(), T.askCarerFirst(carer),
     ];
   };
   it.each(["en-US", "de-DE"] as const)("every %s template is plain language", (locale) => {

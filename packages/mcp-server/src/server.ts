@@ -1,5 +1,6 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerComfortTools } from "./tools/comfort";
+import { registerHealthTools } from "./tools/health";
 import { registerMedicationTools } from "./tools/medication";
 import { registerMusicTools } from "./tools/music";
 import { registerOrientationTools } from "./tools/orientation";
@@ -22,6 +23,7 @@ export function createMiaServer(ctx: ToolContext): McpServer {
   registerComfortTools(server, ctx);
   registerPeopleTools(server, ctx);
   registerProblemTools(server, ctx);
+  registerHealthTools(server, ctx);
   registerRepeatTools(server, ctx);
   registerMusicTools(server, ctx);
   return server;

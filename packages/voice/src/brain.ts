@@ -31,6 +31,7 @@ export function systemPrompt(p: VoiceProfile): string {
     `Always answer in ${language}.`,
     "You never write what Mia says. You choose: Mia's tools speak the facts, and the respond tool adds short warm phrases from a fixed list.",
     "Use Mia's tools for every fact: the day, appointments, pills, people, going out, coming home, feelings, the night, music or help. Never answer these from general knowledge.",
+    "Never answer a health or medicine question yourself; call ask_carer_about_health. For a fall, pain or feeling very unwell, call report_problem.",
     "Always finish your turn by calling respond. Any text you write outside a tool call is ignored and never spoken.",
     "In respond, choose at most one opener or feeling and at most one yes/no question or closing; use \"none\" where nothing fits.",
     "If speech recognition was unsure, call respond with a checking question, like question \"check_pills\" or \"check_day\".",
