@@ -690,3 +690,54 @@ describe("round 6 review I-1: no opener or feeling before a pill or health answe
     }
   });
 });
+
+describe("round 6 review I-2: beside a health question a due dose is never prompted (real tools)", () => {
+  const HEALTH = { "en-US": ["I can't answer that one.", "Let's ask Tom first."], "de-DE": ["Das kann ich dir nicht sagen.", "Wir fragen zuerst Tom."] } as const;
+  const TOOK = { "en-US": "You took your morning pills at five past eight.", "de-DE": "Du hast deine Morgentabletten um fünf nach acht genommen." } as const;
+  const both = (first: string, what: string) => {
+    const health = { id: "a", name: "ask_carer_about_health", input: { what } };
+    const pills = { id: "b", name: "get_medication_status", input: {} };
+    return { kind: "tools" as const, text: "", calls: first === "health" ? [health, pills] : [pills, health] };
+  };
+  const CASES = [[rose(), "My pills make me dizzy, should I take them?"], [roseDe(), "Mir ist schwindelig von den Tabletten, soll ich sie nehmen?"]] as const;
+
+  it("08:05, the morning dose due: only the health answer, never 'Now it's time' (en + de, both call orders)", async () => {
+    for (const [profile, q] of CASES) {
+      for (const first of ["health", "pills"]) {
+        for (const choice of [{}, { question: "anything_else" }]) {
+          const s = await setup("2026-10-14T08:05:00", [both(first, q), respond(choice)], profile);
+          const r = await s.brain.turn({ text: q });
+          const tag = `${profile.locale} ${first} ${JSON.stringify(choice)} ${JSON.stringify(r.sentences)}`;
+          expect(r.sentences.slice(0, 2), tag).toEqual(HEALTH[profile.locale]);
+          expect(r.sentences.join(" "), tag).not.toMatch(/Now it's time|Jetzt ist Zeit|That's the|Das ist die/);
+          expect(await s.store.listAlerts(profile.id), tag).toMatchObject([{ rule: "health_question", severity: "medium" }]);
+        }
+        const s = await setup("2026-10-14T08:05:00", [both(first, q), respond()], profile);
+        expect((await s.brain.turn({ text: q })).sentences, `${profile.locale} ${first}`).toEqual(HEALTH[profile.locale]);
+      }
+    }
+  });
+  it("12:05, morning taken and noon due: the health answer and the taken fact, never the due prompt (en + de, both call orders)", async () => {
+    for (const [profile, q] of CASES) {
+      for (const first of ["health", "pills"]) {
+        const s = await setup("2026-10-14T08:05:00", [both(first, q), respond()], profile);
+        await s.mia.call("confirm_medication");
+        s.setNow("2026-10-14T12:05:00");
+        const r = await s.brain.turn({ text: q });
+        expect(r.sentences, `${profile.locale} ${first}`).toEqual([...HEALTH[profile.locale], TOOK[profile.locale]]);
+      }
+    }
+  });
+  it("without the health question the due prompt is still spoken (en + de)", async () => {
+    for (const [profile, due, is] of [
+      [rose(), "Now it's time for your noon pill.", "That's the little yellow one."],
+      [roseDe(), "Jetzt ist Zeit für deine Mittagstablette.", "Das ist die kleine gelbe."],
+    ] as const) {
+      const s = await setup("2026-10-14T08:05:00", [tool("get_medication_status"), respond()], profile);
+      await s.mia.call("confirm_medication");
+      s.setNow("2026-10-14T12:05:00");
+      const r = await s.brain.turn({ text: "Tell me about my pills, Mia" });
+      expect(r.sentences, profile.locale).toEqual([TOOK[profile.locale], due, is]);
+    }
+  });
+});

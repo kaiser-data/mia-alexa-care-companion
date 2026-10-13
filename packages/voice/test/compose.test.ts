@@ -283,7 +283,11 @@ describe.each([["en", EN], ["de", DE]] as const)("pills first, one call offer at
     }
   });
   it("ask_carer_about_health comes before the pills and is never cut; the pills follow when they fit", () => {
-    expect(compose([g("get_medication_status", F.pills2), g("ask_carer_about_health", F.health)], { question: "anything_else" }, ctx)).toEqual([...F.health, ...F.pills2]);
+    // A due dose is never prompted beside a health question (round 6 review I-2); the other pill facts may follow.
+    expect(compose([g("get_medication_status", F.pills2), g("ask_carer_about_health", F.health)], { question: "anything_else" }, ctx)).toEqual([...F.health, anything]);
+    expect(compose([g("ask_carer_about_health", F.health), g("get_medication_status", F.pillsTakenDue)], null, ctx)).toEqual([...F.health, F.pillsTakenDue[0]]);
+    expect(compose([g("get_medication_status", F.pillsTakenDue), g("ask_carer_about_health", F.health)], { question: "anything_else" }, ctx)).toEqual([...F.health, F.pillsTakenDue[0], anything]);
+    expect(compose([g("get_medication_status", F.pills2)], null, ctx)).toEqual(F.pills2);
     expect(compose([g("get_medication_status", F.pills3), g("ask_carer_about_health", F.health)], null, ctx)).toEqual(F.health);
     expect(compose([g("ask_carer_about_health", F.health), g("report_problem", F.problem)], null, ctx)).toEqual([...F.problem, ...F.health]);
   });
@@ -343,6 +347,8 @@ const splitAll = (says: string[], locale: Locale) => says.flatMap((s) => splitSe
  * 11. A question the LLM picked never takes a place before a fact: when it is spoken, every skipped answer without
  *     its own question could not have fitted in four beside the facts that are spoken.
  * 12. Beside a pill or health answer no opener or feeling is spoken (only a greeting could lead, and the table picks none).
+ * 13. Beside ask_carer_about_health no due-dose line ("Now it's time…", "That's the…") is spoken; (5)-(11) count
+ *     only what the pill tool can be heard to say there.
  * The pool holds the real get_today and get_next_appointment output of a group day and a day without the group,
  * so (6) "no sentence twice" is checked on what the tools really say.
  */
@@ -371,6 +377,7 @@ describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool c
     { feeling: "oh_dear", question: "offer_call" }, { opener: "of_course", closing: "sleep_well" }, { feeling: "thank_you", question: "tell_me_more" },
   ];
   const MEDS = ["get_medication_status", "confirm_medication"];
+  const DUE_LINES = new Set([F.pillsTakenDue[1]!, F.pillsTakenDue[2]!, ...F.pills2]);
   const SIDE = ["request_call", "play_music", "report_leaving", "report_home"];
   const isQ = (s: string) => s.trimEnd().endsWith("?");
   const CLOSINGS = new Set(CHOICES.flatMap((c) => (c?.closing ? [phraseText(c.closing, ctx.locale, ctx)!] : [])));
@@ -394,6 +401,9 @@ describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool c
     for (const says of combos()) {
       for (const choice of CHOICES) {
         const out = compose(says, choice, ctx);
+        // What each tool can be heard to say: beside a health question the pill tool's due lines are never spoken.
+        const health = says.some((s) => s.tool === "ask_carer_about_health");
+        const heard = (s: ToolSay) => splitAll(s.says, ctx.locale).filter((x) => !(health && s.tool === "get_medication_status" && DUE_LINES.has(x)));
         const tag = `${says.map((s) => s.tool).join("+")} ${JSON.stringify(choice)} → ${JSON.stringify(out)}`;
         expect(out.length, tag).toBeGreaterThan(0);
         expect(out.length, tag).toBeLessThanOrEqual(MAX_SENTENCES);
@@ -409,7 +419,8 @@ describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool c
           const prefix: string[] = [];
           for (const t of top) {
             if (!t) continue;
-            const ts = splitAll(t.says, ctx.locale);
+            const ts = heard(t);
+            if (!ts.length) continue;
             if (!prefix.length || prefix.length + ts.length <= MAX_SENTENCES) prefix.push(...ts);
           }
           const at = out[0] === prefix[0] ? 0 : 1;
@@ -425,7 +436,9 @@ describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool c
           const shared = says.some((o) => o !== s && splitAll(o.says, ctx.locale).some((x) => facts.includes(x)));
           if (isQ(last) && sentences.includes(last) && facts.length && !shared && facts.some((f) => out.includes(f))) expect(facts, tag).toContain(out.at(-2));
         }
-        const factsIn = (s: ToolSay) => splitAll(s.says, ctx.locale).filter((x) => !isQ(x) && !REPEATS.has(x));
+        // (13) Beside a health question no due-dose line is spoken.
+        if (health) for (const x of out) expect(DUE_LINES.has(x), tag).toBe(false);
+        const factsIn = (s: ToolSay) => heard(s).filter((x) => !isQ(x) && !REPEATS.has(x));
         const skipped = says.filter((s) => factsIn(s).some((f) => !out.includes(f)));
         // (10) A repeated day only when no answer was skipped.
         if (skipped.length) for (const x of out) expect(REPEATS.has(x), tag).toBe(false);
@@ -449,9 +462,9 @@ describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool c
         const plain = says.filter((s) => [...MEDS, "ask_carer_about_health"].includes(s.tool)).flatMap((s) => splitAll(s.says, ctx.locale));
         const said = new Set(says.flatMap((s) => splitAll(s.says, ctx.locale)));
         if (plain.some((x) => out.includes(x))) for (const x of out) if (!said.has(x)) expect(LEADS.has(x), tag).toBe(false);
-        const factsOf = (tools: string[]) => says.filter((s) => tools.includes(s.tool)).flatMap((s) => splitAll(s.says, ctx.locale).filter((x) => !isQ(x)));
+        const factsOf = (tools: string[]) => says.filter((s) => tools.includes(s.tool)).flatMap((s) => heard(s).filter((x) => !isQ(x)));
         // (8) Side-effects are walked in call order, right after report_problem and the pills.
-        const factsOf8 = (s: ToolSay) => splitAll(s.says, ctx.locale).filter((x) => !isQ(x));
+        const factsOf8 = (s: ToolSay) => heard(s).filter((x) => !isQ(x));
         const sides = says.filter((s) => SIDE.includes(s.tool));
         const higher = new Set([...factsOf(["report_problem", "ask_carer_about_health", ...MEDS]), ...sides.flatMap(factsOf8)]);
         for (const [k, side] of sides.entries()) {

@@ -79,6 +79,21 @@ const GREETINGS = ["hello", "good_morning", "good_evening"];
 const NO_LEAD = new Set(["get_medication_status", "confirm_medication", "ask_carer_about_health"]);
 
 const isQuestion = (s: string) => s.trimEnd().endsWith("?");
+/** A sentence made by one template with one argument: the template's text around the argument. */
+const madeBy = (template: (x: string) => string) => {
+  const [head, tail] = template("\u0000").split("\u0000") as [string, string];
+  return (s: string) => s.length > head.length + tail.length && s.startsWith(head) && s.endsWith(tail);
+};
+/**
+ * The pill tool's "take it now" lines: "Now it's time for your morning pills." and "That's the small white pill…".
+ * Beside a health question they are never spoken: she asked whether to take them, and only the carer decides.
+ */
+const dueLines = (locale: Locale) => {
+  const T = templates(locale);
+  const due = madeBy(T.medDue);
+  const is = madeBy(T.medIs);
+  return (s: string) => due(s) || is(s);
+};
 /**
  * Lines that only repeat the weekday just said, the first thing given up when space is short: get_today's closing
  * "Today is Sunday." (the shared repeatDay template) and get_next_appointment's "On Monday." (the shared onDay template).
@@ -91,7 +106,7 @@ const repeatDays = (locale: Locale) => {
 
 /**
  * Builds what Mia says. Invariants (checked on every output by the table test in compose.test.ts):
- * never silence; at most four sentences; at most one question, always the last sentence, right after its own tool's
+ * never silence; at most four sentences; beside ask_carer_about_health never a due-dose line (medDue / medIs); at most one question, always the last sentence, right after its own tool's
  * facts; never a call offer after request_call ran; the pills are never dropped or displaced by side-effect answers;
  * a side-effect confirmation is never dropped for a question.
  *
@@ -128,9 +143,14 @@ export function compose(toolSays: ToolSay[], choice: RespondInput | null, ctx: C
   const phrase = (id: string) => phraseText(id, ctx.locale, { name: ctx.name, carer: ctx.carer })!;
 
   const repeats = repeatDays(ctx.locale);
+  // A health question for the carer ran: the carer decides about the dose, so no "take it now" is spoken at all.
+  const askedCarer = toolSays.some((g) => g.tool === "ask_carer_about_health");
+  const isDue = dueLines(ctx.locale);
   const groups = toolSays
     .map((g, i) => {
-      const sentences = g.says.flatMap((s) => splitSentences(s, ctx.locale)).filter((s) => !(requestedCall && s === callOffer));
+      const sentences = g.says.flatMap((s) => splitSentences(s, ctx.locale))
+        .filter((s) => !(requestedCall && s === callOffer))
+        .filter((s) => !(askedCarer && g.tool === "get_medication_status" && isDue(s)));
       const statements = sentences.filter((s) => !isQuestion(s));
       return {
         i, tool: g.tool, rank: PRIORITY[g.tool] ?? OTHERS, statements,
