@@ -37,7 +37,7 @@ export function registerOrientationTools(server: McpServer, ctx: ToolContext): v
   server.registerTool("get_next_appointment", {
     title: "When is my group / next appointment",
     description:
-      "Use when she asks whether an appointment is today or when it is next — especially her group. Pass her words as 'name'. " +
+      "Use when she asks whether an appointment is today or when it is next — especially her group. Pass her own words as 'name', in her language. " +
       "Examples: 'Is it group today?', 'When is my club?', 'Ist heute Gruppe?', 'Wann ist die Tagesgruppe?'.",
     inputSchema: { name: z.string().optional().describe("Her words for the appointment, e.g. 'group'") },
     outputSchema: OUTPUT_SHAPE,

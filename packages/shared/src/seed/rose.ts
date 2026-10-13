@@ -95,7 +95,8 @@ export function roseDe(): Profile {
     appointments: [{
       ...p.appointments[0]!,
       name: "Tagesgruppe",
-      aliases: ["gruppe", "tagesgruppe", "club", "maple grove"],
+      // "group" and "day club" too: the LLM's instructions are English, so it may pass her words translated.
+      aliases: ["gruppe", "tagesgruppe", "club", "maple grove", "group", "day club"],
       checklist: ["deinen Schlüssel am roten Band", "deine Handtasche", "deine Brille", "deinen Mantel"],
     }],
     people: [

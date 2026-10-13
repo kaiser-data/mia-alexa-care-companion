@@ -82,6 +82,17 @@ describe("get_next_appointment", () => {
     const r = await (await connect(at("2026-10-12T08:05:00"), roseDe())).call("get_next_appointment", { name: "Gruppe" });
     expect(r.say).toEqual(["Ja, Tagesgruppe ist heute.", "Du gehst um zwanzig vor zehn los."]);
   });
+  it("S-2: rose-de, the LLM passes English or her own words: the group is found (Sunday 19:00)", async () => {
+    for (const name of ["group", "my group", "Gruppen", "Seniorengruppe", "meine Gruppe", "day club"]) {
+      const r = await (await connect(at("2026-10-11T19:00:00"), roseDe())).call("get_next_appointment", { name });
+      expect(r.say, name).toEqual(["Heute nicht. Tagesgruppe ist am Montag.", "Am Montag."]);
+    }
+  });
+  it("the description asks for her own words, in her language", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"));
+    const { tools } = await m.client.listTools();
+    expect(tools.find((t) => t.name === "get_next_appointment")!.description).toContain("Pass her own words as 'name', in her language.");
+  });
   it("Monday 15:00 after the group: next is Tuesday", async () => {
     const r = await (await connect(at("2026-10-12T15:00:00"))).call("get_next_appointment", { name: "group" });
     expect(r.say).toEqual(["Not today. Maple Grove Day Club is on Tuesday.", "On Tuesday."]);

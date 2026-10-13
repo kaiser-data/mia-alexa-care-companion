@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { at } from "../src/testing";
-import { rose } from "../src/seed/rose";
+import { rose, roseDe } from "../src/seed/rose";
 import { appointmentsOn, matchesAppointment, nextAppointment, partOfDay, todayView } from "../src/domain/today";
 
 describe("appointmentsOn", () => {
@@ -61,8 +61,15 @@ describe("nextAppointment", () => {
 describe("matchesAppointment", () => {
   it.each(["group", "my group", "Is it group today?", "maple grove", "the day club"])("matches %s", (q) =>
     expect(matchesAppointment(rose().appointments[0]!, q)).toBe(true));
-  it.each(["a", "ma", "clubbing", "groups", "", "   ", "dentist"])("does not match %j", (q) =>
+  it.each(["a", "ma", "clubbing", "", "   ", "dentist", "doctor", "nightclub", "grouping", "grove"])("does not match %j", (q) =>
     expect(matchesAppointment(rose().appointments[0]!, q)).toBe(false));
+  it.each(["groups", "my groups", "clubs", "the day clubs"])("a plural matches: %j", (q) =>
+    expect(matchesAppointment(rose().appointments[0]!, q)).toBe(true));
+  // S-2: the LLM's prompt is English, so for rose-de it may pass "group"; she says "Gruppen" or "Seniorengruppe".
+  it.each(["meine Gruppe", "group", "my group", "Gruppen", "Seniorengruppe", "club", "day club", "Ist heute Gruppe?", "Tagesgruppe", "Tagesgruppen"])(
+    "rose-de: matches %j", (q) => expect(matchesAppointment(roseDe().appointments[0]!, q)).toBe(true));
+  it.each(["doctor", "Arzt", "Arzttermin", "Gruppenarzt", "day", "Tag", "pe", ""])("rose-de: does not match %j", (q) =>
+    expect(matchesAppointment(roseDe().appointments[0]!, q)).toBe(false));
   it("blank name query means any appointment", () => {
     expect(nextAppointment(rose(), at("2026-10-14T10:00:00"), "  ")?.weekday).toBe(4);
   });
