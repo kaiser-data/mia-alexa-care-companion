@@ -249,7 +249,9 @@ export class Brain {
     const sentences = said.flatMap((s) => splitSentences(s, locale));
     // "Pardon?" repeats the last real answer; a filler or a repeat leaves it, and the pill context, as they were.
     if (kind === "answer") this.lastSpoken = sentences;
-    this.lastNightAt = tools.includes("night_reassurance") ? this.deps.now() : undefined;
+    // Set only when the reassurance is spoken; it expires by time alone (NIGHT_REPEAT_MINUTES). No other reply clears it,
+    // or every request after an LLM turn would be answered with "go back to sleep" again.
+    if (tools.includes("night_reassurance")) this.lastNightAt = this.deps.now();
     return { sentences, rate, breakMs: speech.sentenceBreakMs, tools, ...(action ? { action } : {}) };
   }
 }

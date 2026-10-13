@@ -642,3 +642,44 @@ describe("health questions go to the carer", () => {
     expect(r.sentences.length).toBeLessThanOrEqual(4);
   });
 });
+
+describe("N-1: night reassurance once, then she is heard", () => {
+  const NIGHT = "2026-10-13T00:45:00";
+  for (const [profile, wake, who, bored, again, night, frank, chat] of [
+    [rose(), "Is it morning?", "Who is Frank?", "I'm bored", "Is it morning yet?",
+      ["It's quarter to one, in the middle of the night.", "You're safe at home.", "You can go back to sleep."],
+      ["Frank is your husband.", "Frank loved you very much."], ["That sounds lovely.", "Can I help with anything else?"]],
+    [roseDe(), "Ist es Morgen?", "Wer ist Frank?", "Mir ist langweilig", "Ist es schon Morgen?",
+      ["Es ist Viertel vor eins, mitten in der Nacht.", "Du bist sicher zu Hause.", "Du kannst weiterschlafen."],
+      ["Frank ist dein Mann.", "Frank hat dich sehr geliebt."], ["Das klingt schön.", "Kann ich sonst noch helfen?"]],
+  ] as const) {
+    it(`${profile.locale}: 1st turn night, 2nd and 3rd turn the LLM, after ten minutes night again`, async () => {
+      const s = await setup(NIGHT, [tool("who_is", { name: "Frank" }), respond(), respond({ feeling: "sounds_lovely", question: "anything_else" })], profile);
+      expect(await s.brain.turn({ text: wake })).toMatchObject({ sentences: night, tools: ["night_reassurance"] });
+      expect(s.llm.requests).toHaveLength(0);
+      s.setNow("2026-10-13T00:46:00");
+      expect(await s.brain.turn({ text: who })).toMatchObject({ sentences: frank, tools: ["who_is"] });
+      expect(s.llm.requests).toHaveLength(2);
+      s.setNow("2026-10-13T00:50:00");
+      expect(await s.brain.turn({ text: bored })).toMatchObject({ sentences: chat, tools: [] });
+      expect(s.llm.requests).toHaveLength(3);
+      // Eleven minutes after the first reassurance: night again, with the time as it is now.
+      s.setNow("2026-10-13T00:56:00");
+      const fourth = await s.brain.turn({ text: again });
+      expect(fourth.tools).toEqual(["night_reassurance"]);
+      expect(fourth.sentences.slice(1)).toEqual(night.slice(1));
+      expect(s.llm.requests).toHaveLength(3);
+    });
+  }
+  it("a filler in between neither restarts nor clears the ten minutes", async () => {
+    const s = await setup(NIGHT, [respond({ question: "anything_else" }), respond({ question: "anything_else" })]);
+    expect((await s.brain.turn({ text: "Is it morning?" })).tools).toEqual(["night_reassurance"]);
+    s.setNow("2026-10-13T00:47:00");
+    expect((await s.brain.turn({ text: "" })).sentences).toEqual(["I'm listening."]);
+    s.setNow("2026-10-13T00:48:00");
+    expect((await s.brain.turn({ text: "I'm bored" })).sentences).toEqual(["Can I help with anything else?"]);
+    s.setNow("2026-10-13T00:54:00");
+    expect((await s.brain.turn({ text: "I'm still bored" })).sentences).toEqual(["Can I help with anything else?"]);
+    expect(s.llm.requests).toHaveLength(2);
+  });
+});
