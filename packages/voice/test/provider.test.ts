@@ -56,6 +56,9 @@ describe("chooseLlm", () => {
     it("only a gpt-oss model gets reasoning_effort low and room for its reasoning", () => {
       expect(modelTuning("openai/gpt-oss-120b")).toEqual({ reasoningEffort: "low", maxTokens: 1024 });
       expect(modelTuning("openai/gpt-oss-20b")).toEqual({ reasoningEffort: "low", maxTokens: 1024 });
+      // M-4: the model id is matched case-insensitively.
+      expect(modelTuning("openai/GPT-OSS-120B")).toEqual({ reasoningEffort: "low", maxTokens: 1024 });
+      expect(modelTuning("GPT-OSS-20B")).toEqual({ reasoningEffort: "low", maxTokens: 1024 });
       expect(modelTuning("mistralai/Mistral-Large-Instruct-2411")).toEqual({});
       expect(modelTuning("moonshotai/Kimi-K2-Instruct-0905")).toEqual({});
     });

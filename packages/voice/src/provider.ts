@@ -17,10 +17,11 @@ export const FEATHERLESS_MODEL = "openai/gpt-oss-120b";
 /**
  * gpt-oss is a reasoning model, and its reasoning tokens count against max_tokens: with 400 it once stopped with
  * finish_reason "length" on the second step. Featherless accepts reasoning_effort "low" for it (checked 2026-10-12);
- * other models reject the unknown parameter with HTTP 400, so it is sent to gpt-oss only.
+ * other models reject the unknown parameter with HTTP 400, so it is sent to gpt-oss only (matched case-insensitively).
+ * With LLM_PROVIDER=openai any backend serving a gpt-oss id gets it too: Groq and vLLM accept it, other gateways may not.
  */
 export function modelTuning(model: string): Pick<OpenAiCompatOptions, "reasoningEffort" | "maxTokens"> {
-  return model.includes("gpt-oss") ? { reasoningEffort: "low", maxTokens: 1024 } : {};
+  return model.toLowerCase().includes("gpt-oss") ? { reasoningEffort: "low", maxTokens: 1024 } : {};
 }
 
 function need(env: Env, name: string, why = ""): string {

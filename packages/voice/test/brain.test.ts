@@ -522,6 +522,24 @@ describe("a pill question goes straight to the pill tool, never to the LLM", () 
       expect(s.llm.requests).toHaveLength(0);
     }
   });
+  it("I-2: an unsure hearing never takes the pill route: it reaches the LLM with the unsure marker (en + de)", async () => {
+    for (const [profile, q, check] of [[rose(), "have I had my pills", "Do you mean your pills?"], [roseDe(), "habe ich meine Tabletten genommen?", "Meinst du deine Tabletten?"]] as const) {
+      const s = await setup(MON, [respond({ question: "check_pills" })], profile);
+      const r = await s.brain.turn({ text: q, confidence: 0.5 });
+      expect(r, profile.locale).toMatchObject({ sentences: [check], tools: [] });
+      expect(s.llm.requests).toHaveLength(1);
+      expect(s.llm.requests[0]!.messages.at(-1)).toMatchObject({ role: "user", text: `(speech recognition unsure, confidence 0.50) ${q}` });
+    }
+  });
+  it("I-2: a clear hearing of the same words takes the pill route (en + de)", async () => {
+    for (const [profile, q, said] of [[rose(), "have I had my pills", PILLS], [roseDe(), "habe ich meine Tabletten genommen?", DE_PILLS]] as const) {
+      for (const confidence of [0.9, undefined]) {
+        const s = await setup(MON, NEVER(), profile);
+        const r = await s.brain.turn({ text: q, ...(confidence === undefined ? {} : { confidence }) });
+        expect(r, `${profile.locale} ${confidence}`).toMatchObject({ sentences: said, tools: ["get_medication_status"] });
+      }
+    }
+  });
   it("at night the pill tool answers a pill question, not night reassurance: it is the only source of truth on doses", async () => {
     const s = await setup("2026-10-13T03:10:00", NEVER());
     const r = await s.brain.turn({ text: "Should I take my pills?" });

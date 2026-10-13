@@ -115,7 +115,10 @@ export class Brain {
     // A plain pill question is answered by the pill tool, never by the LLM: a model may answer it without calling the tool.
     // Anything less plain (a self-report, a symptom, a second request) goes to the LLM, which can record, alert or ask Tom.
     // It wins over night reassurance too: at night as by day, only the pill tool knows whether a dose is due.
-    if (detectPillQuestion(text)) return this.direct(text, "get_medication_status", {});
+    // Only a clear hearing: "have I had my pills" and "I've had my pills" sound alike, so an unsure one goes to the LLM,
+    // which sees the unsure marker and can ask "Do you mean your pills?".
+    const clear = input.confidence === undefined || input.confidence >= p.speech.confidenceThreshold;
+    if (clear && detectPillQuestion(text)) return this.direct(text, "get_medication_status", {});
 
     if (localParts(now(), p.timezone).minutes < NIGHT_END_MINUTES && !this.nightAnsweredRecently()) {
       return this.direct(text, "night_reassurance", {});
