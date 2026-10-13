@@ -11,12 +11,19 @@ describe("get_medication_status", () => {
     const r = await (await connect(at("2026-10-12T08:05:00"))).call("get_medication_status");
     expect(r.say).toEqual(["Now it's time for your morning pills.", "That's the small white pill and the round pink one."]);
   });
-  it("after confirming: yes with time, next pills with part of day", async () => {
+  it("after confirming: taken with time, no more now, next pills with part of day; never a bare 'Yes.' (C-1)", async () => {
     const m = await connect(at("2026-10-12T08:05:00"));
     await m.call("confirm_medication");
     m.setNow(at("2026-10-12T09:30:00"));
     const r = await m.call("get_medication_status");
-    expect(r.say).toEqual(["Yes. You took your morning pills at five past eight.", "Your next pills are at eight o'clock in the evening."]);
+    expect(r.say).toEqual(["You took your morning pills at five past eight.", "No more pills needed now.", "Your next pills are at eight o'clock in the evening."]);
+  });
+  it("German after confirming: no 'Ja.', 'Jetzt brauchst du keine mehr.' (C-1)", async () => {
+    const m = await connect(at("2026-10-14T08:05:00"), roseDe());
+    await m.call("confirm_medication");
+    m.setNow(at("2026-10-14T10:00:00"));
+    const r = await m.call("get_medication_status");
+    expect(r.say).toEqual(["Du hast deine Morgentabletten um fünf nach acht genommen.", "Jetzt brauchst du keine mehr.", "Die nächsten Tabletten sind um zwölf Uhr mittags."]);
   });
   it("Monday 06:00: next pills in the morning", async () => {
     const r = await (await connect(at("2026-10-12T06:00:00"))).call("get_medication_status");
@@ -65,7 +72,7 @@ describe("confirm_medication", () => {
     await m.store.addEvent({ profileId: "rose", type: "stayed_home", at: "2026-10-12T14:00:00Z", detail: { appointmentId: "maple-grove" } });
     m.setNow(at("2026-10-12T12:30:00"));
     const r = await m.call("get_medication_status");
-    expect(r.say).toEqual(["Yes. You took your morning pills at five past eight.", "Now it's time for your noon pill.", "That's the little yellow one."]);
+    expect(r.say).toEqual(["You took your morning pills at five past eight.", "Now it's time for your noon pill.", "That's the little yellow one."]);
   });
 });
 
@@ -109,7 +116,7 @@ describe("unsure noon pill (no word whether she went to the group)", () => {
     await m.call("confirm_medication");
     m.setNow(at("2026-10-12T20:00:00"));
     const r = await m.call("get_medication_status");
-    expect(r.say).toEqual(["Yes. You took your morning pills at five past eight.", "Now it's time for your evening pill.", "That's the white capsule."]);
+    expect(r.say).toEqual(["You took your morning pills at five past eight.", "Now it's time for your evening pill.", "That's the white capsule."]);
     expect(await types(m)).toEqual(["med_confirmed", "med_asked", "med_unsure"]);
   });
 });

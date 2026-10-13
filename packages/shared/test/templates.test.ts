@@ -46,12 +46,13 @@ describe("templates", () => {
   it("renders English exactly", () => {
     const T = templates("en-US");
     expect(T.leaveFor("Maple Grove Day Club", "twenty to ten")).toBe("You leave for Maple Grove Day Club at twenty to ten.");
-    expect(T.medTaken("your morning pills", "five past eight")).toBe("Yes. You took your morning pills at five past eight.");
+    expect(T.medTaken("your morning pills", "five past eight")).toBe("You took your morning pills at five past eight.");
   });
   it("renders German exactly", () => {
     const T = templates("de-DE");
     expect(T.leaveFor("Tagesgruppe", "zwanzig vor zehn")).toBe("Tagesgruppe ist heute. Du gehst um zwanzig vor zehn los.");
     expect(T.take(["deinen Schlüssel", "deine Tasche"])).toBe("Nimm deinen Schlüssel und deine Tasche mit.");
+    expect(T.medTaken("deine Morgentabletten", "fünf nach acht")).toBe("Du hast deine Morgentabletten um fünf nach acht genommen.");
   });
   it("unsure dose wording", () => {
     expect(templates("en-US").medUnsure("your noon pill")).toBe("I'm not sure if you had your noon pill yet.");

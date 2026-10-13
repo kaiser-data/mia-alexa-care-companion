@@ -184,9 +184,9 @@ function fixtures(locale: Locale) {
   return {
     callOffer: T.callOffer(C),
     problem: [T.distressAck(C), T.distressFollow(C)],
-    pills4: [T.medTaken(de ? "deine Morgentabletten" : "your morning pills", de ? "acht Uhr" : "eight o'clock"), T.medDue(de ? "deine Abendtablette" : "your evening pill"), T.medIs(de ? "die weiße Kapsel" : "the white capsule")],
-    // Production shapes of get_medication_status: taken earlier + due (4 once "Yes." splits off), taken + next (3), due (2).
-    pills3: [T.medTaken(de ? "deine Morgentabletten" : "your morning pills", de ? "acht Uhr" : "eight o'clock"), T.medNextAt(de ? "sechs Uhr abends" : "six in the evening")],
+    // Production shapes of get_medication_status: taken earlier + due (3), taken + no more now + next (3), due (2).
+    pillsTakenDue: [T.medTaken(de ? "deine Morgentabletten" : "your morning pills", de ? "acht Uhr" : "eight o'clock"), T.medDue(de ? "deine Abendtablette" : "your evening pill"), T.medIs(de ? "die weiße Kapsel" : "the white capsule")],
+    pills3: [T.medTaken(de ? "deine Morgentabletten" : "your morning pills", de ? "acht Uhr" : "eight o'clock"), T.noMoreNow(), T.medNextAt(de ? "sechs Uhr abends" : "six in the evening")],
     pills2: [T.medDue(de ? "deine Abendtablette" : "your evening pill"), T.medIs(de ? "die weiße Kapsel" : "the white capsule")],
     confirm: [T.medConfirmed(de ? "deine Morgentabletten" : "your morning pills")],
     call: [T.callRequested(C)],
@@ -221,8 +221,8 @@ describe.each([["en", EN], ["de", DE]] as const)("pills first, one call offer at
     expect(compose([g("report_home", F.home), g("get_medication_status", F.pills3)], null, ctx)).toEqual([...pills, F.home[0]]);
     expect(compose([g("get_medication_status", F.pills3), g("report_home", F.home)], null, ctx)).toEqual([...pills, F.home[0]]);
   });
-  it("pills (4) fill the answer: a side-effect confirmation cannot follow; the pills win", () => {
-    expect(compose([g("report_home", F.home), g("get_medication_status", F.pills4)], null, ctx)).toEqual(splitAll(F.pills4, ctx.locale));
+  it("pills (taken + due) + report_home: the pills first, the welcome after them, its question gives way", () => {
+    expect(compose([g("report_home", F.home), g("get_medication_status", F.pillsTakenDue)], null, ctx)).toEqual([...F.pillsTakenDue, F.home[0]]);
   });
   it("I-B: report_problem, then the pills, then side-effects, then the rest", () => {
     expect(compose([g("play_music", F.music), g("get_medication_status", F.pills2), g("report_problem", F.problem)], { question: "anything_else" }, ctx))
@@ -317,7 +317,7 @@ const splitAll = (says: string[], locale: Locale) => says.flatMap((s) => splitSe
 describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool combinations (%s)", (_, ctx) => {
   const F = fixtures(ctx.locale);
   const POOL: ToolSay[] = [
-    g("report_problem", F.problem), g("get_medication_status", F.pills4), g("get_medication_status", F.pills3), g("get_medication_status", F.pills2),
+    g("report_problem", F.problem), g("get_medication_status", F.pillsTakenDue), g("get_medication_status", F.pills3), g("get_medication_status", F.pills2),
     g("confirm_medication", F.confirm), g("request_call", F.call), g("play_music", F.music), g("report_leaving", F.leaving), g("report_home", F.home),
     g("comfort_me", F.comfort), g("chat_about_life", F.chat), g("chat_about_life", F.chatEmpty), g("who_is", F.who), g("get_today", F.today),
     g("night_reassurance", F.night), g("get_next_appointment", F.apptNot),

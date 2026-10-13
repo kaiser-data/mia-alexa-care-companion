@@ -460,8 +460,30 @@ describe("a pill question goes straight to the pill tool, never to the LLM", () 
     await s.brain.turn({ text: "I took them" });
     const r = await s.brain.turn({ text: "Did I take my pills?" });
     expect(r.tools).toEqual(["get_medication_status"]);
-    expect(r.sentences[0]).toBe("Yes.");
+    expect(r.sentences).toEqual(["You took your morning pills at half past eight.", "No more pills needed now.", "Your next pills are at eight o'clock in the evening."]);
     expect(s.llm.requests).toHaveLength(2); // both from "I took them"
+  });
+  it("C-1: 'Should I take my pills now?' with the dose taken is never answered 'Yes.' (real tools, en + de)", async () => {
+    for (const [profile, q, said] of [
+      [rose(), "Should I take my pills now?", ["You took your morning pills at five past eight.", "No more pills needed now.", "Your next pills are at twelve noon."]],
+      [roseDe(), "Soll ich meine Tabletten nehmen?", ["Du hast deine Morgentabletten um fünf nach acht genommen.", "Jetzt brauchst du keine mehr.", "Die nächsten Tabletten sind um zwölf Uhr mittags."]],
+    ] as const) {
+      const s = await setup("2026-10-14T08:05:00", NEVER(), profile);
+      await s.mia.call("confirm_medication");
+      s.setNow("2026-10-14T10:00:00");
+      const r = await s.brain.turn({ text: q, confidence: 0.9 });
+      expect(r, profile.locale).toMatchObject({ sentences: said, tools: ["get_medication_status"] });
+      expect(r.sentences).not.toContain("Yes.");
+      expect(r.sentences).not.toContain("Ja.");
+    }
+  });
+  it("C-1: 'Have I had my evening pills?' no longer opens with 'Yes.'", async () => {
+    const s = await setup("2026-10-14T08:05:00", NEVER());
+    await s.mia.call("confirm_medication");
+    s.setNow("2026-10-14T10:00:00");
+    const r = await s.brain.turn({ text: "Have I had my evening pills?", confidence: 0.9 });
+    expect(r.tools).toEqual(["get_medication_status"]);
+    expect(r.sentences[0]).toBe("You took your morning pills at five past eight.");
   });
   it("a self-report still goes to the LLM, which records it", async () => {
     const s = await setup(MON, [tool("confirm_medication"), respond()]);

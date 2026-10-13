@@ -48,10 +48,11 @@ export function registerMedicationTools(server: McpServer, ctx: ToolContext): vo
       say = [T.medUnsure(names(unsure.slice(0, 1), p)), T.askCarerFirst(p.carerName)];
     } else if (taken.length) {
       const last = taken.at(-1)!;
-      say = [
-        T.medTaken(last.name, timeWords(last.takenAt!, p.locale)),
-        upcoming[0] ? T.medNextAt(timeWords(upcoming[0].time, p.locale, { withPart: true })) : T.medNoneToday(),
-      ];
+      // Nothing is due: never a bare "Yes" (to "Should I take them?" it is a double-dose prompt), but a clear "no more now".
+      // "There are no more pills today." already says it, so the "no more now" line is only added before a later dose.
+      say = upcoming[0]
+        ? [T.medTaken(last.name, timeWords(last.takenAt!, p.locale)), T.noMoreNow(), T.medNextAt(timeWords(upcoming[0].time, p.locale, { withPart: true }))]
+        : [T.medTaken(last.name, timeWords(last.takenAt!, p.locale)), T.medNoneToday()];
     } else if (upcoming[0]) {
       say = [T.medNextAt(timeWords(upcoming[0].time, p.locale, { withPart: true }))];
     } else if (atAppointment[0]) {
