@@ -741,3 +741,40 @@ describe("round 6 review I-2: beside a health question a due dose is never promp
     }
   });
 });
+
+describe("round 6 review M-2: beside a health answer, 'I've asked Tom to call you.' is always spoken (real tools)", () => {
+  const HEALTH = { "en-US": ["I can't answer that one.", "Let's ask Tom first."], "de-DE": ["Das kann ich dir nicht sagen.", "Wir fragen zuerst Tom."] } as const;
+  const CALLED = { "en-US": "I've asked Tom to call you.", "de-DE": "Ich habe Tom um einen Anruf gebeten." } as const;
+  const step = (names: string[]) => ({ kind: "tools" as const, text: "", calls: names.map((name, i) => ({ id: `c${i}`, name, input: name === "ask_carer_about_health" ? { what: "dizzy" } : {} })) });
+  const ORDERS = [
+    ["ask_carer_about_health", "confirm_medication", "request_call"],
+    ["confirm_medication", "request_call", "ask_carer_about_health"],
+    ["request_call", "ask_carer_about_health", "confirm_medication"],
+  ];
+
+  it("health + confirm_medication + request_call at 08:05: the health answer, then the call confirmation (en + de, 3 call orders)", async () => {
+    for (const profile of [rose(), roseDe()]) {
+      for (const names of ORDERS) {
+        const s = await setup("2026-10-14T08:05:00", [step(names), respond()], profile);
+        const r = await s.brain.turn({ text: profile.locale === "de-DE" ? "Ich hab sie genommen, aber mir ist schwindelig. Tom soll anrufen." : "I took them but I feel dizzy. Can Tom call me?" });
+        expect(r.sentences, `${profile.locale} ${names.join("+")}`).toEqual([...HEALTH[profile.locale], CALLED[profile.locale]]);
+      }
+    }
+  });
+  it("health + get_medication_status + request_call, at 08:05, 10:00 and 12:05: the call confirmation is always spoken (en + de)", async () => {
+    for (const profile of [rose(), roseDe()]) {
+      for (const time of ["2026-10-14T08:05:00", "2026-10-14T10:00:00", "2026-10-14T12:05:00"]) {
+        for (const names of [["ask_carer_about_health", "get_medication_status", "request_call"], ["get_medication_status", "request_call", "ask_carer_about_health"]]) {
+          const s = await setup("2026-10-14T08:05:00", [step(names), respond()], profile);
+          if (time !== "2026-10-14T08:05:00") await s.mia.call("confirm_medication");
+          s.setNow(time);
+          const r = await s.brain.turn({ text: "My pills make me dizzy. Can Tom call me?" });
+          const tag = `${profile.locale} ${time} ${names.join("+")} ${JSON.stringify(r.sentences)}`;
+          expect(r.sentences.slice(0, 2), tag).toEqual(HEALTH[profile.locale]);
+          expect(r.sentences, tag).toContain(CALLED[profile.locale]);
+          expect(r.sentences.length, tag).toBeLessThanOrEqual(4);
+        }
+      }
+    }
+  });
+});

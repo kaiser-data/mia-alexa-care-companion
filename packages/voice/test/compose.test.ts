@@ -335,12 +335,14 @@ const splitAll = (says: string[], locale: Locale) => says.flatMap((s) => splitSe
  * 4. A call that request_call just made is never offered.
  * 5. The pills are never dropped or displaced by side-effect answers: right after report_problem and
  *    ask_carer_about_health (or first), after at most a lead phrase; kept whenever they fit in four beside those.
- *    ask_carer_about_health is held to the same rule, right after report_problem.
+ *    ask_carer_about_health is held to the same rule, right after report_problem. Beside ask_carer_about_health
+ *    the side-effect confirmations come before the pills (see 8).
  * 6. No sentence is spoken twice.
  * 7. A tool's own question is spoken right after a sentence of that same tool (when the tool has any other sentence):
  *    "Do you remember that?" always follows the life-story sentence it refers to.
- * 8. A side-effect confirmation is dropped only when report_problem, the pills and the side-effects called before it
- *    already fill the four places with it: then nothing else is spoken, no question and no lower-ranked answer.
+ * 8. A side-effect confirmation is dropped only when report_problem, ask_carer_about_health, the pills and the
+ *    side-effects called before it already fill the four places with it: then nothing else is spoken, no question and
+ *    no lower-ranked answer. Beside ask_carer_about_health the pills do not count here: the confirmation comes first.
  * 9. get_today's repeated day ("Today is Monday.") is the first thing given up: when its answer is spoken without it
  *    and no answer was skipped, the answer is full and holds no lead or closing.
  * 10. A repeated day ("Today is Sunday.", "On Monday.") is spoken only when every answer's facts are spoken.
@@ -414,7 +416,8 @@ describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool c
         if (says.some((s) => s.tool === "request_call")) expect(out, tag).not.toContain(F.callOffer);
         expect(new Set(out).size, tag).toBe(out.length);
         // (5) report_problem, then ask_carer_about_health, then the pills: each whole, first, or while all fit in four.
-        const top = [says.find((s) => s.tool === "report_problem"), says.find((s) => s.tool === "ask_carer_about_health"), says.find((s) => MEDS.includes(s.tool))];
+        // Beside a health answer the side-effect confirmations come before the pills (M-2): then (8) holds them, not (5).
+        const top = [says.find((s) => s.tool === "report_problem"), says.find((s) => s.tool === "ask_carer_about_health"), health ? undefined : says.find((s) => MEDS.includes(s.tool))];
         if (top[1] || top[2]) {
           const prefix: string[] = [];
           for (const t of top) {
@@ -466,11 +469,12 @@ describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool c
         // (8) Side-effects are walked in call order, right after report_problem and the pills.
         const factsOf8 = (s: ToolSay) => heard(s).filter((x) => !isQ(x));
         const sides = says.filter((s) => SIDE.includes(s.tool));
-        const higher = new Set([...factsOf(["report_problem", "ask_carer_about_health", ...MEDS]), ...sides.flatMap(factsOf8)]);
+        const above = ["report_problem", "ask_carer_about_health", ...(health ? [] : MEDS)];
+        const higher = new Set([...factsOf(above), ...sides.flatMap(factsOf8)]);
         for (const [k, side] of sides.entries()) {
           const facts = factsOf8(side);
           if (facts.every((f) => out.includes(f))) continue;
-          const before = [...factsOf(["report_problem", "ask_carer_about_health", ...MEDS]), ...sides.slice(0, k).flatMap(factsOf8)].filter((f) => out.includes(f));
+          const before = [...factsOf(above), ...sides.slice(0, k).flatMap(factsOf8)].filter((f) => out.includes(f));
           expect(before.length + facts.length, tag).toBeGreaterThan(MAX_SENTENCES);
           for (const x of out) expect(higher.has(x), tag).toBe(true);
         }

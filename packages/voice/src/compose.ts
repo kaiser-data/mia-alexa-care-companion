@@ -70,6 +70,9 @@ const PRIORITY: Record<string, number> = {
   comfort_me: 2, night_reassurance: 2,
 };
 const OTHERS = 3;
+/** Beside a health answer a side-effect confirmation ("I've asked Tom to call you.") comes before the other pill facts. */
+const SIDE_BEFORE_PILLS = 0.75;
+const SIDE_EFFECT_TOOLS = new Set(Object.keys(PRIORITY).filter((t) => PRIORITY[t] === SIDE_EFFECTS));
 /** Openers that may stand without a tool answer: a greeting is not a "yes". */
 const GREETINGS = ["hello", "good_morning", "good_evening"];
 /**
@@ -112,7 +115,8 @@ const repeatDays = (locale: Locale) => {
  *
  * One rule decides what is spoken: fill four places in priority order, then say the kept parts in rank order.
  * 1. Tool answers are walked in rank order: report_problem, ask_carer_about_health, the pills (get_medication_status, confirm_medication),
- *    the side-effects (request_call, play_music, report_leaving, report_home), comfort_me / night_reassurance, then the
+ *    the side-effects (request_call, play_music, report_leaving, report_home; beside ask_carer_about_health they come
+ *    before the pills, so "I've asked Tom to call you." is always heard), comfort_me / night_reassurance, then the
  *    rest in call order. Each answer's facts (its sentences without its question) are kept whole or not at all;
  *    a later smaller answer may still fit. A fact an earlier kept answer already says takes no place and is spoken once.
  *    - The first answer and every answer up to the side-effects count only their facts: no question keeps them out.
@@ -153,7 +157,7 @@ export function compose(toolSays: ToolSay[], choice: RespondInput | null, ctx: C
         .filter((s) => !(askedCarer && g.tool === "get_medication_status" && isDue(s)));
       const statements = sentences.filter((s) => !isQuestion(s));
       return {
-        i, tool: g.tool, rank: PRIORITY[g.tool] ?? OTHERS, statements,
+        i, tool: g.tool, rank: askedCarer && SIDE_EFFECT_TOOLS.has(g.tool) ? SIDE_BEFORE_PILLS : PRIORITY[g.tool] ?? OTHERS, statements,
         facts: statements.filter((s) => !repeats.has(s)), question: sentences.find(isQuestion) ?? null,
       };
     })
