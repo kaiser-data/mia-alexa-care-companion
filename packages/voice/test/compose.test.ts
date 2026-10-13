@@ -29,8 +29,8 @@ describe("RESPOND_TOOL", () => {
 
 describe("compose", () => {
   it("lead, tool sentences, question", () => {
-    expect(compose([g("confirm_medication", ["Not yet."])], { opener: "of_course", question: "anything_else" }, EN))
-      .toEqual(["Of course, Rose.", "Not yet.", "Can I help with anything else?"]);
+    expect(compose([g("who_is", ["Frank is your husband."])], { opener: "of_course", question: "anything_else" }, EN))
+      .toEqual(["Of course, Rose.", "Frank is your husband.", "Can I help with anything else?"]);
   });
   it("splits tool entries into sentences", () => {
     expect(compose([g("get_medication_status", ["Yes. You took them."])], null, EN)).toEqual(["Yes.", "You took them."]);
@@ -342,6 +342,7 @@ const splitAll = (says: string[], locale: Locale) => says.flatMap((s) => splitSe
  * 10. A repeated day ("Today is Sunday.", "On Monday.") is spoken only when every answer's facts are spoken.
  * 11. A question the LLM picked never takes a place before a fact: when it is spoken, every skipped answer without
  *     its own question could not have fitted in four beside the facts that are spoken.
+ * 12. Beside a pill or health answer no opener or feeling is spoken (only a greeting could lead, and the table picks none).
  * The pool holds the real get_today and get_next_appointment output of a group day and a day without the group,
  * so (6) "no sentence twice" is checked on what the tools really say.
  */
@@ -444,6 +445,10 @@ describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool c
           const fromTools = new Set(says.flatMap((s) => splitAll(s.says, ctx.locale)));
           for (const s of out) if (!fromTools.has(s)) expect(LEADS.has(s) || CLOSINGS.has(s), tag).toBe(false);
         }
+        // (12) No lead before a pill or health answer.
+        const plain = says.filter((s) => [...MEDS, "ask_carer_about_health"].includes(s.tool)).flatMap((s) => splitAll(s.says, ctx.locale));
+        const said = new Set(says.flatMap((s) => splitAll(s.says, ctx.locale)));
+        if (plain.some((x) => out.includes(x))) for (const x of out) if (!said.has(x)) expect(LEADS.has(x), tag).toBe(false);
         const factsOf = (tools: string[]) => says.filter((s) => tools.includes(s.tool)).flatMap((s) => splitAll(s.says, ctx.locale).filter((x) => !isQ(x)));
         // (8) Side-effects are walked in call order, right after report_problem and the pills.
         const factsOf8 = (s: ToolSay) => splitAll(s.says, ctx.locale).filter((x) => !isQ(x));

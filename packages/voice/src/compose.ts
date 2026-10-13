@@ -72,6 +72,11 @@ const PRIORITY: Record<string, number> = {
 const OTHERS = 3;
 /** Openers that may stand without a tool answer: a greeting is not a "yes". */
 const GREETINGS = ["hello", "good_morning", "good_evening"];
+/**
+ * Answers that only a greeting may lead: "Of course, Rose." or "I'm glad." before "You took your morning pills…" or
+ * "I can't answer that one." is heard as the answer to "Should I take…?".
+ */
+const NO_LEAD = new Set(["get_medication_status", "confirm_medication", "ask_carer_about_health"]);
 
 const isQuestion = (s: string) => s.trimEnd().endsWith("?");
 /**
@@ -106,7 +111,7 @@ const repeatDays = (locale: Locale) => {
  * 3. Then, only while places are free and only when no answer was skipped: the repeated days (get_today's
  *    "Today is Sunday." and get_next_appointment's "On Monday.", the shared repeatDay and onDay templates, not counted
  *    in step 1); then the closing (only without a question), then the lead (feeling wins over opener; not when it
- *    repeats the first sentence). So a repeated day is the first thing given up, and either tool alone still speaks
+ *    repeats the first sentence; beside a pill or health answer only a greeting). So a repeated day is the first thing given up, and either tool alone still speaks
  *    all three sentences. No sentence is spoken twice.
  * Order: the kept answers in rank order; an answer whose question is asked moves last, whole, so its question
  * follows its own facts ("Do you remember that?" after the life-story sentence). The pills never ask, so they stay first.
@@ -128,7 +133,7 @@ export function compose(toolSays: ToolSay[], choice: RespondInput | null, ctx: C
       const sentences = g.says.flatMap((s) => splitSentences(s, ctx.locale)).filter((s) => !(requestedCall && s === callOffer));
       const statements = sentences.filter((s) => !isQuestion(s));
       return {
-        i, rank: PRIORITY[g.tool] ?? OTHERS, statements,
+        i, tool: g.tool, rank: PRIORITY[g.tool] ?? OTHERS, statements,
         facts: statements.filter((s) => !repeats.has(s)), question: sentences.find(isQuestion) ?? null,
       };
     })
@@ -180,7 +185,10 @@ export function compose(toolSays: ToolSay[], choice: RespondInput | null, ctx: C
   }
   if (question) out.push(question);
   else if (closing && out.length < MAX_SENTENCES) out.push(closing);
-  const lead = pick(c.feeling, "feeling", ctx) ?? pick(c.opener, "opener", ctx);
+  const plain = kept.some((g) => NO_LEAD.has(g.tool));
+  const lead = plain
+    ? (GREETINGS.includes(c.opener ?? "") ? pick(c.opener, "opener", ctx) : null)
+    : pick(c.feeling, "feeling", ctx) ?? pick(c.opener, "opener", ctx);
   if (lead && lead !== out[0] && out.length < MAX_SENTENCES) out.unshift(lead);
   return out;
 }

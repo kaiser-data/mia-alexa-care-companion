@@ -20,9 +20,9 @@ const PILLS = ["Now it's time for your morning pills.", "That's the small white 
 
 describe("Brain.turn", () => {
   it("LLM chooses the tool and a phrase; the template sentences are spoken after it", async () => {
-    const s = await setup("2026-10-12T08:05:00", [tool("get_medication_status"), respond({ opener: "of_course" })]);
+    const s = await setup("2026-10-12T08:05:00", [tool("get_medication_status"), respond({ opener: "good_morning" })]);
     const r = await s.brain.turn({ text: "Tell me about my pills", confidence: 0.92 });
-    expect(r).toEqual({ sentences: ["Of course, Rose.", ...PILLS], rate: 0.9, breakMs: 700, tools: ["get_medication_status"] });
+    expect(r).toEqual({ sentences: ["Good morning, Rose.", ...PILLS], rate: 0.9, breakMs: 700, tools: ["get_medication_status"] });
     const tools = s.llm.requests[0]!.tools;
     expect(tools.map((t) => t.name)).toContain("get_medication_status");
     expect(tools.at(-1)).toMatchObject({ name: "respond", strict: true });
@@ -279,12 +279,12 @@ describe("Claude picks, doesn't write", () => {
   it("German: phrases in German, the cap respected", async () => {
     const DE_PILLS = ["Jetzt ist Zeit für deine Morgentabletten.", "Das ist die kleine weiße und die runde rosa Tablette."];
     const s = await setup(MON, [
-      tool("get_medication_status"), respond({ opener: "of_course" }),
-      tool("get_medication_status"), respond({ opener: "of_course", question: "anything_else" }),
+      tool("get_medication_status"), respond({ opener: "good_morning" }),
+      tool("get_medication_status"), respond({ opener: "good_morning", question: "anything_else" }),
     ], roseDe());
-    expect((await s.brain.turn({ text: "Erzähl mir von meinen Tabletten" })).sentences).toEqual(["Natürlich, Rose.", ...DE_PILLS]);
-    // Two pill sentences + opener + question are four: all fit.
-    expect((await s.brain.turn({ text: "Und jetzt?" })).sentences).toEqual(["Natürlich, Rose.", ...DE_PILLS, "Kann ich sonst noch helfen?"]);
+    expect((await s.brain.turn({ text: "Erzähl mir von meinen Tabletten" })).sentences).toEqual(["Guten Morgen, Rose.", ...DE_PILLS]);
+    // Two pill sentences + greeting + question are four: all fit.
+    expect((await s.brain.turn({ text: "Und jetzt?" })).sentences).toEqual(["Guten Morgen, Rose.", ...DE_PILLS, "Kann ich sonst noch helfen?"]);
   });
   it("too many pills alerts Tom at once, without the LLM", async () => {
     const s = await setup(MON, []);
@@ -640,5 +640,53 @@ describe("health questions go to the carer", () => {
     const r = await s.brain.turn({ text: "What day is it? Can I take an aspirin?" });
     expect(r.sentences.slice(0, 2)).toEqual(["I can't answer that one.", "Let's ask Tom first."]);
     expect(r.sentences.length).toBeLessThanOrEqual(4);
+  });
+});
+
+describe("round 6 review I-1: no opener or feeling before a pill or health answer (LLM path, real tools)", () => {
+  const TAKEN = {
+    "en-US": ["You took your morning pills at five past eight.", "No more pills needed now.", "Your next pills are at twelve noon."],
+    "de-DE": ["Du hast deine Morgentabletten um fünf nach acht genommen.", "Jetzt brauchst du keine mehr.", "Die nächsten Tabletten sind um zwölf Uhr mittags."],
+  } as const;
+  const HEALTH = { "en-US": ["I can't answer that one.", "Let's ask Tom first."], "de-DE": ["Das kann ich dir nicht sagen.", "Wir fragen zuerst Tom."] } as const;
+
+  it("a taken dose: 'Of course, Rose.' / 'I'm glad.' never opens the answer (en + de)", async () => {
+    for (const [profile, q] of [[rose(), "Should I take my pills now, Mia?"], [roseDe(), "Soll ich meine Tabletten jetzt nehmen, Mia?"]] as const) {
+      for (const choice of [{ opener: "of_course" }, { feeling: "im_glad" }, { opener: "let_me_see", feeling: "sounds_lovely" }]) {
+        const s = await setup("2026-10-14T08:05:00", [tool("get_medication_status"), respond(choice)], profile);
+        await s.mia.call("confirm_medication");
+        s.setNow("2026-10-14T10:00:00");
+        const r = await s.brain.turn({ text: q, confidence: 0.9 });
+        expect(r.sentences, `${profile.locale} ${JSON.stringify(choice)}`).toEqual(TAKEN[profile.locale]);
+      }
+    }
+  });
+  it("a due dose: no opener either (en + de)", async () => {
+    for (const [profile, said] of [[rose(), PILLS], [roseDe(), ["Jetzt ist Zeit für deine Morgentabletten.", "Das ist die kleine weiße und die runde rosa Tablette."]]] as const) {
+      const s = await setup("2026-10-12T08:05:00", [tool("get_medication_status"), respond({ opener: "of_course" })], profile);
+      expect((await s.brain.turn({ text: "Tell me about my pills, Mia" })).sentences, profile.locale).toEqual(said);
+    }
+  });
+  it("confirm_medication: no feeling before 'Thank you. I've noted …' (en + de)", async () => {
+    for (const [profile, said] of [[rose(), ["Thank you.", "I've noted your morning pills."]], [roseDe(), ["Danke.", "Ich habe deine Morgentabletten notiert."]]] as const) {
+      const s = await setup("2026-10-12T08:05:00", [tool("confirm_medication"), respond({ feeling: "im_glad" })], profile);
+      expect((await s.brain.turn({ text: "I took them" })).sentences, profile.locale).toEqual(said);
+    }
+  });
+  it("a health question: never 'Of course, Rose. I can't answer that one.' (en + de)", async () => {
+    for (const [profile, q] of [[rose(), "Can I take an aspirin?"], [roseDe(), "Darf ich eine Kopfschmerztablette nehmen?"]] as const) {
+      for (const choice of [{ opener: "of_course" }, { feeling: "im_glad" }, { feeling: "oh_dear" }]) {
+        const s = await setup("2026-10-14T10:00:00", [tool("ask_carer_about_health", { what: q }), respond(choice)], profile);
+        expect((await s.brain.turn({ text: q })).sentences, `${profile.locale} ${JSON.stringify(choice)}`).toEqual(HEALTH[profile.locale]);
+      }
+    }
+  });
+  it("a greeting may still lead: it is not a yes (en + de)", async () => {
+    for (const [profile, hello] of [[rose(), "Good morning, Rose."], [roseDe(), "Guten Morgen, Rose."]] as const) {
+      const s = await setup("2026-10-14T08:05:00", [tool("get_medication_status"), respond({ opener: "good_morning" })], profile);
+      await s.mia.call("confirm_medication");
+      s.setNow("2026-10-14T10:00:00");
+      expect((await s.brain.turn({ text: "pills, Mia?" })).sentences, profile.locale).toEqual([hello, ...TAKEN[profile.locale]]);
+    }
   });
 });
