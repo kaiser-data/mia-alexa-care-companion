@@ -1,12 +1,34 @@
 # Mia — Memory & Care Companion for Alexa+
 
-An Alexa+ MCP add-on that helps people living with dementia at home — medication, orientation, sleep, anxiety, loneliness — with a secure carer side and alarm escalation.
+Mia is an Alexa+ add-on (an MCP server) and a browser voice simulator for people living with dementia at home. Rose Whitaker, 78, is a fictional persona; her son Tom looks after her from afar. Mia helps with her five hardest things: **medication** (did I take my pills?), **orientation** (what day is it, is it a group day?), **sleep** (night-time waking), **anxiety** (calm, repeated, kind answers) and **loneliness** (a friendly voice that speaks first). Every answer comes from what the family entered, never from a guess, and when something is wrong Tom is alerted.
 
-Built for the [Build, Ship, Shape: Amazon Developer Hackathon](https://amazonappdev2026.devpost.com/) (Alexa+ track). Demo persona: **Rose Whitaker**, fictional ([docs/persona/rose.md](docs/persona/rose.md)).
+Built for the [Build, Ship, Shape: Amazon Developer Hackathon](https://amazonappdev2026.devpost.com/) (Alexa+ track, AWS Builder and Open Source mini challenges). Licensed MIT ([LICENSE](LICENSE)). Persona: [docs/persona/rose.md](docs/persona/rose.md).
 
-## Run locally (no AWS needed)
+## What it shows
 
-Requires Node 24, pnpm 10, Chrome or Edge (for speech), and an API key for one model provider (see below).
+- **Mia MCP server** with 16 tools (medication, appointments, orientation, weather, alerts, carer messages), Streamable HTTP, bearer-token auth.
+- **Mia Voice, a browser simulator** with **Care Mode**: care topics reach Mia without its name, and Mia speaks first at agreed times. Today's Alexa+ add-ons cannot do this; see [the proposal](docs/submission/care-mode-proposal.md).
+- **Alexa skill bridge** (German, classic skill) so a real Echo can reach the same brain.
+- **SES alarm email**: medium and high alerts go to the carer; a cry for help that cannot be mailed tells Rose to call for help.
+- **AWS deploy**: one small server in Frankfurt (EC2 + Caddy + SES), see [deploy/aws/README.md](deploy/aws/README.md).
+
+## Architecture
+
+    Echo / browser (Rose speaks)
+            |
+            v
+    Mia Voice (speech in/out, Care Mode, proactive turns)
+            |  the LLM picks a tool
+            v
+    Mia MCP server (16 tools, Streamable HTTP, bearer token)
+            |                         |
+            v                         v
+    SQLite, AES-256-GCM       alerts --> Amazon SES --> Tom's inbox
+    encrypted at rest
+
+## Quick start (60 seconds, local, no AWS)
+
+Requires Node 24, pnpm 10, Chrome or Edge (for speech) and an API key for one model provider.
 
     pnpm install
     cp .env.example .env              # set MIA_DEV_TOKEN to a long random string
@@ -19,9 +41,9 @@ Tap the circle once and talk — no name, no wake word. Mia also speaks first at
 
 To run only the MCP server (e.g. for the MCP Inspector): `pnpm dev:mcp` → `http://127.0.0.1:8787/mcp` with header `Authorization: Bearer <MIA_DEV_TOKEN>`.
 
-Local mode stores data in SQLite under `.mia-data/`, encrypted with a generated AES-256-GCM key. It is **not** production; AWS mode (DynamoDB + KMS, OAuth 2.1, Transcribe/Polly/Bedrock) follows.
+Local mode stores data in SQLite under `.mia-data/`, encrypted with a generated AES-256-GCM key. It is **not** production.
 
-**"Care Mode" (a proposal for Alexa+):** in Mia Voice, care topics reach Mia without its name, and Mia may speak first at agreed times (`GET /proactive`). Today's Alexa+ add-ons cannot do this; the demo shows how it would help.
+Optional settings (see `.env.example`): `MIA_PUBLIC_ORIGIN` when the page sits behind a proxy, `MIA_CLOCK_START` to start the demo clock at a chosen time, `MIA_ALERT_EMAIL_TO` / `MIA_ALERT_EMAIL_FROM` / `AWS_REGION` for the SES alarm mail.
 
 ## Echo Dot (classic Alexa skill, local mode)
 
@@ -33,12 +55,42 @@ While Alexa+ add-ons are closed, an Echo reaches Mia through a German custom ski
 
 A private profile: `MIA_PROFILE_FILE=.mia-data/<name>.json` (gitignored; same shape as the seed profiles) instead of `MIA_PROFILE`.
 
+## Safety rules
+
+- The family is the source of truth. Unknown means "I don't know, let me ask Tom". No guessing.
+- No medical advice. Medication answers come only from the plan and the log; Mia never names doses, never advises on extra pills, never interprets symptoms.
+- Pills taken twice are treated as a cry for help and alert the carer; a duplicate dose is blocked kindly.
+- The alarm is raised before anything else and does not depend on the model or on reading the log.
+- Mia is not an emergency service. It alerts family and never calls 112 or 911 itself.
+- Same answer, every time, kindly: never "you already asked that".
+
+## Privacy
+
+- Stored data is encrypted with AES-256-GCM using a generated local key (`.mia-data/`, gitignored).
+- All data in this repository is fictional (Rose Whitaker, Tom). A private profile is loaded with `MIA_PROFILE_FILE`, which stays outside git.
+- Transcripts do not leave the machine by default. The only outbound calls are to the model provider you configure, Open-Meteo for weather, and Amazon SES for alarm mail when you enable it.
+- Health data is treated as GDPR Art. 9 data by design.
+
+## Limits
+
+Local mode is a demo, not production. Known open findings are in [docs/known-issues.md](docs/known-issues.md). Alexa+ add-ons are closed to hackathon participants, so the simulator and the classic skill stand in for them.
+
+## Submission docs
+
+- [Devpost text](docs/submission/devpost.md)
+- [Demo video script](docs/submission/demo-video-script.md)
+- [Care Mode proposal](docs/submission/care-mode-proposal.md)
+- [Friction log](docs/submission/friction-log.md)
+- [Product feedback](docs/submission/product-feedback.md)
+
 ## Tests
 
     pnpm test
     pnpm typecheck
 
-## Docs
+Tests need no `.env` and no API key.
+
+## More docs
 
 - Design: [docs/superpowers/specs/2026-10-06-mia-design.md](docs/superpowers/specs/2026-10-06-mia-design.md)
 - Research: [docs/research/2026-10-06-practical-implementation.md](docs/research/2026-10-06-practical-implementation.md)
