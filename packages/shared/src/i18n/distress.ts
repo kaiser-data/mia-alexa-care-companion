@@ -14,7 +14,8 @@ const ALWAYS = [
   // Too many or the wrong pills is a possible emergency, never a question for the pill tool.
   "too many pills", "too many tablets", "took too many", "double dose", "overdose", "wrong pills",
   "pills twice", "tablets twice", "took them twice", "took it twice",
-  "zu viele tabletten", "zu viel genommen", "doppelt genommen", "zweimal genommen", "falsche tabletten", "überdosis",
+  "tablet twice", "medication twice", "medicine twice", "taken them twice", "taken it twice", "pills two times", "tablets two times",
+  "zu viele tabletten", "zu viel genommen", "doppelt genommen", "zweimal genommen", "zweimal eingenommen", "doppelt eingenommen", "tablette zweimal", "falsche tabletten", "überdosis",
 ];
 /** Only alarming on their own: "help" in a long sentence is usually an ordinary request. */
 const SHORT_ONLY = ["help", "help me", "please help", "help please", "hilfe", "hilf mir", "bitte hilfe", "hilfe bitte"];
@@ -29,7 +30,7 @@ function normalise(text: string): string {
     .replace(/[\u2018\u2019`]/g, "'")
     .replace(/[^\p{L}\p{N}' ]+/gu, " ")
     .replace(/\b(fell|fallen) (asleep|in love)\b/g, " ")
-    .replace(/\b(twice|zweimal) (a|am) (day|tag)\b/g, " ")
+    .replace(/\b(?:(?:twice|two times|zweimal) (?:a|am|die|pro) (?:day|week|tag|woche)|(?:twice|two times) daily|zweimal täglich)\b/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }

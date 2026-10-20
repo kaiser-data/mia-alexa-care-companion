@@ -23,3 +23,14 @@ describe("pills taken twice is a possible emergency (M-5)", () => {
   it.each(["Do I take my pills twice a day?", "Nehme ich die Tabletten zweimal am Tag?"])("a question about the plan is not: %s", (t) =>
     expect(detectDistress(t)).toBe(false));
 });
+
+describe("more ways to say pills taken twice (M-5 follow-up)", () => {
+  it.each(["I took my tablet twice", "I took my medication twice", "I took the medicine twice", "I have taken them twice",
+    "I have taken it twice", "I took my pills two times", "I took my tablets two times",
+    "Ich habe sie zweimal eingenommen", "Ich habe sie doppelt eingenommen", "Ich habe die Tablette zweimal genommen",
+    "Ich habe meine Tabletten zweimal genommen"])("%s", (t) => expect(detectDistress(t)).toBe(true));
+  it.each(["Do I take my medicine twice a day?", "I take my tablet twice daily", "Nehme ich die Tablette zweimal täglich?",
+    "Take my pills two times a day?", "Nehme ich die Tablette zweimal die Woche?", "Twice a week I go to the market",
+    "Did I take my pills?", "Habe ich meine Tabletten genommen?"])("a plan question is not: %s", (t) =>
+    expect(detectDistress(t)).toBe(false));
+});
