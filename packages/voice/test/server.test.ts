@@ -123,3 +123,25 @@ describe("voice gateway", () => {
     expect((await a.request("/style.css", { headers: LOCAL })).status).toBe(404);
   });
 });
+
+describe("public origin (behind Caddy on AWS)", () => {
+  const PUBLIC = "https://3-120-1-2.sslip.io";
+  function publicApp() {
+    const publicDir = mkdtempSync(join(tmpdir(), "mia-public-"));
+    writeFileSync(join(publicDir, "index.html"), "<!doctype html>");
+    const brain = { turn: async () => reply, proactive: async () => null };
+    return createVoiceApp({ brain, profile: rose(), publicDir, port: 8788, publicOrigin: PUBLIC });
+  }
+  const turn = (a: ReturnType<typeof publicApp>, headers: Record<string, string>) =>
+    a.request("/api/turn", { method: "POST", headers: { "content-type": "application/json", ...headers }, body: JSON.stringify({ text: "hi" }) });
+  it("answers its own page on the public host", async () => {
+    expect((await turn(publicApp(), { host: "3-120-1-2.sslip.io", origin: PUBLIC })).status).toBe(200);
+  });
+  it("still refuses other hosts and origins", async () => {
+    expect((await turn(publicApp(), { host: "evil.example", origin: PUBLIC })).status).toBe(403);
+    expect((await turn(publicApp(), { host: "3-120-1-2.sslip.io", origin: "https://evil.example" })).status).toBe(403);
+  });
+  it("refuses a public origin that is not https", () => {
+    expect(() => createVoiceApp({ brain: { turn: async () => reply, proactive: async () => null }, profile: rose(), publicDir: tmpdir(), port: 8788, publicOrigin: "http://x.example" })).toThrow(/https/);
+  });
+});
