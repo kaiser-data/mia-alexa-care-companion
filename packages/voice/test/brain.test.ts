@@ -778,3 +778,21 @@ describe("round 6 review M-2: beside a health answer, 'I've asked Tom to call yo
     }
   });
 });
+
+describe("round 6 review M-4: report_problem wins over the health answer (real tools)", () => {
+  // Without the health answer the turn is a plain distress turn, so its feeling leads as it does beside report_problem alone.
+  it("report_problem + ask_carer_about_health: only the distress answer, both alerts raised (en + de, both call orders)", async () => {
+    for (const [profile, said] of [
+      [rose(), ["Oh dear.", "I've let Tom know right away.", "Tom will get in touch with you."]],
+      [roseDe(), ["Oh je.", "Ich habe Tom sofort Bescheid gegeben.", "Tom meldet sich bei dir."]],
+    ] as const) {
+      for (const first of ["report_problem", "ask_carer_about_health"]) {
+        const calls = [{ id: "a", name: "report_problem", input: { what: "sick" } }, { id: "b", name: "ask_carer_about_health", input: { what: "sick" } }];
+        const s = await setup("2026-10-14T10:00:00", [{ kind: "tools" as const, text: "", calls: first === "report_problem" ? calls : calls.reverse() }, respond({ feeling: "oh_dear" })], profile);
+        const r = await s.brain.turn({ text: "I feel so sick from my pills" });
+        expect(r.sentences, `${profile.locale} ${first}`).toEqual([...said]);
+        expect((await s.store.listAlerts(profile.id)).map((a) => a.rule).sort(), first).toEqual(["health_question", expect.any(String)].sort());
+      }
+    }
+  });
+});

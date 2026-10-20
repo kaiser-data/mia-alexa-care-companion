@@ -289,10 +289,30 @@ describe.each([["en", EN], ["de", DE]] as const)("pills first, one call offer at
     expect(compose([g("get_medication_status", F.pillsTakenDue), g("ask_carer_about_health", F.health)], { question: "anything_else" }, ctx)).toEqual([...F.health, F.pillsTakenDue[0], anything]);
     expect(compose([g("get_medication_status", F.pills2)], null, ctx)).toEqual(F.pills2);
     expect(compose([g("get_medication_status", F.pills3), g("ask_carer_about_health", F.health)], null, ctx)).toEqual(F.health);
-    expect(compose([g("ask_carer_about_health", F.health), g("report_problem", F.problem)], null, ctx)).toEqual([...F.problem, ...F.health]);
+    // Beside report_problem the health answer is dropped: the distress answer wins (round 6 review M-4).
+    expect(compose([g("ask_carer_about_health", F.health), g("report_problem", F.problem)], null, ctx)).toEqual(F.problem);
   });
   it("I-C: request_call + an empty-life-story chat (only a call offer): no offer", () => {
     expect(compose([g("chat_about_life", F.chatEmpty), g("request_call", F.call)], null, ctx)).toEqual(F.call);
+  });
+});
+
+describe.each([["en", EN], ["de", DE]] as const)("round 6 review M-4: report_problem wins over the health answer (%s)", (_, ctx) => {
+  const T = templates(ctx.locale);
+  const failed = [T.distressFailed("Tom")];
+  const health = [T.healthAsk(), T.askCarerFirst("Tom")];
+  it("the alert failed: 'I couldn't reach Tom. Please call for help.' is never followed by 'Let's ask Tom first.', in either call order", () => {
+    const said = splitAll(failed, ctx.locale);
+    for (const choice of [null, { question: "anything_else" }, { feeling: "oh_dear" }]) {
+      expect(compose([g("report_problem", failed), g("ask_carer_about_health", health)], choice, ctx), JSON.stringify(choice)).not.toContain(health[1]);
+      expect(compose([g("ask_carer_about_health", health), g("report_problem", failed)], null, ctx)).toEqual(said);
+      expect(compose([g("report_problem", failed), g("ask_carer_about_health", health)], null, ctx)).toEqual(said);
+    }
+  });
+  it("the alert went out: only the distress answer, in either call order", () => {
+    const ok = [T.distressAck("Tom"), T.distressFollow("Tom")];
+    expect(compose([g("ask_carer_about_health", health), g("report_problem", ok)], null, ctx)).toEqual(ok);
+    expect(compose([g("report_problem", ok), g("ask_carer_about_health", health)], null, ctx)).toEqual(ok);
   });
 });
 
@@ -351,6 +371,7 @@ const splitAll = (says: string[], locale: Locale) => says.flatMap((s) => splitSe
  * 12. Beside a pill or health answer no opener or feeling is spoken (only a greeting could lead, and the table picks none).
  * 13. Beside ask_carer_about_health no due-dose line ("Now it's time…", "That's the…") is spoken; (5)-(11) count
  *     only what the pill tool can be heard to say there.
+ * 14. Beside report_problem the health answer is never spoken; it counts as saying nothing in (5)-(11).
  * The pool holds the real get_today and get_next_appointment output of a group day and a day without the group,
  * so (6) "no sentence twice" is checked on what the tools really say.
  */
@@ -405,7 +426,8 @@ describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool c
         const out = compose(says, choice, ctx);
         // What each tool can be heard to say: beside a health question the pill tool's due lines are never spoken.
         const health = says.some((s) => s.tool === "ask_carer_about_health");
-        const heard = (s: ToolSay) => splitAll(s.says, ctx.locale).filter((x) => !(health && s.tool === "get_medication_status" && DUE_LINES.has(x)));
+        const heard = (s: ToolSay) => (s.tool === "ask_carer_about_health" && says.some((o) => o.tool === "report_problem") ? [] :
+          splitAll(s.says, ctx.locale).filter((x) => !(health && s.tool === "get_medication_status" && DUE_LINES.has(x))));
         const tag = `${says.map((s) => s.tool).join("+")} ${JSON.stringify(choice)} → ${JSON.stringify(out)}`;
         expect(out.length, tag).toBeGreaterThan(0);
         expect(out.length, tag).toBeLessThanOrEqual(MAX_SENTENCES);
@@ -417,7 +439,10 @@ describe.each([["en", EN], ["de", DE]] as const)("compose invariants over tool c
         expect(new Set(out).size, tag).toBe(out.length);
         // (5) report_problem, then ask_carer_about_health, then the pills: each whole, first, or while all fit in four.
         // Beside a health answer the side-effect confirmations come before the pills (M-2): then (8) holds them, not (5).
-        const top = [says.find((s) => s.tool === "report_problem"), says.find((s) => s.tool === "ask_carer_about_health"), health ? undefined : says.find((s) => MEDS.includes(s.tool))];
+        const problem = says.some((s) => s.tool === "report_problem");
+        // (14) Beside report_problem the health answer is never spoken (M-4).
+        if (problem && health) for (const x of F.health) expect(out, tag).not.toContain(x);
+        const top = [says.find((s) => s.tool === "report_problem"), problem ? undefined : says.find((s) => s.tool === "ask_carer_about_health"), health ? undefined : says.find((s) => MEDS.includes(s.tool))];
         if (top[1] || top[2]) {
           const prefix: string[] = [];
           for (const t of top) {

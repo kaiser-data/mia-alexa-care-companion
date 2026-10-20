@@ -109,7 +109,7 @@ const repeatDays = (locale: Locale) => {
 
 /**
  * Builds what Mia says. Invariants (checked on every output by the table test in compose.test.ts):
- * never silence; at most four sentences; beside ask_carer_about_health never a due-dose line (medDue / medIs); at most one question, always the last sentence, right after its own tool's
+ * never silence; at most four sentences; beside report_problem no health answer; beside ask_carer_about_health never a due-dose line (medDue / medIs); at most one question, always the last sentence, right after its own tool's
  * facts; never a call offer after request_call ran; the pills are never dropped or displaced by side-effect answers;
  * a side-effect confirmation is never dropped for a question.
  *
@@ -150,7 +150,11 @@ export function compose(toolSays: ToolSay[], choice: RespondInput | null, ctx: C
   // A health question for the carer ran: the carer decides about the dose, so no "take it now" is spoken at all.
   const askedCarer = toolSays.some((g) => g.tool === "ask_carer_about_health");
   const isDue = dueLines(ctx.locale);
+  // A cry for help wins: beside report_problem the health answer is not spoken ("I couldn't reach Tom. Please call for
+  // help." must not be followed by "Let's ask Tom first."). Its carer flag still went out, and its due-line rule still holds.
+  const distress = toolSays.some((g) => g.tool === "report_problem");
   const groups = toolSays
+    .filter((g) => !(distress && g.tool === "ask_carer_about_health"))
     .map((g, i) => {
       const sentences = g.says.flatMap((s) => splitSentences(s, ctx.locale))
         .filter((s) => !(requestedCall && s === callOffer))
