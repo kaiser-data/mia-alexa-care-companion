@@ -8,9 +8,10 @@ export function registerHealthTools(server: McpServer, ctx: ToolContext): void {
     title: "A health or medicine question for the carer",
     description:
       "Use whenever she asks a health or medicine question Mia must not answer: side effects, other medicines or painkillers, " +
-      "whether to stop, skip, take extra or double pills, feeling unwell because of her pills, food or alcohol with pills. " +
+      "whether to stop, skip or take extra pills, feeling unwell because of her pills, food or alcohol with pills. " +
       "Mia never answers it: she says so, suggests asking the carer, and the carer is told. " +
       "A fall, pain, being hurt or feeling very unwell is report_problem instead. " +
+      "Pills already taken twice or too many is report_problem, not this tool. " +
       "Examples: 'My pills make me dizzy, should I take them?', 'Can I take an aspirin?', 'Can I have a glass of wine with my pills?', " +
       "'Darf ich eine Kopfschmerztablette nehmen?', 'Mir ist schwindelig von den Tabletten, soll ich sie nehmen?'.",
     inputSchema: { what: z.string().optional().describe("Her own words, in her language") },

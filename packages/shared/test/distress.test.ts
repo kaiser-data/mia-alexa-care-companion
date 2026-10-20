@@ -15,3 +15,11 @@ describe("detectDistress", () => {
     "What a help you are to me today", "Ich brauche Hilfe beim Kochen heute Abend", "Wann ist die Gruppe?", "", "   ",
   ])("ignores %j", (t) => expect(detectDistress(t)).toBe(false));
 });
+
+describe("pills taken twice is a possible emergency (M-5)", () => {
+  it.each(["I took my pills twice", "I think I took my tablets twice", "took them twice",
+    "Ich habe meine Tabletten zweimal genommen", "zweimal genommen", "doppelt genommen", "zu viele Tabletten"])("%s", (t) =>
+    expect(detectDistress(t)).toBe(true));
+  it.each(["Do I take my pills twice a day?", "Nehme ich die Tabletten zweimal am Tag?"])("a question about the plan is not: %s", (t) =>
+    expect(detectDistress(t)).toBe(false));
+});
