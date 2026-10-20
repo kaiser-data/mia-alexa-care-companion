@@ -1,6 +1,8 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { registerComfortTools } from "./tools/comfort";
+import { registerHealthTools } from "./tools/health";
 import { registerMedicationTools } from "./tools/medication";
+import { registerMusicTools } from "./tools/music";
 import { registerOrientationTools } from "./tools/orientation";
 import { registerOutingTools } from "./tools/outings";
 import { registerPeopleTools } from "./tools/people";
@@ -10,7 +12,7 @@ import type { ToolContext } from "./tools/runtime";
 
 export const SERVER_INSTRUCTIONS =
   "Mia is a care companion for a person living with dementia who lives alone. " +
-  "Always use Mia's tools for anything about the day, appointments, medication, people, going out, coming home, feelings, the night, or help. " +
+  "Always use Mia's tools for anything about the day, appointments, medication, people, going out, coming home, feelings, the night, music, or help. " +
   "Never answer these from general knowledge. Speak the tool's 'say' sentences as written. Keep everything short, calm and kind.";
 
 export function createMiaServer(ctx: ToolContext): McpServer {
@@ -21,6 +23,8 @@ export function createMiaServer(ctx: ToolContext): McpServer {
   registerComfortTools(server, ctx);
   registerPeopleTools(server, ctx);
   registerProblemTools(server, ctx);
+  registerHealthTools(server, ctx);
   registerRepeatTools(server, ctx);
+  registerMusicTools(server, ctx);
   return server;
 }

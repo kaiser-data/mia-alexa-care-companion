@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { checkPlain, rose, roseDe, type Profile } from "@mia/shared";
+import { checkPlain, rose, roseDe, type Profile, proactivePrompt } from "@mia/shared";
 import { at } from "@mia/shared/testing";
 import { connect } from "./helpers";
 
@@ -27,6 +27,7 @@ const SCRIPT: [string, string, Record<string, unknown>?][] = [
   ["2026-10-14T10:00:00", "get_next_appointment", { name: "group" }],
   ["2026-10-14T15:10:00", "get_today"],
   ["2026-10-14T15:20:00", "report_problem", { what: "I fell" }],
+  ["2026-10-14T16:31:00", "play_music"],
   ["2026-10-14T20:00:00", "get_medication_status"],
   ["2026-10-14T21:00:00", "confirm_medication"],
   ["2026-10-15T14:45:00", "get_medication_status"],
@@ -42,5 +43,21 @@ describe.each([["en", rose()], ["de", roseDe()]] as [string, Profile][])("plain-
       expect(r.say.length, `${tool} @ ${time}`).toBeGreaterThan(0);
       expect(checkPlain(r.say.join(" "), profile.locale), `${tool} @ ${time}: ${r.say.join(" ")}`).toMatchObject({ ok: true });
     }
+  });
+
+  it("every proactive prompt of a full week passes the plain-language rules", () => {
+    const seen = new Set<string>();
+    for (let day = 12; day <= 18; day++) {
+      for (let minutes = 0; minutes < 24 * 60; minutes += 5) {
+        const hh = String(Math.floor(minutes / 60)).padStart(2, "0");
+        const mm = String(minutes % 60).padStart(2, "0");
+        const prompt = proactivePrompt(profile, [], at(`2026-10-${day}T${hh}:${mm}:00`));
+        if (!prompt || seen.has(prompt.kind)) continue;
+        seen.add(prompt.kind);
+        expect(checkPlain(prompt.say.join(" "), profile.locale), prompt.say.join(" ")).toMatchObject({ ok: true });
+        expect(prompt.say.at(-1)!.endsWith("?"), prompt.id).toBe(true);
+      }
+    }
+    expect([...seen].sort()).toEqual(["bedtime", "check_in", "leave", "medication", "music"]);
   });
 });

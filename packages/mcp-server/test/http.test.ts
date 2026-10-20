@@ -44,7 +44,7 @@ describe("HTTP /mcp", () => {
     expect(body.result.protocolVersion).toBe(version);
     expect(body.result.serverInfo.name).toBe("mia");
   });
-  it("serves all 14 tools to a real MCP client over Streamable HTTP", async () => {
+  it("serves all 16 tools to a real MCP client over Streamable HTTP", async () => {
     const transport = new StreamableHTTPClientTransport(new URL("http://mia.test/mcp"), {
       fetch: async (url, init) => app.request(url.toString(), init),
       requestInit: { headers: { authorization: `Bearer ${TOKEN}` } },
@@ -53,8 +53,8 @@ describe("HTTP /mcp", () => {
     await client.connect(transport);
     const { tools } = await client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual([
-      "chat_about_life", "comfort_me", "confirm_medication", "get_medication_status", "get_next_appointment",
-      "get_preparation_steps", "get_today", "night_reassurance", "repeat_last", "report_home", "report_leaving",
+      "ask_carer_about_health", "chat_about_life", "comfort_me", "confirm_medication", "get_medication_status", "get_next_appointment",
+      "get_preparation_steps", "get_today", "night_reassurance", "play_music", "repeat_last", "report_home", "report_leaving",
       "report_problem", "request_call", "who_is",
     ]);
     for (const t of tools) expect(t.description!.length).toBeGreaterThan(60);

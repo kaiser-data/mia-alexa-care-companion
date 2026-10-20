@@ -5,6 +5,7 @@ import {
   type Profile,
 } from "@mia/shared";
 import { appointmentLine, capText, logEvent, OUTPUT_SHAPE, run, type MiaResult, type ToolContext } from "./runtime";
+import { weatherLine } from "../weather";
 
 export async function todayResult(ctx: ToolContext, p: Profile): Promise<MiaResult> {
   const T = templates(p.locale);
@@ -36,7 +37,7 @@ export function registerOrientationTools(server: McpServer, ctx: ToolContext): v
   server.registerTool("get_next_appointment", {
     title: "When is my group / next appointment",
     description:
-      "Use when she asks whether an appointment is today or when it is next — especially her group. Pass her words as 'name'. " +
+      "Use when she asks whether an appointment is today or when it is next — especially her group. Pass her own words as 'name', in her language. " +
       "Examples: 'Is it group today?', 'When is my club?', 'Ist heute Gruppe?', 'Wann ist die Tagesgruppe?'.",
     inputSchema: { name: z.string().optional().describe("Her words for the appointment, e.g. 'group'") },
     outputSchema: OUTPUT_SHAPE,
@@ -75,7 +76,14 @@ export function registerOrientationTools(server: McpServer, ctx: ToolContext): v
     const items = n.appointment.checklist.slice(s * 2, s * 2 + 2);
     if (!items.length) return { facts: { hasMore: false }, say: [T.thatsAll()], verbatim: true };
     const hasMore = n.appointment.checklist.length > s * 2 + 2;
-    return { facts: { appointment: n.appointment.name, items, nextStep: s + 1, hasMore }, say: [T.take(items)], verbatim: true };
+    const weather = s === 0 && p.location && ctx.weather
+      ? weatherLine(await ctx.weather.today(p.location.latitude, p.location.longitude, n.date).catch(() => null), p.locale)
+      : null;
+    return {
+      facts: { appointment: n.appointment.name, items, nextStep: s + 1, hasMore, weather },
+      say: weather ? [weather, T.take(items)] : [T.take(items)],
+      verbatim: true,
+    };
   }));
 
   server.registerTool("night_reassurance", {

@@ -38,20 +38,21 @@ export function registerComfortTools(server: McpServer, ctx: ToolContext): void 
   server.registerTool("chat_about_life", {
     title: "Talk with me",
     description:
-      "Use when she is lonely, bored, or wants to talk. Returns topics from her own life story to chat about warmly. " +
+      "Use when she is lonely, bored, or wants to talk. Speaks one topic from her own life story and asks if she remembers it. " +
       "Examples: 'I'm lonely.', 'Tell me something.', 'Talk to me.', 'Mir ist langweilig.', 'Erzähl mir was.'.",
     outputSchema: OUTPUT_SHAPE,
     annotations: { readOnlyHint: false },
   }, async () => run(ctx, async (p) => {
+    const T = templates(p.locale);
     await logEvent(ctx, "lonely");
-    if (!p.lifeStory.length) return { facts: { topics: [] }, say: [templates(p.locale).callOffer(p.carerName)], verbatim: true };
+    if (!p.lifeStory.length) return { facts: { topics: [] }, say: [T.callOffer(p.carerName)], verbatim: true };
     const dayIndex = Math.floor(Date.parse(`${localParts(ctx.now(), p.timezone).date}T00:00:00Z`) / 86_400_000);
     const suggestedTopic = p.lifeStory[dayIndex % p.lifeStory.length] ?? "";
+    // Claude picks, doesn't write: the family-written topic is spoken as it is, then one fixed question.
     return {
       facts: { topics: p.lifeStory, suggestedTopic, carerName: p.carerName },
-      say: [],
-      verbatim: false,
-      text: `Suggested topic: ${suggestedTopic}`,
+      say: [suggestedTopic, T.rememberAsk()],
+      verbatim: true,
     };
   }));
 }

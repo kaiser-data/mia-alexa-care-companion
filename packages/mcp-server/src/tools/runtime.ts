@@ -3,12 +3,15 @@ import { z } from "zod";
 import { templates, timeWords, toMinutes, type Appointment, type CareEvent, type EventType, type Locale, type Profile } from "@mia/shared";
 import type { AlertSink } from "../alerts";
 import type { Store } from "../store/store";
+import type { WeatherProvider } from "../weather";
 
 export interface ToolContext {
   store: Store;
   profileId: string;
   now: () => Date;
   alerts: AlertSink;
+  /** optional: adds a weather sentence to the first preparation step */
+  weather?: WeatherProvider;
 }
 
 export interface MiaResult {
@@ -40,6 +43,11 @@ const LOOKBACK_MS = 36 * 3600 * 1000;
 /** Cut free text to at most n characters without splitting an emoji. */
 export function capText(s: string, n: number): string {
   return Array.from(s).slice(0, n).join("");
+}
+
+/** Keep the last n characters (without splitting an emoji): the most recent words matter most. */
+export function capTextEnd(s: string, n: number): string {
+  return Array.from(s).slice(-n).join("");
 }
 
 export async function logEvent(ctx: ToolContext, type: EventType, detail?: Record<string, string>): Promise<void> {

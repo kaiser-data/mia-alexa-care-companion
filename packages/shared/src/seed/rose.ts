@@ -23,7 +23,7 @@ export function rose(): Profile {
       { time: "15:00", label: "tea" },
       { time: "18:00", label: "supper" },
       { time: "19:00", label: "Tom's call" },
-      { time: "21:30", label: "bedtime" },
+      { time: "21:30", label: "bedtime", kind: "bedtime" },
     ],
     medications: [
       { id: "morning-pills", name: "your morning pills", description: "the small white pill and the round pink one", times: ["08:00"] },
@@ -58,13 +58,16 @@ export function rose(): Profile {
     ],
     lifeStory: [
       "You were a school librarian for 38 years at Westgate Elementary.",
-      "You love your rose garden, especially the yellow climbing rose by the porch.",
+      "You love your rose garden, especially the yellow climbing rose.",
       "You love Frank Sinatra and Ella Fitzgerald.",
       "You married Frank in 1966 and went to Niagara Falls.",
       "You grew up in Dayton, the youngest of four sisters.",
       "Your apple pie is the best on Linden Street.",
     ],
     speech: defaultSpeech(),
+    location: { latitude: 39.9612, longitude: -82.9988 },
+    favouriteMusic: "Ella Fitzgerald",
+    checkInTime: "15:30",
   };
 }
 
@@ -82,7 +85,7 @@ export function roseDe(): Profile {
       { time: "15:00", label: "Kaffee und Kuchen" },
       { time: "18:00", label: "Abendbrot" },
       { time: "19:00", label: "Toms Anruf" },
-      { time: "21:30", label: "Schlafenszeit" },
+      { time: "21:30", label: "Schlafenszeit", kind: "bedtime" },
     ],
     medications: [
       { id: "morning-pills", name: "deine Morgentabletten", description: "die kleine weiße und die runde rosa Tablette", times: ["08:00"] },
@@ -92,7 +95,8 @@ export function roseDe(): Profile {
     appointments: [{
       ...p.appointments[0]!,
       name: "Tagesgruppe",
-      aliases: ["gruppe", "tagesgruppe", "club", "maple grove"],
+      // "group" and "day club" too: the LLM's instructions are English, so it may pass her words translated.
+      aliases: ["gruppe", "tagesgruppe", "club", "maple grove", "group", "day club"],
       checklist: ["deinen Schlüssel am roten Band", "deine Handtasche", "deine Brille", "deinen Mantel"],
     }],
     people: [
@@ -116,3 +120,7 @@ export function roseDe(): Profile {
     ],
   };
 }
+
+export const SEED_PROFILES = { rose, "rose-de": roseDe } as const;
+export type SeedId = keyof typeof SEED_PROFILES;
+export const isSeedId = (s: string): s is SeedId => Object.hasOwn(SEED_PROFILES, s);

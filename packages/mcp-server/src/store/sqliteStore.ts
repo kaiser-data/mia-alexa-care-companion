@@ -25,6 +25,10 @@ type Row = Record<string, string | number | null>;
 export class SqliteStore implements Store {
   private readonly db: DatabaseSync;
 
+  close(): void {
+    this.db.close();
+  }
+
   constructor(path: string, private readonly cipher: FieldCipher) {
     this.db = new DatabaseSync(path);
     if (path !== ":memory:") chmodSync(path, 0o600);

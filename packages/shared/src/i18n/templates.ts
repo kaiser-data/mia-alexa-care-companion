@@ -28,6 +28,8 @@ export interface Templates {
   medAtAppt(name: string, appointment: string): string;
   medUnsure(name: string): string;
   askCarerFirst(carer: string): string;
+  /** A health or medicine question Mia never answers; always followed by askCarerFirst. */
+  healthAsk(): string;
   medNoneToday(): string;
   medConfirmed(names: string): string;
   medEarlyNoted(carer: string): string;
@@ -43,6 +45,19 @@ export interface Templates {
   distressFailed(carer: string): string;
   systemError(carer: string): string;
   personIs(name: string, relationship: string): string;
+  listening(): string;
+  musicStart(artist: string): string;
+  weatherCold(): string;
+  weatherRain(): string;
+  proMedAsk(name: string): string;
+  proPrepAsk(): string;
+  proAreYouHome(name: string): string;
+  proBedtime(time: string): string;
+  proDoorAsk(): string;
+  proMusicAsk(artist: string): string;
+  proHello(name: string): string;
+  proChatAsk(): string;
+  rememberAsk(): string;
 }
 
 const EN: Templates = {
@@ -67,11 +82,12 @@ const EN: Templates = {
   notYet: () => "Not yet.",
   medDue: (n) => `Now it's time for ${n}.`,
   medIs: (d) => `That's ${d}.`,
-  medTaken: (n, t) => `Yes. You took ${n} at ${t}.`,
+  medTaken: (n, t) => `You took ${n} at ${t}.`,
   medNextAt: (t) => `Your next pills are at ${t}.`,
   medAtAppt: (n, a) => `You get ${n} at ${a} today.`,
   medUnsure: (n) => `I'm not sure if you had ${n} yet.`,
   askCarerFirst: (c) => `Let's ask ${c} first.`,
+  healthAsk: () => "I can't answer that one.",
   medNoneToday: () => "There are no more pills today.",
   medConfirmed: (n) => `Thank you. I've noted ${n}.`,
   medEarlyNoted: (c) => `Thank you. I'll tell ${c}.`,
@@ -87,6 +103,19 @@ const EN: Templates = {
   distressFailed: (c) => `I couldn't reach ${c}. Please call for help.`,
   systemError: (c) => `I can't check right now. ${c} can help.`,
   personIs: (n, r) => `${n} is your ${r}.`,
+  listening: () => "I'm listening.",
+  musicStart: (a) => `Here is some ${a}.`,
+  weatherCold: () => "It's cold today. Wear your warm coat.",
+  weatherRain: () => "It may rain today. Take your umbrella.",
+  proMedAsk: (n) => `Have you taken ${n} yet?`,
+  proPrepAsk: () => "Shall I tell you what to take?",
+  proAreYouHome: (n) => `Are you back home, ${n}?`,
+  proBedtime: (t) => `It's ${t}. Time to get ready for bed.`,
+  proDoorAsk: () => "Is the front door locked?",
+  proMusicAsk: (a) => `Shall I play some ${a}?`,
+  proHello: (n) => `Hello, ${n}.`,
+  proChatAsk: () => "Shall we have a little chat?",
+  rememberAsk: () => "Do you remember that?",
 };
 
 const DE: Templates = {
@@ -111,11 +140,12 @@ const DE: Templates = {
   notYet: () => "Noch nicht.",
   medDue: (n) => `Jetzt ist Zeit für ${n}.`,
   medIs: (d) => `Das ist ${d}.`,
-  medTaken: (n, t) => `Ja. Du hast ${n} um ${t} genommen.`,
+  medTaken: (n, t) => `Du hast ${n} um ${t} genommen.`,
   medNextAt: (t) => `Die nächsten Tabletten sind um ${t}.`,
   medAtAppt: (n, a) => `Heute bekommst du ${n} dort: ${a}.`,
   medUnsure: (n) => `Ich weiß nicht sicher, ob du ${n} schon hattest.`,
   askCarerFirst: (c) => `Wir fragen zuerst ${c}.`,
+  healthAsk: () => "Das kann ich dir nicht sagen.",
   medNoneToday: () => "Heute sind keine Tabletten mehr dran.",
   medConfirmed: (n) => `Danke. Ich habe ${n} notiert.`,
   medEarlyNoted: (c) => `Danke. Ich sage es ${c}.`,
@@ -131,6 +161,19 @@ const DE: Templates = {
   distressFailed: (c) => `Ich konnte ${c} nicht erreichen. Bitte ruf um Hilfe.`,
   systemError: (c) => `Ich kann das gerade nicht nachsehen. ${c} hilft dir.`,
   personIs: (n, r) => `${n} ist ${r}.`,
+  listening: () => "Ich höre zu.",
+  musicStart: (a) => `Hier ist etwas von ${a}.`,
+  weatherCold: () => "Heute ist es kalt. Zieh deinen warmen Mantel an.",
+  weatherRain: () => "Heute regnet es vielleicht. Nimm deinen Schirm mit.",
+  proMedAsk: (n) => `Hast du ${n} schon genommen?`,
+  proPrepAsk: () => "Soll ich dir sagen, was du mitnimmst?",
+  proAreYouHome: (n) => `Bist du wieder zu Hause, ${n}?`,
+  proBedtime: (t) => `Es ist ${t}. Bald ist Schlafenszeit.`,
+  proDoorAsk: () => "Ist die Haustür abgeschlossen?",
+  proMusicAsk: (a) => `Soll ich etwas von ${a} spielen?`,
+  proHello: (n) => `Hallo, ${n}.`,
+  proChatAsk: () => "Wollen wir ein bisschen plaudern?",
+  rememberAsk: () => "Erinnerst du dich daran?",
 };
 
 export function templates(locale: Locale): Templates {

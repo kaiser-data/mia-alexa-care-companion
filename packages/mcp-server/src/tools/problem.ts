@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { templates, type Profile } from "@mia/shared";
-import { capText, logEvent, OUTPUT_SHAPE, toResult, type ToolContext } from "./runtime";
+import { capTextEnd, logEvent, OUTPUT_SHAPE, toResult, type ToolContext } from "./runtime";
 
 export function registerProblemTools(server: McpServer, ctx: ToolContext): void {
   server.registerTool("report_problem", {
@@ -14,7 +14,8 @@ export function registerProblemTools(server: McpServer, ctx: ToolContext): void 
     outputSchema: OUTPUT_SHAPE,
     annotations: { readOnlyHint: false },
   }, async ({ what: rawWhat }) => {
-    const what = rawWhat === undefined ? undefined : capText(rawWhat, 200);
+    // Her last words are where "I fell" is most likely to be.
+    const what = rawWhat === undefined ? undefined : capTextEnd(rawWhat, 200);
     // Deliberately not run(): the alert must not depend on reading the profile's event log.
     let p: Profile | null = null;
     try { p = await ctx.store.getProfile(ctx.profileId); } catch (err) { console.error("[mia] distress: profile read failed:", err); }

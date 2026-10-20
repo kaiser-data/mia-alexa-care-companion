@@ -47,12 +47,32 @@ export function todayView(p: Profile, now: Date): TodayView {
 
 const words = (s: string): string[] => s.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 
+/** Plural endings, English and German: "groups", "Gruppen", "Tagesgruppen". */
+const PLURAL_ENDINGS = ["s", "n", "en", "e"];
+/** A German compound ends with the alias word ("Seniorengruppe" → "gruppe"), only for alias words this long. */
+const MIN_COMPOUND_TAIL = 5;
+
+/**
+ * One query word stands for one alias word if it is
+ * - the same word ("group" = "group"),
+ * - the alias word with a plural ending: "s", "n", "en" or "e" ("groups", "Gruppen"), or
+ * - a German compound ending with an alias word of at least five letters ("Seniorengruppe" ends with "gruppe";
+ *   "club" is too short, so "nightclub" is not the club).
+ * Case-insensitive and deterministic. No other fuzziness: "grouping" or "Gruppenarzt" do not match.
+ */
+function wordMatches(queryWord: string, aliasWord: string): boolean {
+  if (queryWord === aliasWord) return true;
+  if (PLURAL_ENDINGS.some((e) => queryWord === aliasWord + e)) return true;
+  return aliasWord.length >= MIN_COMPOUND_TAIL && queryWord.endsWith(aliasWord);
+}
+
+/** The query names the appointment if every word of its name or of one alias is matched by a query word (wordMatches). */
 export function matchesAppointment(a: Appointment, query: string): boolean {
-  const q = new Set(words(query));
-  if (q.size === 0) return false;
+  const q = words(query);
+  if (q.length === 0) return false;
   return [a.name, ...a.aliases].some((n) => {
     const w = words(n);
-    return w.length > 0 && w.every((x) => q.has(x));
+    return w.length > 0 && w.every((x) => q.some((y) => wordMatches(y, x)));
   });
 }
 
