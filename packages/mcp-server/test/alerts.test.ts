@@ -40,4 +40,20 @@ describe("EmailAlertSink", () => {
     await expect(s.raise(a("high", "distress", "help"))).rejects.toThrow(/SES down/);
     expect(stored).toHaveLength(2);
   });
+  it("a mailer that never answers: high rejects after the timeout, medium returns at once; both are stored", async () => {
+    const stored: AlertInput[] = [];
+    const hung: Mailer = { send: () => new Promise<void>(() => {}) };
+    const s = new EmailAlertSink({ raise: async (x) => { stored.push(x); } }, hung, { now: () => new Date(), timeoutMs: 20 });
+    await expect(s.raise(a("medium"))).resolves.toBeUndefined();
+    await expect(s.raise(a("high", "distress", "help"))).rejects.toThrow(/timed out/);
+    expect(stored).toHaveLength(2);
+  });
+  it("forgets dedupe entries older than 6 hours", async () => {
+    const { s, mails, later } = sink();
+    await s.raise(a("medium", "r1"));
+    later(6 * 3_600_000 + 1);
+    await s.raise(a("medium", "r2"));
+    expect((s as unknown as { sent: Map<string, number> }).sent.size).toBe(1);
+    expect(mails).toHaveLength(2);
+  });
 });
