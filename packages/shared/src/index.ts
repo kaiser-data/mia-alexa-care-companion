@@ -10,3 +10,4 @@ export * from "./i18n/plain";
 export * from "./i18n/phrases";
 export * from "./i18n/distress";
 export * from "./i18n/pill-question";
+export * from "./i18n/carer-request";
