@@ -40,9 +40,13 @@ interface AlexaBody {
 
 const escapeXml = (s: string) => s.replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;", "'": "&apos;" })[c]!);
 
-/** Mia's sentences, one pause between each, at her speech rate. */
+/** Alexa already pauses about this long after a full stop; her sentence break is the whole pause, not extra. */
+export const ALEXA_SENTENCE_PAUSE_MS = 400;
+
+/** Mia's sentences, her sentence break between each (Alexa's own pause counted in), at her speech rate. */
 export function toSsml(sentences: string[], rate: number, breakMs: number): string {
-  const inner = sentences.map(escapeXml).join(`<break time="${Math.round(breakMs)}ms"/>`);
+  const extra = Math.max(0, Math.round(breakMs - ALEXA_SENTENCE_PAUSE_MS));
+  const inner = sentences.map(escapeXml).join(extra ? `<break time="${extra}ms"/>` : " ");
   return `<speak><prosody rate="${Math.round(rate * 100)}%">${inner}</prosody></speak>`;
 }
 
@@ -71,15 +75,17 @@ export function createAlexaApp(deps: AlexaAppDeps): Hono {
 
   app.post("/alexa", async (c) => {
     const raw = await c.req.text();
-    if (!(await deps.verify({ headers: c.req.raw.headers, body: raw }))) return c.json({ error: "forbidden" }, 403);
+    const refuse = (why: string) => { console.warn(`[mia-alexa] refused: ${why}`); return c.json({ error: "forbidden" }, 403); };
+    if (!(await deps.verify({ headers: c.req.raw.headers, body: raw }))) return refuse("signature");
     let body: AlexaBody;
     try { body = JSON.parse(raw) as AlexaBody; } catch { return c.json({ error: "bad request" }, 400); }
     const appId = body.context?.System?.application?.applicationId ?? body.session?.application?.applicationId;
-    if (appId !== deps.skillId) return c.json({ error: "forbidden" }, 403);
+    if (appId !== deps.skillId) return refuse(`skill id ${appId}`);
     const at = Date.parse(body.request?.timestamp ?? "");
-    if (!Number.isFinite(at) || Math.abs(now().getTime() - at) > MAX_SKEW_MS) return c.json({ error: "forbidden" }, 403);
+    if (!Number.isFinite(at) || Math.abs(now().getTime() - at) > MAX_SKEW_MS) return refuse(`timestamp ${body.request?.timestamp}`);
 
     const type = body.request?.type;
+    console.log(`[mia-alexa] ${type} ${body.request?.intent?.name ?? ""}`);
     if (type === "SessionEndedRequest") return c.json({ version: "1.0", response: {} });
     if (type === "LaunchRequest") {
       // What Mia would have said first (pills, the group, bedtime), else a plain hello.

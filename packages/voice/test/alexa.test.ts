@@ -35,7 +35,7 @@ describe("Alexa skill endpoint", () => {
     const r = await post(a, intent("MiaIntent", "what day is it"));
     expect(turns).toEqual([{ text: "what day is it" }]);
     const body = await r.json() as { response: { shouldEndSession: boolean; reprompt?: unknown; outputSpeech: { ssml: string } } };
-    expect(body.response.outputSpeech.ssml).toBe('<speak><prosody rate="90%">Hello, Rose.<break time="700ms"/>It\'s Tuesday.</prosody></speak>'.replace("'", "&apos;"));
+    expect(body.response.outputSpeech.ssml).toBe('<speak><prosody rate="90%">Hello, Rose.<break time="300ms"/>It\'s Tuesday.</prosody></speak>'.replace("'", "&apos;"));
     expect(body.response.shouldEndSession).toBe(false);
     expect(body.response.reprompt).toBeDefined();
   });
@@ -70,6 +70,9 @@ describe("Alexa skill endpoint", () => {
     await post(a, intent("MiaIntent", `${"x".repeat(600)} help`));
     expect((turns[0] as { text: string }).text.endsWith(" help")).toBe(true);
     expect((turns[0] as { text: string }).text.length).toBe(500);
+  });
+  it("Alexa's own pause after a full stop counts toward her sentence break", () => {
+    expect(toSsml(["A.", "B."], 0.95, 300)).toBe('<speak><prosody rate="95%">A. B.</prosody></speak>');
   });
   it("SSML escapes her profile's words", () => {
     expect(toSsml(["Tom & June <3"], 1, 500)).toBe('<speak><prosody rate="100%">Tom &amp; June &lt;3</prosody></speak>');
