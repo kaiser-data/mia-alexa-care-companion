@@ -1,6 +1,7 @@
 import { join, resolve } from "node:path";
 import { offsetClock } from "@mia/shared";
 import { checkDevToken, loadProfile, startLocalMia } from "./local";
+import { sesMailerFromEnv } from "./ses";
 import { OpenMeteoWeather } from "./weather";
 
 const root = resolve(import.meta.dirname, "../../..");
@@ -13,5 +14,7 @@ const profile = loadProfile({ ...process.env, MIA_PROFILE_FILE: profileFile && r
 const dataDir = resolve(root, process.env.MIA_DATA_DIR ?? ".mia-data");
 const port = Number(process.env.PORT ?? 8787);
 
-const mia = await startLocalMia({ token, profile, dataDir, port, weather: new OpenMeteoWeather(), now: offsetClock(process.env.MIA_CLOCK_START) });
+const mailer = sesMailerFromEnv(process.env);
+const mia = await startLocalMia({ token, profile, dataDir, port, weather: new OpenMeteoWeather(), now: offsetClock(process.env.MIA_CLOCK_START), mailer });
 console.log(`[mia] LOCAL MODE — not production. MCP endpoint: ${mia.url}/mcp (profile: ${profile.id})`);
+if (mailer) console.log(`[mia] alert email on → ${process.env.MIA_ALERT_EMAIL_TO}`);

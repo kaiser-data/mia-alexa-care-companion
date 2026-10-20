@@ -3,7 +3,7 @@ import type { AddressInfo } from "node:net";
 import { join } from "node:path";
 import { serve } from "@hono/node-server";
 import { isSeedId, type Profile, SEED_PROFILES } from "@mia/shared";
-import { StoreAlertSink } from "./alerts";
+import { EmailAlertSink, type Mailer, StoreAlertSink } from "./alerts";
 import { createHttpApp } from "./http";
 import { LocalAesCipher, loadOrCreateLocalKey } from "./store/crypto";
 import { SqliteStore } from "./store/sqliteStore";
@@ -40,7 +40,7 @@ export function loadProfile(env: Record<string, string | undefined>): Profile {
   return p;
 }
 
-export interface LocalMiaOptions { token: string; profile: Profile; dataDir: string; port: number; weather?: WeatherProvider; now?: () => Date }
+export interface LocalMiaOptions { token: string; profile: Profile; dataDir: string; port: number; weather?: WeatherProvider; now?: () => Date; mailer?: Mailer | null }
 
 /** Starts the Mia MCP server in local mode (SQLite + local AES key) on 127.0.0.1. Port 0 picks a free port. */
 export async function startLocalMia(o: LocalMiaOptions): Promise<{ url: string; close(): Promise<void> }> {
@@ -50,9 +50,11 @@ export async function startLocalMia(o: LocalMiaOptions): Promise<{ url: string; 
   const store = new SqliteStore(join(o.dataDir, "mia.db"), new LocalAesCipher(loadOrCreateLocalKey(join(o.dataDir, "local.key"))));
   // Written on every start: edits to the profile take effect after a restart; her events and alerts are kept.
   await store.putProfile(o.profile);
+  const now = o.now ?? (() => new Date());
+  const alerts = o.mailer ? new EmailAlertSink(new StoreAlertSink(store), o.mailer, { now }) : new StoreAlertSink(store);
   const app = createHttpApp({
     tokens: new Map([[o.token, o.profile.id]]),
-    makeContext: (id) => ({ store, profileId: id, now: o.now ?? (() => new Date()), alerts: new StoreAlertSink(store), weather: o.weather }),
+    makeContext: (id) => ({ store, profileId: id, now, alerts, weather: o.weather }),
   });
   const { server, port } = await new Promise<{ server: ReturnType<typeof serve>; port: number }>((resolve, reject) => {
     const s = serve({ fetch: app.fetch, port: o.port, hostname: "127.0.0.1" }, (info: AddressInfo) => resolve({ server: s, port: info.port }));
