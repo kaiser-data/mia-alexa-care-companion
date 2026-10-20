@@ -23,6 +23,16 @@ Local mode stores data in SQLite under `.mia-data/`, encrypted with a generated 
 
 **"Care Mode" (a proposal for Alexa+):** in Mia Voice, care topics reach Mia without its name, and Mia may speak first at agreed times (`GET /proactive`). Today's Alexa+ add-ons cannot do this; the demo shows how it would help.
 
+## Echo Dot (classic Alexa skill, local mode)
+
+While Alexa+ add-ons are closed, an Echo reaches Mia through a German custom skill ("Alexa, öffne meine Mia"). Her words go to the same brain; Mia cannot speak first on the Echo.
+
+1. Create a custom skill (de-DE, own backend) at developer.amazon.com/alexa/console/ask, paste `packages/voice/alexa/de-DE.json` into the JSON editor, build.
+2. `cloudflared tunnel --url http://127.0.0.1:8789` and set the HTTPS endpoint to `<tunnel>/alexa` ("sub-domain of a domain that has a wildcard certificate").
+3. Start Mia with `MIA_ALEXA_SKILL_ID=amzn1.ask.skill.…`. Only requests signed by Alexa for that skill are answered.
+
+A private profile: `MIA_PROFILE_FILE=.mia-data/<name>.json` (gitignored; same shape as the seed profiles) instead of `MIA_PROFILE`.
+
 ## Tests
 
     pnpm test

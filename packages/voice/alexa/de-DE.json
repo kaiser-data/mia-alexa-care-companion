@@ -1,0 +1,208 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "meine mia",
+      "intents": [
+        {
+          "name": "MiaIntent",
+          "slots": [
+            {
+              "name": "text",
+              "type": "MIA_TEXT"
+            }
+          ],
+          "samples": [
+            "{text}"
+          ]
+        },
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.FallbackIntent",
+          "samples": []
+        }
+      ],
+      "types": [
+        {
+          "name": "MIA_TEXT",
+          "values": [
+            {
+              "name": {
+                "value": "welcher Tag ist heute"
+              }
+            },
+            {
+              "name": {
+                "value": "wie spät ist es"
+              }
+            },
+            {
+              "name": {
+                "value": "muss ich meine Tabletten nehmen"
+              }
+            },
+            {
+              "name": {
+                "value": "habe ich meine Tabletten schon genommen"
+              }
+            },
+            {
+              "name": {
+                "value": "ich habe meine Tabletten genommen"
+              }
+            },
+            {
+              "name": {
+                "value": "wann ist meine Gruppe"
+              }
+            },
+            {
+              "name": {
+                "value": "muss ich heute in die Gruppe"
+              }
+            },
+            {
+              "name": {
+                "value": "wann muss ich los"
+              }
+            },
+            {
+              "name": {
+                "value": "was muss ich mitnehmen"
+              }
+            },
+            {
+              "name": {
+                "value": "ich bin wieder zu Hause"
+              }
+            },
+            {
+              "name": {
+                "value": "ich habe Angst"
+              }
+            },
+            {
+              "name": {
+                "value": "ich kann nicht schlafen"
+              }
+            },
+            {
+              "name": {
+                "value": "ich bin allein"
+              }
+            },
+            {
+              "name": {
+                "value": "mir ist langweilig"
+              }
+            },
+            {
+              "name": {
+                "value": "ich fühle mich nicht gut"
+              }
+            },
+            {
+              "name": {
+                "value": "ich bin gestürzt"
+              }
+            },
+            {
+              "name": {
+                "value": "hilf mir"
+              }
+            },
+            {
+              "name": {
+                "value": "ruf meinen Sohn an"
+              }
+            },
+            {
+              "name": {
+                "value": "wer ist das"
+              }
+            },
+            {
+              "name": {
+                "value": "erzähl mir was"
+              }
+            },
+            {
+              "name": {
+                "value": "spiel Musik"
+              }
+            },
+            {
+              "name": {
+                "value": "wie ist das Wetter"
+              }
+            },
+            {
+              "name": {
+                "value": "ist es Morgen"
+              }
+            },
+            {
+              "name": {
+                "value": "ist es Nacht"
+              }
+            },
+            {
+              "name": {
+                "value": "ich weiß nicht wo ich bin"
+              }
+            },
+            {
+              "name": {
+                "value": "wo ist mein Schlüssel"
+              }
+            },
+            {
+              "name": {
+                "value": "ich muss zur Arbeit"
+              }
+            },
+            {
+              "name": {
+                "value": "danke"
+              }
+            },
+            {
+              "name": {
+                "value": "ja"
+              }
+            },
+            {
+              "name": {
+                "value": "nein"
+              }
+            },
+            {
+              "name": {
+                "value": "gute Nacht"
+              }
+            },
+            {
+              "name": {
+                "value": "guten Morgen"
+              }
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
