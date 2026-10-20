@@ -32,3 +32,21 @@ describe("addDays", () => {
     expect(addDays("2026-10-18", 1)).toEqual({ date: "2026-10-19", weekday: 1 });
   });
 });
+
+import { offsetClock } from "../src/domain/clock";
+
+describe("offsetClock", () => {
+  it("is the real clock without a start", () => {
+    expect(offsetClock(undefined, () => 1000)().getTime()).toBe(1000);
+  });
+  it("starts at the given instant and then runs on", () => {
+    let real = Date.parse("2026-10-20T18:00:00Z");
+    const now = offsetClock("2026-10-21T07:58:00-04:00", () => real);
+    expect(now().toISOString()).toBe("2026-10-21T11:58:00.000Z");
+    real += 120_000;
+    expect(now().toISOString()).toBe("2026-10-21T12:00:00.000Z");
+  });
+  it("refuses a start that is not a date", () => {
+    expect(() => offsetClock("tomorrow")).toThrow(/MIA_CLOCK_START/);
+  });
+});

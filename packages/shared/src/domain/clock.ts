@@ -25,3 +25,12 @@ export function addDays(date: string, n: number): { date: string; weekday: Weekd
   const wd = d.getUTCDay();
   return { date: d.toISOString().slice(0, 10), weekday: (wd === 0 ? 7 : wd) as Weekday };
 }
+
+/** For demo recordings: a clock that reads `start` now and runs on in real time. Unset: the real clock. */
+export function offsetClock(start: string | undefined, real: () => number = Date.now): () => Date {
+  if (!start) return () => new Date(real());
+  const at = Date.parse(start);
+  if (!Number.isFinite(at)) throw new Error(`MIA_CLOCK_START is not a date: "${start}"`);
+  const offset = at - real();
+  return () => new Date(real() + offset);
+}

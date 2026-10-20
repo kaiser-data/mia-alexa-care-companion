@@ -40,7 +40,7 @@ export function loadProfile(env: Record<string, string | undefined>): Profile {
   return p;
 }
 
-export interface LocalMiaOptions { token: string; profile: Profile; dataDir: string; port: number; weather?: WeatherProvider }
+export interface LocalMiaOptions { token: string; profile: Profile; dataDir: string; port: number; weather?: WeatherProvider; now?: () => Date }
 
 /** Starts the Mia MCP server in local mode (SQLite + local AES key) on 127.0.0.1. Port 0 picks a free port. */
 export async function startLocalMia(o: LocalMiaOptions): Promise<{ url: string; close(): Promise<void> }> {
@@ -52,7 +52,7 @@ export async function startLocalMia(o: LocalMiaOptions): Promise<{ url: string; 
   await store.putProfile(o.profile);
   const app = createHttpApp({
     tokens: new Map([[o.token, o.profile.id]]),
-    makeContext: (id) => ({ store, profileId: id, now: () => new Date(), alerts: new StoreAlertSink(store), weather: o.weather }),
+    makeContext: (id) => ({ store, profileId: id, now: o.now ?? (() => new Date()), alerts: new StoreAlertSink(store), weather: o.weather }),
   });
   const { server, port } = await new Promise<{ server: ReturnType<typeof serve>; port: number }>((resolve, reject) => {
     const s = serve({ fetch: app.fetch, port: o.port, hostname: "127.0.0.1" }, (info: AddressInfo) => resolve({ server: s, port: info.port }));
