@@ -73,6 +73,15 @@ describe("too many of any pill word (fixes review I-C)", () => {
     expect(detectDistress(t)).toBe(true));
 });
 
+describe("more overdose phrasings (review minors)", () => {
+  it.each(["i took another dose", "i took an extra pill", "I've taken an extra tablet", "i took two lots of pills", "i took the whole box of pills",
+    "ich habe die ganze packung genommen", "ich hab die ganze Schachtel geschluckt", "ich hab die tabletten schon wieder genommen",
+    "ich habe noch eine tablette genommen"])("%s", (t) => expect(detectDistress(t)).toBe(true));
+  it.each(["can i have another dose", "do i need an extra pill tonight", "i had another look at my pills", "i took my pills and had another cup of tea",
+    "Ich habe heute wieder meine Tabletten genommen", "Soll ich noch eine Tablette nehmen?", "ich habe die tabletten schon wieder vergessen", "ich habe extra die tabletten genommen"])("not: %s", (t) =>
+    expect(detectDistress(t)).toBe(false));
+});
+
 describe("English pronouns after the pill talk (fixes review I-B)", () => {
   it.each(["i took them again", "i took it again", "i swallowed them again", "i think i took them again this morning",
     "Oh, I took them again!", "i already took my pills and now i took them again", "i took my pills already and then i took them again",

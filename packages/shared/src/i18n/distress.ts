@@ -19,6 +19,7 @@ const ALWAYS = [
   "doppelte dosis", "doppelten dosis",
   "too many medicines", "too many medications", "too many meds", "too much medicine", "too much medication",
   "zu viele pillen", "zu viele medikamente", "zu viele tablette", "zu viel medizin",
+  "whole box", "whole packet", "whole bottle", "two lots of pills", "two lots of tablets", "ganze packung", "ganze schachtel",
 ];
 
 /**
@@ -43,8 +44,9 @@ const TAKEN_WORDS = new Set(["took", "taken", "swallowed", "had", "genommen", "e
 const EN_PRONOUNS = new Set(["them", "it", "those", "these"]);
 const GERMAN_TAKEN = new Set(["genommen", "eingenommen", "geschluckt"]);
 const REPEAT = "zweimal";
-const REPEAT_WORDS = new Set([REPEAT, "twice", "again"]);
-const REPEAT_PHRASES = /\b(?:a second time|second time|one more time|two times|noch mal|noch einmal|nochmal|nochmals|zum zweiten mal|ein zweites mal|zwei mal)\b/g;
+/** "another"/"extra" count as repeat words only after an English taken-verb ("I took another dose"), never in a plan question. */
+const REPEAT_WORDS = new Set([REPEAT, "twice", "again", "another", "extra"]);
+const REPEAT_PHRASES = /\b(?:a second time|second time|one more time|two times|noch mal|noch einmal|nochmal|nochmals|zum zweiten mal|ein zweites mal|zwei mal|schon wieder|noch eine|noch einen)\b/g;
 const CLAUSE_BREAKS = new Set(["and", "und", "but", "aber", "then", "dann", "so", "also", "i", "i'll", "i'm", "i've", "i'd", "ich"]);
 const isNegation = (w: string | undefined) => w !== undefined && (["not", "never", "nicht", "nie", "kein", "keine"].includes(w) || w.endsWith("n't"));
 /** German: the repeat and pill words are at most this many words before the participle. */
@@ -70,7 +72,8 @@ function takenAgainInClause(words: string[]): boolean {
   return taken.some((t) => {
     if (GERMAN_TAKEN.has(words[t]!)) {
       if (words[t - 1] === REPEAT) return true;
-      return repeats.some((r) => r < t && t - r <= DE_SPAN) && pills.some((p) => p < t && t - p <= DE_SPAN);
+      // German "extra" means "on purpose" ("extra die Tabletten genommen"), so only the German repeat words count here.
+      return repeats.some((r) => r < t && t - r <= DE_SPAN && words[r] === REPEAT) && pills.some((p) => p < t && t - p <= DE_SPAN);
     }
     // "I took them again" after the pill talk: the pronoun stands for the pills when the repeat word follows at once.
     if (EN_PRONOUNS.has(words[t + 1]!) && words[t + 2] !== undefined && REPEAT_WORDS.has(words[t + 2]!)) return true;
