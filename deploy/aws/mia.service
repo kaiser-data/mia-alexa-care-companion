@@ -1,0 +1,20 @@
+[Unit]
+Description=Mia Voice (local mode on one server)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=mia
+WorkingDirectory=/opt/mia/packages/voice
+EnvironmentFile=/etc/mia/mia.env
+ExecStart=/usr/bin/node --import tsx src/main.ts
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/mia/.mia-data
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,16 @@
+# {$MIA_HOST} and {$MIA_BASIC_HASH} come from /etc/mia/caddy.env (systemd drop-in for caddy.service).
+# basic_auth needs Caddy >= 2.8 (older versions call it basicauth).
+{$MIA_HOST} {
+	encode gzip
+	# Alexa cannot send basic auth: the skill endpoint checks Alexa's request signature instead.
+	handle /alexa {
+		reverse_proxy 127.0.0.1:8789
+	}
+	handle {
+		basic_auth {
+			mia {$MIA_BASIC_HASH}
+		}
+		reverse_proxy 127.0.0.1:8788
+	}
+	header -Server
+}
