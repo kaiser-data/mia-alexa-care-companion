@@ -31,6 +31,8 @@ export function offsetClock(start: string | undefined, real: () => number = Date
   if (!start) return () => new Date(real());
   const at = Date.parse(start);
   if (!Number.isFinite(at)) throw new Error(`MIA_CLOCK_START is not a date: "${start}"`);
+  // Without an offset Date.parse uses the host's zone (UTC on a server), so a scene would start hours off.
+  if (!/(?:Z|[+-]\d\d:\d\d)$/i.test(start.trim())) throw new Error(`MIA_CLOCK_START needs a time with an offset, e.g. 2026-10-26T07:59:40-04:00: "${start}"`);
   const offset = at - real();
   return () => new Date(real() + offset);
 }

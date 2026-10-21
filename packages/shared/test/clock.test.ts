@@ -49,4 +49,10 @@ describe("offsetClock", () => {
   it("refuses a start that is not a date", () => {
     expect(() => offsetClock("tomorrow")).toThrow(/MIA_CLOCK_START/);
   });
+  it("refuses a start without an offset (it would be read in the host's zone)", () => {
+    expect(() => offsetClock("2026-10-26T07:59:40")).toThrow(/MIA_CLOCK_START/);
+    expect(() => offsetClock("2026-10-26")).toThrow(/MIA_CLOCK_START/);
+    expect(() => offsetClock("2026-10-26T07:59:40Z", () => 0)).not.toThrow();
+    expect(() => offsetClock("2026-10-26T07:59:40+01:00", () => 0)).not.toThrow();
+  });
 });
