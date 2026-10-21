@@ -52,3 +52,17 @@ describe("pills taken twice in free word order (final review I1)", () => {
     "I took my pills", "Ich habe meine Tabletten genommen",
   ])("not an overdose: %s", (t) => expect(detectDistress(t)).toBe(false));
 });
+
+describe("the repeat word must belong to the taking, not to the next clause (fixes review I-A)", () => {
+  it.each([
+    "ich habe tabletten genommen und dann nochmal tom angerufen", "ich hab meine tabletten genommen und dann noch mal gefrühstückt",
+    "ich habe die tabletten genommen ich frag nur nochmal", "nochmal ich habe meine tabletten genommen",
+    "i took my pills and again i feel tired", "i took my pills i'll check again later", "I took my pills. I'll check again later.",
+    "Ich habe die Tabletten genommen. Nochmal: wann kommt Tom?", "i took the dog out again after my pills",
+    "i took my pills at eight and had breakfast again", "i took my medicine and then i took a nap again",
+    "ich hab mir die tabletten nochmal angeschaut aber nicht genommen", "i had my tablets this morning and then i had lunch again",
+  ])("not an overdose: %s", (t) => expect(detectDistress(t)).toBe(false));
+  // Owner policy (controller decision): English "again" with a taken-verb about pills alarms, even as a daily report.
+  it.each(["i took my pills again today", "i had my pills again this morning"])("accepted false alarm, pinned: %s", (t) =>
+    expect(detectDistress(t)).toBe(true));
+});
