@@ -67,10 +67,16 @@ describe("the repeat word must belong to the taking, not to the next clause (fix
     expect(detectDistress(t)).toBe(true));
 });
 
+describe("too many of any pill word (fixes review I-C)", () => {
+  it.each(["ich habe zu viele pillen genommen", "ich habe zu viele Medikamente genommen", "zu viele Tablette", "I took too many tablets",
+    "too many medicines", "I've had too many meds", "I think that was too much medicine", "too many pills", "zu viele Pillen geschluckt"])("%s", (t) =>
+    expect(detectDistress(t)).toBe(true));
+});
+
 describe("English pronouns after the pill talk (fixes review I-B)", () => {
   it.each(["i took them again", "i took it again", "i swallowed them again", "i think i took them again this morning",
     "Oh, I took them again!", "i already took my pills and now i took them again", "i took my pills already and then i took them again",
     "i took my pills and then took them again", "I've taken them again"])("%s", (t) => expect(detectDistress(t)).toBe(true));
-  it.each(["should i take them again", "i haven't taken them again", "i took it out again", "i took them to the shop again"])("not: %s", (t) =>
+  it.each(["should i take them again", "i haven't taken them again", "zu viele Kekse", "i took it out again", "i took them to the shop again"])("not: %s", (t) =>
     expect(detectDistress(t)).toBe(false));
 });

@@ -17,6 +17,8 @@ const ALWAYS = [
   "tablet twice", "medication twice", "medicine twice", "taken them twice", "taken it twice", "pills two times", "tablets two times",
   "zu viele tabletten", "zu viel genommen", "doppelt genommen", "zweimal genommen", "zweimal eingenommen", "doppelt eingenommen", "tablette zweimal", "falsche tabletten", "überdosis",
   "doppelte dosis", "doppelten dosis",
+  "too many medicines", "too many medications", "too many meds", "too much medicine", "too much medication",
+  "zu viele pillen", "zu viele medikamente", "zu viele tablette", "zu viel medizin",
 ];
 
 /**
