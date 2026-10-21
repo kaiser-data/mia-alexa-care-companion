@@ -6,11 +6,11 @@ Built for the [Build, Ship, Shape: Amazon Developer Hackathon](https://amazonapp
 
 ## What it shows
 
-- **Mia MCP server** with 16 tools (medication, appointments, orientation, weather, alerts, carer messages), Streamable HTTP, bearer-token auth.
+- **Mia MCP server** with 16 tools (medication, day and appointments, preparation with weather, outings, people, comfort and calls, health questions to the carer, problems, music, repeat), Streamable HTTP, bearer-token auth.
 - **Mia Voice, a browser simulator** with **Care Mode**: care topics reach Mia without its name, and Mia speaks first at agreed times. Today's Alexa+ add-ons cannot do this; see [the proposal](docs/submission/care-mode-proposal.md).
 - **Alexa skill bridge** (German, classic skill) so a real Echo can reach the same brain.
 - **SES alarm email**: medium and high alerts go to the carer; a cry for help that cannot be mailed tells Rose to call for help.
-- **AWS deploy**: one small server in Frankfurt (EC2 + Caddy + SES), see [deploy/aws/README.md](deploy/aws/README.md).
+- **AWS deploy** (in progress): one small server in Frankfurt (EC2 + Caddy + SES).
 
 ## Architecture
 
@@ -26,7 +26,7 @@ Built for the [Build, Ship, Shape: Amazon Developer Hackathon](https://amazonapp
     SQLite, AES-256-GCM       alerts --> Amazon SES --> Tom's inbox
     encrypted at rest
 
-## Quick start (60 seconds, local, no AWS)
+## Quick start (local, no AWS)
 
 Requires Node 24, pnpm 10, Chrome or Edge (for speech) and an API key for one model provider.
 
@@ -35,7 +35,7 @@ Requires Node 24, pnpm 10, Chrome or Edge (for speech) and an API key for one mo
     export ANTHROPIC_API_KEY=…        # from your secret store; never commit it
     pnpm dev                          # Mia Voice on http://127.0.0.1:8788 (starts the Mia MCP server too)
 
-Choose the model with `LLM_PROVIDER`: `anthropic` (needs `ANTHROPIC_API_KEY`), `featherless` (needs `FEATHERLESS_API_KEY`; default model `openai/gpt-oss-120b`, which picked the right tool 15 of 15 times at 3–5 s per turn in a live probe; `MIA_MODEL=moonshotai/Kimi-K2-Instruct-0905` is faster but less reliable: it answered pill questions without calling the pill tool) or `openai` (any OpenAI-compatible endpoint: `LLM_BASE_URL`, `LLM_API_KEY`, `MIA_MODEL`). Unset, it uses Anthropic if its key is present, otherwise Featherless. `MIA_MODEL` overrides the model. The startup log names the provider and model, never the key.
+Choose the model with `LLM_PROVIDER`: `anthropic` (needs `ANTHROPIC_API_KEY`), `featherless` (needs `FEATHERLESS_API_KEY`; default model `openai/gpt-oss-120b`, which picked the right tool 15 of 15 times at 3–5 s per turn in one live probe, Oct 2026; `MIA_MODEL=moonshotai/Kimi-K2-Instruct-0905` is faster but less reliable: it answered pill questions without calling the pill tool) or `openai` (any OpenAI-compatible endpoint: `LLM_BASE_URL`, `LLM_API_KEY`, `MIA_MODEL`). Unset, it uses Anthropic if its key is present, otherwise Featherless. `MIA_MODEL` overrides the model. The startup log names the provider and model, never the key.
 
 Tap the circle once and talk — no name, no wake word. Mia also speaks first at pill time, when it's time to leave for the group, at bedtime and for an afternoon chat. You can type instead of speaking.
 
@@ -68,7 +68,7 @@ A private profile: `MIA_PROFILE_FILE=.mia-data/<name>.json` (gitignored; same sh
 
 - Stored data is encrypted with AES-256-GCM using a generated local key (`.mia-data/`, gitignored).
 - All data in this repository is fictional (Rose Whitaker, Tom). A private profile is loaded with `MIA_PROFILE_FILE`, which stays outside git.
-- Transcripts do not leave the machine by default. The only outbound calls are to the model provider you configure, Open-Meteo for weather, and Amazon SES for alarm mail when you enable it.
+- Mia keeps no transcripts outside the encrypted local store. What Rose says is sent to the model provider you configure. In the browser, speech recognition runs on the browser vendor's service (Chrome/Edge), and on the Echo, Amazon processes the speech. Other outbound calls: Open-Meteo for weather, and Amazon SES for alarm mail when enabled.
 - Health data is treated as GDPR Art. 9 data by design.
 
 ## Limits
