@@ -34,3 +34,21 @@ describe("more ways to say pills taken twice (M-5 follow-up)", () => {
     "Did I take my pills?", "Habe ich meine Tabletten genommen?"])("a plan question is not: %s", (t) =>
     expect(detectDistress(t)).toBe(false));
 });
+
+describe("pills taken twice in free word order (final review I1)", () => {
+  it.each([
+    "Ich habe heute zweimal meine Tabletten genommen", "Ich habe zweimal die Tabletten genommen", "Heute habe ich zweimal meine Medikamente eingenommen",
+    "Ich habe die doppelte Dosis genommen", "doppelte Dosis", "Ich habe meine Tabletten noch mal genommen", "Ich habe meine Tabletten nochmal genommen",
+    "Ich habe die Tabletten noch einmal genommen", "Ich glaube, ich habe sie noch mal genommen", "Ich habe meine Pillen zum zweiten Mal geschluckt",
+    "I took my pills again", "I took my pills a second time", "I took twice my pills", "I think I've taken my tablets again",
+    "I took my medicine one more time", "I swallowed my tablets a second time", "Oh no, I took the pills again this morning",
+  ])("%s", (t) => expect(detectDistress(t)).toBe(true));
+  it.each([
+    "I take my pills twice a day", "Ich nehme meine Tabletten zweimal täglich", "Ich habe meine Tabletten immer zweimal am Tag genommen",
+    "Should I take my pills again?", "When do I take my tablets a second time?", "Wann nehme ich meine Tabletten noch mal?",
+    "Muss ich die Tabletten heute zweimal nehmen?", "I forgot my pills again", "Ich habe meine Tabletten schon wieder vergessen",
+    "I haven't taken my pills again today", "Ich habe meine Tabletten heute nicht noch mal genommen", "Ich habe meine Tabletten noch nicht genommen",
+    "I haven't taken my pills yet", "I took my pills and I will call Tom again later", "Ich habe heute wieder meine Tabletten genommen",
+    "I took my pills", "Ich habe meine Tabletten genommen",
+  ])("not an overdose: %s", (t) => expect(detectDistress(t)).toBe(false));
+});
