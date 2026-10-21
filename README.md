@@ -8,7 +8,7 @@ Built for the [Build, Ship, Shape: Amazon Developer Hackathon](https://amazonapp
 
 - **Mia MCP server** with 16 tools (medication, day and appointments, preparation with weather, outings, people, comfort and calls, health questions to the carer, problems, music, repeat), Streamable HTTP, bearer-token auth.
 - **Mia Voice, a browser simulator** with **Care Mode**: care topics reach Mia without its name, and Mia speaks first at agreed times. Today's Alexa+ add-ons cannot do this; see [the proposal](docs/submission/care-mode-proposal.md).
-- **Alexa skill bridge** (German, classic skill) so a real Echo can reach the same brain.
+- **Alexa skill bridge** (German, classic skill) to the same brain. It works in the Alexa developer console simulator only; Echo devices on Alexa+ refuse in-development skills ("not supported on this device", see [known issues](docs/known-issues.md)).
 - **SES alarm email**: medium and high alerts go to the carer; a cry for help that cannot be mailed tells Rose to call for help.
 - **AWS deploy** (in progress): one small server in Frankfurt (EC2 + Caddy + SES).
 

@@ -41,7 +41,7 @@ Source: the Official Rules (`/rules`) and FAQs (`/details/faqs`) pages, read on 
 **Not verified / open before submitting**
 
 - Whether the page should show a "submission language" for the German scene. The rules require English or an English translation for video, text and docs: the video has English captions; the German strings in the repo are code and data.
-- The exact repository URL, YouTube/Vimeo link and the live demo address are not yet known and are marked `<...>` below.
+- The exact repository URL and YouTube/Vimeo link are not yet known and are marked `<...>` below. There is no live demo address: the AWS deploy is in progress.
 - The alarm email in the video needs SES out of sandbox or a verified recipient address.
 
 ---
@@ -64,7 +64,7 @@ Everything in this submission is a fictional demo: **Rose Whitaker**, 81, lives 
 
 ## What it does
 
-Mia is an add-on for Alexa+ built as an MCP server with 16 tools, plus a browser "Echo" that acts as an MCP client.
+Mia is built as an Alexa+ add-on: an MCP server with 16 tools. It runs today in our own browser "Echo", an MCP client, because Alexa+ add-on tools are closed to participants.
 
 For Rose:
 - **Pills.** "Did I take my pills?" is answered only from the log. If the dose is due, she hears which pill ("the small white pill and the round pink one"). After "I took them", a second "I took them" is answered kindly with "You took your morning pills at about eight o'clock. No more pills needed now." No double dose. If Mia is unsure, it says so and flags Tom.
@@ -73,7 +73,7 @@ For Rose:
 - **Night.** "Is it morning?" at 2:00 gets "It's two o'clock, in the middle of the night. You're safe at home. You can go back to sleep."
 - **Comfort and people.** Who is Tom, a comfort note, a little chat about her life, music she likes.
 - **No medical advice.** "Can I take an aspirin?" gets "I can't answer that one. Let's ask Tom first." Tom is emailed.
-- **Help.** "I fell" raises a high alert at once, before any language model call, and Tom gets an email: `[Mia] URGENT: Rose asked for help: "I fell.".` If the email cannot be sent, Mia tells Rose: "I couldn't reach Tom. Please call for help."
+- **Help.** "I fell" raises a high alert at once, before any language model call, and Tom gets an email: `[Mia] URGENT: Rose asked for help: "I fell.".` (punctuation as recognised). If the email cannot be sent (when alarm email is configured), Mia tells Rose: "I couldn't reach Tom. Please call for help."
 - **German too.** The same Mia speaks German (de-DE) with its own templates.
 
 For Tom: alarm email through Amazon SES for medium and high severity alerts (a repeat of the same medium alert is mailed at most once per 6 hours; every cry for help is mailed).
@@ -83,9 +83,9 @@ For Tom: alarm email through Amazon SES for medium and high severity alerts (a r
 - **Claude picks, doesn't write.** A language model only chooses which tool to call and which fixed phrase ids (an opener such as "Of course, Rose.", one feeling, one yes/no question, one closing) come around the answer. It writes no sentence. Every spoken fact and every safety sentence comes from server templates in English and German and is spoken verbatim, so Mia cannot invent a medicine, a time, or advice.
 - **MCP server** (TypeScript, Node 24, Hono, official MCP SDK 1.32.1): 16 tools, Streamable HTTP, bearer token, protocol versions 2025-11-25 and 2025-03-26. Sensitive data (pills, people, comfort notes, events, alerts) is stored in SQLite with field-level AES-256-GCM encryption.
 - **Mia Voice** (browser "Echo"): no wake word and no name, Chrome speech recognition and voice, optional captions. It is an actual MCP client (initialize, tools/list, tools/call).
-- **Models.** `openai/gpt-oss-120b` through Featherless by default (picked the right tool 15 of 15 times at 3 to 5 seconds per turn in our probe; a faster model skipped the pill tool). An Anthropic adapter is included. Pill questions and "I fell" take deterministic routes with no model call.
-- **On AWS.** One EC2 instance (t4g.small, Amazon Linux 2023) in Frankfurt runs the app under systemd; Caddy gives HTTPS and basic auth; the instance role sends alarm mail through Amazon SES, with no access keys on the box.
-- **Tested** with a large suite (the repository runs `pnpm test` and `pnpm typecheck` on Node 24), including sweeps over generated utterances for the pill and help paths.
+- **Models.** `openai/gpt-oss-120b` through Featherless, the Featherless default (picked the right tool 15 of 15 times at 3 to 5 seconds per turn in our probe; a faster model skipped the pill tool). An Anthropic adapter is included. Plain pill questions ("Did I take my pills?") and cries for help ("I fell") take deterministic routes with no model call; a self-report like "I took them" goes through the model.
+- **AWS.** Alarm email goes out through Amazon SES (v2 API, region `eu-central-1`, standard AWS credential chain). A one-instance deploy to Frankfurt (EC2 t4g.small, Caddy for HTTPS and basic auth, an instance role instead of access keys) is in progress and not part of this submission's tested path.
+- **Tested** with a large suite (the repository runs `pnpm test` and `pnpm typecheck` on Node 24), including a sweep of every tool answer over a week at nine times of day (over 1,000 answers per language) and long lists of pill and help phrasings in English and German.
 - **Demo clock.** `MIA_CLOCK_START` starts Mia's clock at a chosen time so the video can show 8:00, 9:35 and 2:00 on one afternoon.
 
 ## Challenges we ran into
@@ -98,9 +98,9 @@ For Tom: alarm email through Amazon SES for medium and high severity alerts (a r
 
 ## Accomplishments that we're proud of
 
-- A pill answer that cannot be wrong because it is never written by a model.
+- A pill answer that is never written by a model: it comes only from the log.
 - Mia speaks first, so Rose never has to remember to ask.
-- An alarm that does not depend on the model or on reading the log, and that tells Rose when it failed.
+- An alarm that does not depend on the model or on reading the log, and that tells Rose when the email failed.
 - One codebase in English and German.
 - A concrete, tested **Care Mode proposal** for Alexa+: nameless care topics, proactive speech at carer-set times, carer-set limits.
 - A friction log and product feedback written from real use, including the finding that a German Alexa+ user cannot be served today.
@@ -121,13 +121,13 @@ For Tom: alarm email through Amazon SES for medium and high severity alerts (a r
 
 ## Built with
 
-TypeScript, Node.js 24, Hono, Model Context Protocol (TypeScript SDK), Streamable HTTP, Zod, SQLite, AES-256-GCM, Vitest, Amazon EC2, Amazon SES, AWS IAM, Caddy, systemd, Featherless (`openai/gpt-oss-120b`), Anthropic API, Web Speech API, Open-Meteo, Alexa Skills Kit (German bridge skill).
+TypeScript, Node.js 24, Hono, Model Context Protocol (TypeScript SDK), Streamable HTTP, Zod, SQLite, AES-256-GCM, Vitest, Amazon SES, Featherless (`openai/gpt-oss-120b`), Anthropic API, Web Speech API, Open-Meteo, Alexa Skills Kit (German bridge skill).
 
 ## Try it
 
 - **Repository:** `<GitHub repository URL>` (public, MIT licence)
 - **Demo video:** `<YouTube or Vimeo URL>`
-- **Live demo (optional, may be taken down after judging):** `<https://...sslip.io>` with basic auth credentials in the testing instructions
+- **Live demo:** not available; run it locally (below).
 - **Run locally** (no AWS needed): Node 24, pnpm 10, Chrome. `pnpm install`, copy `.env.example` to `.env`, set `MIA_DEV_TOKEN` and one model key, `pnpm dev`, open `http://127.0.0.1:8788`, tap the circle and talk.
 - **Care Mode proposal:** `docs/submission/care-mode-proposal.md`
 - **Friction log and product feedback:** `docs/submission/friction-log.md`, `docs/submission/product-feedback.md`
@@ -140,6 +140,6 @@ TypeScript, Node.js 24, Hono, Model Context Protocol (TypeScript SDK), Streamabl
 4. Try: "Did I take my pills?", "I took them.", "Is it group today?", "Can I take an aspirin?", "I fell." The page shows what Mia says.
 5. To see Mia speak first at a chosen time: `MIA_CLOCK_START=2026-10-26T07:59:40-04:00 pnpm dev` (Monday, just before pill time).
 6. To test the MCP server on its own: `pnpm dev:mcp`, then `npx @modelcontextprotocol/inspector` with Streamable HTTP at `http://127.0.0.1:8787/mcp` and header `Authorization: Bearer <MIA_DEV_TOKEN>`.
-7. Alarm emails need Amazon SES; without it, alerts are stored and shown in the log only.
+7. Alarm emails need Amazon SES (`MIA_ALERT_EMAIL_TO`, `MIA_ALERT_EMAIL_FROM`, AWS credentials). Without them, alerts are only stored in the encrypted local database, and Mia still answers "I've let Tom know right away."
 
 Mia is a hackathon prototype running in local mode. It is not a medical device and not an emergency service.

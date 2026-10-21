@@ -1,6 +1,6 @@
 # Care Mode for Alexa+: a proposal
 
-From the team behind **Mia**, an Alexa+ add-on for people living with dementia (Build, Ship, Shape: Amazon Developer Hackathon, Alexa+ track). Written 2026-10-20. Persona in this document: **Rose Whitaker**, 81, fictional; her son and carer is **Tom**.
+From the team behind **Mia**, built as an Alexa+ add-on (an MCP server) for people living with dementia (Build, Ship, Shape: Amazon Developer Hackathon, Alexa+ track). Written 2026-10-20. Persona in this document: **Rose Whitaker**, 81, fictional; her son and carer is **Tom**.
 
 This is a feature proposal for Amazon's Alexa+ team. It describes things Alexa+ add-ons cannot do today. It is not a description of current Alexa+ behaviour. Mia's simulator implements all of it so the idea can be seen working.
 
@@ -60,10 +60,10 @@ These are Mia's own rules; Care Mode should require them of any care add-on.
 
 - **No medical advice.** Medication answers come only from the plan the carer entered and the log. A health question ("Can I take an aspirin?") gets "I can't answer that one. Let's ask Tom first." and Tom is emailed. In Mia, the model cannot write that sentence.
 - **No made-up facts.** Every spoken fact comes from a tool result. The language model only chooses which tool to call and which fixed phrase (such as "Of course, Rose." or "Can I help with anything else?") to put before or after. No model-written text is spoken to the person.
-- **A possible emergency always alerts.** "I fell", "Help", "too many pills" go to the carer at once, ahead of any model call, and ahead of reading the log. If the alert cannot be sent, the person is told: "I couldn't reach Tom. Please call for help." She is never left with silence.
+- **A possible emergency always alerts.** "I fell", "Help", "too many pills" go to the carer at once, ahead of any model call, and ahead of reading the log. If the alert cannot be sent (when alarm email is configured), the person is told: "I couldn't reach Tom. Please call for help." She is never left with silence.
 - **Not an emergency service.** Care Mode must not claim to call emergency services. The add-on alerts family.
-- **Data minimisation.** Mia stores no audio and no transcripts. The only words kept are those she says when asking for help (200 characters) and an unanswered question (80 characters), encrypted and shown to the carer only. Sensitive fields are encrypted at rest (AES-256-GCM in the current build).
-- **Consent and control.** Care Mode is set up by the carer with the person's agreement where possible. It can be exported and deleted.
+- **Data minimisation.** Mia stores no audio and no transcripts. The only words of hers that are kept are those in a call for help or a health question (up to 200 characters) and an unknown name (80 characters), encrypted and sent only to the carer by email. Sensitive fields are encrypted at rest (AES-256-GCM in the current build).
+- **Consent and control.** Care Mode is set up by the carer with the person's agreement where possible. Care Mode should let the carer export and delete it (not built in Mia yet).
 - **Honest limits.** Care Mode does not diagnose, does not track location and does not replace a person.
 
 ## How Mia demos it
@@ -74,7 +74,7 @@ The Mia simulator (a browser "Echo" connected to the Mia MCP server over Streama
 |---|---|
 | Nameless care topics | Every utterance goes to the brain, which always has Mia's 16 tools available. No name, no wake word inside a session. The model picks a tool: pills, day, group, people, comfort, night reassurance, health question, help, call request. |
 | Proactive speech | The page asks `GET /api/proactive` every 20 seconds. The server answers with at most one unspoken prompt: pill time, leave-for-group (from 15 minutes before), welcome back from the group, bedtime, afternoon music, afternoon chat. Each ends in a yes/no question and is logged so it is spoken once. |
-| Carer-set limits | The plan (medications, group, routine, quiet hours 00:00 to 05:00, which prompts exist) is configuration entered by Tom. Nothing outside the plan is spoken. |
+| Carer-set limits | The plan (medications and times, group days and leave-by time, bedtime, check-in time, favourite music) is the carer's profile data: a seed file in this demo, with a carer page planned. Quiet hours (00:00 to 05:00) and the prompt windows are fixed in code today. Nothing outside the plan is spoken. |
 
 In the demo video, scenes 1 and 2 show Mia speaking first, with Rose saying nothing; scene 3 shows a nameless health question being routed and reported; the proposal is labelled **"Proposal, not current Alexa+ behaviour"** on screen.
 

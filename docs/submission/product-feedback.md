@@ -11,13 +11,11 @@ Structured as the Devpost rules ask: which tools and for what, what worked, what
 | Alexa+ add-on documentation (design guide, client lifecycle, quickstart, MCP Toolkit overview) | designing the server to the documented client behaviour (protocol versions, Streamable HTTP, response shape, latency) |
 | Model Context Protocol, TypeScript SDK `@modelcontextprotocol/sdk` 1.32.1 | the Mia server (16 tools over Streamable HTTP) and the client inside the simulator |
 | Hackathon pages (rules, FAQ) | requirements; the simulator path |
-| Alexa Skills Kit / Alexa developer console (classic custom skill, de-DE) | a bridge so a German Echo could reach Mia |
-| Amazon EC2 (t4g.small, Amazon Linux 2023, encrypted gp3 volume), Elastic IP, IAM instance role | the server in Frankfurt (eu-central-1), no access keys on the box |
-| Amazon SES (v2 API) | alarm email to the carer for medium and high severity alerts |
+| Alexa Skills Kit / Alexa developer console (classic custom skill, de-DE) | a bridge meant to let a German Echo reach Mia (works in the developer console simulator only; Alexa+ Echos refuse in-development skills) |
+| Amazon SES (v2 API) | alarm email to the carer for medium and high alerts (sent with local AWS credentials in this build) |
 | LLM APIs: Featherless (OpenAI-compatible, `openai/gpt-oss-120b` default) and the Anthropic API (adapter) | choosing a tool and fixed phrase ids; never writing spoken text |
 | Browser Web Speech API (Chrome) | listening and speaking in the simulator |
 | Open-Meteo | the weather line in the "what to take" answer |
-| Caddy, sslip.io | HTTPS in front of the instance |
 
 ## 2. What worked well
 
@@ -25,7 +23,7 @@ Structured as the Devpost rules ask: which tools and for what, what worked, what
 - **Concrete client-lifecycle docs.** Protocol version, `structuredContent` plus a text content item, no session id and the latency target are stated plainly. We built to them (the server accepts both `2025-03-26` and `2025-11-25`).
 - **MCP itself.** Tools with a title, a description with examples, an output schema and annotations are enough for a model to choose well. Tool descriptions with example utterances ("Did I take my pills?", "Habe ich meine Tabletten genommen?") were the most useful thing we wrote.
 - **A clear staff answer.** Amazon staff confirmed on the forum that add-ons cannot start calls or Drop In and that a submission may demonstrate beyond today's capabilities. That let us show Care Mode honestly, labelled as a proposal.
-- **SES from an instance role.** One IAM role on the instance, the SES v2 SDK call, and the alarm email works without keys on disk. Configuration is a recipient and a sender address.
+- **SES v2.** One SDK call, bounded at 5 s; configuration is a recipient and a sender address. Medium alerts never hold her turn; a cry for help is awaited.
 - **Hackathon logistics.** The Official Rules are specific (video under three minutes, public YouTube/Vimeo link, GitHub repository, licence file or private share), so we could plan the last week against them.
 
 ## 3. What needs work
@@ -47,7 +45,7 @@ Structured as the Devpost rules ask: which tools and for what, what worked, what
 
 ## 5. Would we build with these devices and services again?
 
-**Yes**, for the Amazon-hosted parts we used (EC2, SES) and for the MCP-based add-on model. **Yes with a condition** for Alexa+: only if a care add-on can be reached without its name and can speak first at carer-approved times (the Care Mode proposal). Without those, a person with dementia cannot use an add-on on their own. With them, Alexa+ would be a strong home for this kind of product, because the device is already in the kitchen and the person already says "Alexa".
+**Yes**, for the Amazon-hosted parts we used (SES) and for the MCP-based add-on model. **Yes with a condition** for Alexa+: only if a care add-on can be reached without its name and can speak first at carer-approved times (the Care Mode proposal). Without those, a person with dementia cannot use an add-on on their own. With them, Alexa+ would be a strong home for this kind of product, because the device is already in the kitchen and the person already says "Alexa".
 
 ## 6. Feature requests
 
@@ -67,11 +65,8 @@ Full proposal: `docs/submission/care-mode-proposal.md`.
 
 Honest scope: this build uses a small set of AWS services, each with a documented purpose. It does not use Bedrock, AgentCore, Strands, Transcribe or Polly (those were in our early plan and are out of scope for this release).
 
-- **Amazon EC2** (t4g.small, Amazon Linux 2023, Frankfurt `eu-central-1`, encrypted gp3 volume) runs the Mia Voice gateway and the embedded Mia MCP server under systemd. Caddy terminates HTTPS and puts basic auth in front of the page and `/api`; only Alexa-signed requests reach the skill port.
-- **Elastic IP + sslip.io** give a stable HTTPS address without a domain.
-- **IAM instance role** gives the server permission to send mail; there are no access keys on the instance.
-- **Amazon SES (v2 API)**: the alarm channel. Medium and high alerts are stored, then mailed to Tom. The same medium alert is mailed at most once per 6 hours; a cry for help is mailed every time. If a high alert cannot be mailed, the server throws and Mia tells Rose: "I couldn't reach Tom. Please call for help." Subjects look like `[Mia] URGENT: Rose asked for help: "I fell.".`
-- Provisioning and deploy scripts, the Caddyfile and the systemd unit are in `deploy/aws/` in the repository, with a README.
+- **Amazon SES (v2 API)** is the alarm channel. Medium and high alerts are stored, then mailed to Tom. The same medium alert is mailed at most once per 6 hours; a cry for help is mailed every time. If a high alert cannot be mailed, the server throws and Mia tells Rose: "I couldn't reach Tom. Please call for help." Subjects look like `[Mia] URGENT: Rose asked for help: "I fell.".`
+- **Planned, in progress, not in this submission:** one EC2 t4g.small in Frankfurt (eu-central-1) with Caddy (HTTPS plus basic auth), an IAM instance role (no keys on the box) and systemd.
 - Why Frankfurt: Mia treats health data as sensitive personal data from the start (GDPR Art. 9), so the data stays in an EU region.
 
 What we would add next on AWS: DynamoDB with a customer-managed KMS key in place of local SQLite, Amazon Transcribe and Polly for the voice pipeline, and Bedrock as an optional model provider. They are in the design (`docs/superpowers/specs/2026-10-06-mia-design.md`) and not built.
@@ -80,7 +75,7 @@ What we would add next on AWS: DynamoDB with a customer-managed KMS key in place
 
 - **Contribution:** a new open-source repository, MIT licence, created during the hackathon window (the first commit is in October 2026). Mia's code, tests and docs are public.
 - **Contribution URL / project repository URL:** `<repository URL>` (to be filled in at submission).
-- **GitHub username:** `kaiser-data`.
+- **GitHub username:** `<GitHub username>` (to be filled in at submission).
 - **What it is:** an MCP server for people living with dementia (16 tools over Streamable HTTP), a browser voice simulator that acts as an MCP client, a German and English phrase catalogue, an encrypted local store, and an alarm-email sink.
-- **How it works:** the model picks a tool and fixed phrase ids; the server returns the spoken sentences from templates; the test suite includes sweeps over thousands of generated utterances for the pill and distress paths.
+- **How it works:** the model picks a tool and fixed phrase ids; the server returns the spoken sentences from templates; the test suite includes a sweep of every tool answer over a week at nine times of day (over 1,000 answers per language) and long lists of pill and help phrasings in English and German.
 - **Why it matters:** other developers building care or accessibility add-ons can reuse the "model picks, templates speak" pattern, the pill-safety rules and the alarm sink without having Alexa+ access.
