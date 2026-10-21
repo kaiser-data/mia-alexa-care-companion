@@ -18,6 +18,12 @@ const RANK = { low: 0, medium: 1, high: 2 } as const;
 export const MAIL_DEDUPE_MS = 6 * 3_600_000;
 
 export const MAIL_TIMEOUT_MS = 5000;
+export const MAIL_SUBJECT_MAX = 150;
+
+/** Her words are in the subject: one line (no CR/LF or control characters, which SES may reject) and capped. The body keeps them whole. */
+function mailSubject(s: string): string {
+  return [...s.replace(/[\s\p{Cc}]+/gu, " ").trim()].slice(0, MAIL_SUBJECT_MAX).join("");
+}
 
 /**
  * Stores every alert, and mails medium and high ones to the carer. Every send is bounded by a timeout.
@@ -65,7 +71,7 @@ export class EmailAlertSink implements AlertSink {
   }
   private prepare(a: AlertInput, key: string, t: number) {
     const mail = {
-      subject: `[Mia] ${a.severity === "high" ? "URGENT: " : ""}${a.message}`,
+      subject: mailSubject(`[Mia] ${a.severity === "high" ? "URGENT: " : ""}${a.message}`),
       text: `${a.message}\n\nRule: ${a.rule}\nSeverity: ${a.severity}\nAt: ${a.at}\n\nSent by Mia (local mode, not production).`,
     };
     const done = () => {

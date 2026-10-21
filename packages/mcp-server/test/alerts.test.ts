@@ -79,6 +79,16 @@ describe("EmailAlertSink", () => {
     await expect(s.raise(a("medium"))).rejects.toThrow(/locked/);
     expect(mails).toHaveLength(0);
   });
+  it("the subject has no CR/LF and is capped; the body keeps her full words", async () => {
+    const { s, mails } = sink();
+    const words = `Rose said:\r\nBcc: someone@example.com\n${"help ".repeat(60)}`;
+    await s.raise(a("high", "distress", words));
+    const { subject, text } = mails[0]!;
+    expect(subject).not.toMatch(/[\r\n]/);
+    expect(subject.length).toBeLessThanOrEqual(150);
+    expect(subject.startsWith("[Mia] URGENT: Rose said: Bcc: someone@example.com help")).toBe(true);
+    expect(text).toContain(words);
+  });
   it("forgets dedupe entries older than 6 hours", async () => {
     const { s, mails, later } = sink();
     await s.raise(a("medium", "r1"));
