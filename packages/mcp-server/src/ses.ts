@@ -17,3 +17,11 @@ export function sesMailerFromEnv(env: Record<string, string | undefined>): Maile
     },
   };
 }
+
+/** For logs: "tom@example.com" → "t***@example.com". Never the full address (journald, screen recordings). */
+export function maskEmail(addr: string | undefined): string {
+  const a = addr?.trim() ?? "";
+  const at = a.lastIndexOf("@");
+  if (at < 0) return "***";
+  return `${a.slice(0, Math.min(at, 1))}***${a.slice(at)}`;
+}

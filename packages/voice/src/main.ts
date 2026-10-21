@@ -2,7 +2,7 @@ import { join, resolve } from "node:path";
 import { offsetClock } from "@mia/shared";
 import { serve } from "@hono/node-server";
 import { checkDevToken, loadProfile, startLocalMia } from "@mia/mcp-server/local";
-import { sesMailerFromEnv } from "@mia/mcp-server/ses";
+import { maskEmail, sesMailerFromEnv } from "@mia/mcp-server/ses";
 import { OpenMeteoWeather } from "@mia/mcp-server/weather";
 import { alexaSignatureVerifier, createAlexaApp } from "./alexa";
 import { Brain } from "./brain";
@@ -28,7 +28,7 @@ const voicePort = parseVoicePort(process.env.VOICE_PORT);
 
 // Embedded Mia only talks to this gateway: any free port will do.
 const mailer = process.env.MIA_MCP_URL ? null : sesMailerFromEnv(process.env);
-if (mailer) console.log(`[mia] alert email on → ${process.env.MIA_ALERT_EMAIL_TO}`);
+if (mailer) console.log(`[mia] alert email on → ${maskEmail(process.env.MIA_ALERT_EMAIL_TO)}`);
 const miaUrl = process.env.MIA_MCP_URL ?? (await startLocalMia({
   token, profile, port: 0,
   dataDir: resolve(root, process.env.MIA_DATA_DIR ?? ".mia-data"), weather: new OpenMeteoWeather(), now, mailer,
