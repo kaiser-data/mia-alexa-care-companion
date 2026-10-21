@@ -18,6 +18,15 @@ export function sesMailerFromEnv(env: Record<string, string | undefined>): Maile
   };
 }
 
+/**
+ * On a public deploy (MIA_PUBLIC_ORIGIN) without a mailer every alert is only stored, yet Mia says the carer was told.
+ * Startup does not refuse (a demo must still run), but says so loudly on stderr.
+ */
+export function alertEmailOffWarning(env: Record<string, string | undefined>, mailerOn: boolean): string | null {
+  if (mailerOn || !env.MIA_PUBLIC_ORIGIN?.trim()) return null;
+  return "[mia] WARNING: alert email OFF on a public deploy (MIA_PUBLIC_ORIGIN is set): alerts are only stored and the carer is NOT mailed. Set MIA_ALERT_EMAIL_TO and MIA_ALERT_EMAIL_FROM.";
+}
+
 /** For logs: "tom@example.com" → "t***@example.com". Never the full address (journald, screen recordings). */
 export function maskEmail(addr: string | undefined): string {
   const a = addr?.trim() ?? "";
