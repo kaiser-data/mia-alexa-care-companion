@@ -10,7 +10,7 @@ Built for the [Build, Ship, Shape: Amazon Developer Hackathon](https://amazonapp
 - **Mia Voice, a browser simulator** with **Care Mode**: care topics reach Mia without its name, and Mia speaks first at agreed times. Today's Alexa+ add-ons cannot do this; see [the proposal](docs/submission/care-mode-proposal.md).
 - **Alexa skill bridge** (German, classic skill) to the same brain. It works in the Alexa developer console simulator only; Echo devices on Alexa+ refuse in-development skills ("not supported on this device", see [known issues](docs/known-issues.md)).
 - **SES alarm email**: medium and high alerts go to the carer; a cry for help that cannot be mailed tells Rose to call for help.
-- **AWS deploy** (in progress): one small server in Frankfurt (EC2 + Caddy + SES).
+- **AWS deploy**: one small server in Frankfurt (EC2 + Caddy + SES), see [deploy/aws/README.md](deploy/aws/README.md).
 
 ## Architecture
 

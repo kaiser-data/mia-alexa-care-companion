@@ -41,7 +41,7 @@ Source: the Official Rules (`/rules`) and FAQs (`/details/faqs`) pages, read on 
 **Not verified / open before submitting**
 
 - Whether the page should show a "submission language" for the German scene. The rules require English or an English translation for video, text and docs: the video has English captions; the German strings in the repo are code and data.
-- The exact repository URL and YouTube/Vimeo link are not yet known and are marked `<...>` below. There is no live demo address: the AWS deploy is in progress.
+- The exact repository URL, YouTube/Vimeo link and the live demo address are not yet known and are marked `<...>` below.
 - The alarm email in the video needs SES out of sandbox or a verified recipient address.
 
 ---
@@ -84,7 +84,7 @@ For Tom: alarm email through Amazon SES for medium and high severity alerts (a r
 - **MCP server** (TypeScript, Node 24, Hono, official MCP SDK 1.32.1): 16 tools, Streamable HTTP, bearer token, protocol versions 2025-11-25 and 2025-03-26. Sensitive data (pills, people, comfort notes, events, alerts) is stored in SQLite with field-level AES-256-GCM encryption.
 - **Mia Voice** (browser "Echo"): no wake word and no name, Chrome speech recognition and voice, optional captions. It is an actual MCP client (initialize, tools/list, tools/call).
 - **Models.** `openai/gpt-oss-120b` through Featherless, the Featherless default (picked the right tool 15 of 15 times at 3 to 5 seconds per turn in our probe; a faster model skipped the pill tool). An Anthropic adapter is included. Plain pill questions ("Did I take my pills?") and cries for help ("I fell") take deterministic routes with no model call; a self-report like "I took them" goes through the model.
-- **AWS.** Alarm email goes out through Amazon SES (v2 API, region `eu-central-1`, standard AWS credential chain). A one-instance deploy to Frankfurt (EC2 t4g.small, Caddy for HTTPS and basic auth, an instance role instead of access keys) is in progress and not part of this submission's tested path.
+- **On AWS.** One EC2 instance (t4g.small, Amazon Linux 2023) in Frankfurt runs the app under systemd; Caddy gives HTTPS and basic auth; the instance role sends alarm mail through Amazon SES, with no access keys on the box. Deploy scripts are in `deploy/aws/`.
 - **Tested** with a large suite (the repository runs `pnpm test` and `pnpm typecheck` on Node 24), including a sweep of every tool answer over a week at nine times of day (over 1,000 answers per language) and long lists of pill and help phrasings in English and German.
 - **Demo clock.** `MIA_CLOCK_START` starts Mia's clock at a chosen time so the video can show 8:00, 9:35 and 2:00 on one afternoon.
 
@@ -121,13 +121,13 @@ For Tom: alarm email through Amazon SES for medium and high severity alerts (a r
 
 ## Built with
 
-TypeScript, Node.js 24, Hono, Model Context Protocol (TypeScript SDK), Streamable HTTP, Zod, SQLite, AES-256-GCM, Vitest, Amazon SES, Featherless (`openai/gpt-oss-120b`), Anthropic API, Web Speech API, Open-Meteo, Alexa Skills Kit (German bridge skill).
+TypeScript, Node.js 24, Hono, Model Context Protocol (TypeScript SDK), Streamable HTTP, Zod, SQLite, AES-256-GCM, Vitest, Amazon EC2, Amazon SES, AWS IAM, Caddy, systemd, Featherless (`openai/gpt-oss-120b`), Anthropic API, Web Speech API, Open-Meteo, Alexa Skills Kit (German bridge skill).
 
 ## Try it
 
 - **Repository:** `<GitHub repository URL>` (public, MIT licence)
 - **Demo video:** `<YouTube or Vimeo URL>`
-- **Live demo:** not available; run it locally (below).
+- **Live demo (may be taken down after judging):** `https://<ip-with-dashes>.sslip.io`, basic-auth credentials in the testing instructions
 - **Run locally** (no AWS needed): Node 24, pnpm 10, Chrome. `pnpm install`, copy `.env.example` to `.env`, set `MIA_DEV_TOKEN` and one model key, `pnpm dev`, open `http://127.0.0.1:8788`, tap the circle and talk.
 - **Care Mode proposal:** `docs/submission/care-mode-proposal.md`
 - **Friction log and product feedback:** `docs/submission/friction-log.md`, `docs/submission/product-feedback.md`

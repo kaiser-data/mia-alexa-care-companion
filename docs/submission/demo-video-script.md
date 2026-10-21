@@ -15,7 +15,7 @@ Every line Mia says below is a line the software can say. The sentences come fro
 | Data | a **fresh `MIA_DATA_DIR` for every take**, for example `MIA_DATA_DIR=.mia-data/take-1a`. Never reuse a directory: earlier pills would change the answers. |
 | Clock | `MIA_CLOCK_START=<ISO time with offset>` per scene, see below. The clock starts at that time and then runs on in real time. |
 | Model | `LLM_PROVIDER=featherless` (default model `openai/gpt-oss-120b`) with `FEATHERLESS_API_KEY` from the secret store, or `anthropic`. Never show the key or `.env`. |
-| Alarm email | start the server with `MIA_ALERT_EMAIL_TO` and `MIA_ALERT_EMAIL_FROM` set (Amazon SES). Open Tom's inbox in a second window and keep it ready for scenes 3 and 5. Run locally with AWS credentials for SES exported in the shell (never on screen). The recipient must be SES-verified while the account is in the sandbox. |
+| Alarm email | start the server with `MIA_ALERT_EMAIL_TO` and `MIA_ALERT_EMAIL_FROM` set (Amazon SES, instance role on AWS). Open Tom's inbox in a second window and keep it ready for scenes 3 and 5. Run locally with AWS credentials for SES exported in the shell (never on screen), or on the Frankfurt EC2 instance (`MIA_PUBLIC_ORIGIN` set). The recipient must be SES-verified while the account is in the sandbox. |
 | Date | **Monday 2026-10-26** is a group day (Rose goes Monday, Tuesday, Thursday). New York is still on summer time on that date (offset `-04:00`; clocks change on 2026-11-01), so the offsets below are right. |
 
 Start command pattern (local):
@@ -146,9 +146,9 @@ Slide A (about 8 seconds): the architecture diagram.
                  ->  Mia MCP server     (Streamable HTTP, MCP 2025-11-25)
                  ->  encrypted store    (SQLite, AES-256-GCM)
                  ->  alarm email        (Amazon SES)
-    Runs locally in this video; alarm email through Amazon SES (eu-central-1).
+    Runs on one EC2 instance in Frankfurt (eu-central-1), HTTPS by Caddy.
 
-Voice-over: "The Mia server is a real MCP server over Streamable HTTP, built to the documented Alexa Plus client behaviour. The simulator is an MCP client. The language model picks tools and phrase ids and writes nothing. Alarms go out through Amazon SES."
+Voice-over: "The Mia server is a real MCP server over Streamable HTTP, built to the documented Alexa Plus client behaviour. The simulator is an MCP client. The language model picks tools and phrase ids and writes nothing. Everything runs on one server on AWS in Frankfurt, and alarms go out through Amazon SES."
 
 Slide B (about 7 seconds), labelled **"Proposal, not current Alexa+ behaviour":**
 
