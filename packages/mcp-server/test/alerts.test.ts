@@ -48,6 +48,37 @@ describe("EmailAlertSink", () => {
     await expect(s.raise(a("high", "distress", "help"))).rejects.toThrow(/timed out/);
     expect(stored).toHaveLength(2);
   });
+  it("a cry for help is mailed even when the store write fails, and does not throw (Tom got it)", async () => {
+    const mails: { subject: string; text: string }[] = [];
+    const brokenStore = { raise: async () => { throw new Error("database is locked"); } };
+    const s = new EmailAlertSink(brokenStore, { send: async (m) => { mails.push(m); } }, { now: () => new Date() });
+    await expect(s.raise(a("high", "distress", "help"))).resolves.toBeUndefined();
+    expect(mails.map((m) => m.subject)).toEqual(["[Mia] URGENT: help"]);
+  });
+  it("a store that throws synchronously still lets the cry for help be mailed", async () => {
+    const mails: { subject: string; text: string }[] = [];
+    const brokenStore = { raise: (): Promise<void> => { throw new Error("disk full"); } };
+    const s = new EmailAlertSink(brokenStore, { send: async (m) => { mails.push(m); } }, { now: () => new Date() });
+    await expect(s.raise(a("high", "distress", "help"))).resolves.toBeUndefined();
+    expect(mails).toHaveLength(1);
+  });
+  it("store fine, mail fails: the cry for help is stored and throws", async () => {
+    const { s, stored } = sink({ fail: true });
+    await expect(s.raise(a("high", "distress", "help"))).rejects.toThrow(/SES down/);
+    expect(stored).toHaveLength(1);
+  });
+  it("store and mail both fail: the cry for help throws the mail error", async () => {
+    const brokenStore = { raise: async () => { throw new Error("database is locked"); } };
+    const s = new EmailAlertSink(brokenStore, { send: async () => { throw new Error("SES down"); } }, { now: () => new Date() });
+    await expect(s.raise(a("high", "distress", "help"))).rejects.toThrow(/SES down/);
+  });
+  it("medium keeps its order: a failed store write throws and nothing is mailed", async () => {
+    const mails: { subject: string; text: string }[] = [];
+    const brokenStore = { raise: async () => { throw new Error("database is locked"); } };
+    const s = new EmailAlertSink(brokenStore, { send: async (m) => { mails.push(m); } }, { now: () => new Date() });
+    await expect(s.raise(a("medium"))).rejects.toThrow(/locked/);
+    expect(mails).toHaveLength(0);
+  });
   it("forgets dedupe entries older than 6 hours", async () => {
     const { s, mails, later } = sink();
     await s.raise(a("medium", "r1"));

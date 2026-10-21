@@ -33,12 +33,37 @@ export class EmailAlertSink implements AlertSink {
     return Promise.race([this.mailer.send(m), timeout]).finally(() => clearTimeout(timer));
   }
   async raise(a: AlertInput): Promise<void> {
+    if (a.severity === "high") return this.raiseHigh(a);
     await this.inner.raise(a);
     if (RANK[a.severity] < RANK.medium) return;
     const key = `${a.profileId}|${a.rule}|${a.message}`;
     const t = this.o.now().getTime();
     const last = this.sent.get(key);
-    if (a.severity !== "high" && last !== undefined && t - last < MAIL_DEDUPE_MS) return;
+    if (last !== undefined && t - last < MAIL_DEDUPE_MS) return;
+    const { mail, done, failed } = this.prepare(a, key, t);
+    // Medium never holds her turn. The dedupe slot is taken at once so a repeat while in flight is not mailed twice.
+    done();
+    this.send(mail).catch((err) => { this.sent.delete(key); failed(err); });
+  }
+  /**
+   * A cry for help: the store write and the mail run independently, so a broken database never stops the mail to the carer.
+   * Throws only when the mail failed — that is what she must be told. A failed store write is logged.
+   */
+  private async raiseHigh(a: AlertInput): Promise<void> {
+    const t = this.o.now().getTime();
+    const { mail, done, failed } = this.prepare(a, `${a.profileId}|${a.rule}|${a.message}`, t);
+    const [stored, mailed] = await Promise.allSettled([
+      Promise.resolve().then(() => this.inner.raise(a)),
+      Promise.resolve().then(() => this.send(mail)),
+    ]);
+    if (stored.status === "rejected") {
+      const err = stored.reason;
+      console.error("[mia] alert store failed (high):", err instanceof Error ? err.message : err);
+    }
+    if (mailed.status === "rejected") { failed(mailed.reason); throw mailed.reason; }
+    done();
+  }
+  private prepare(a: AlertInput, key: string, t: number) {
     const mail = {
       subject: `[Mia] ${a.severity === "high" ? "URGENT: " : ""}${a.message}`,
       text: `${a.message}\n\nRule: ${a.rule}\nSeverity: ${a.severity}\nAt: ${a.at}\n\nSent by Mia (local mode, not production).`,
@@ -48,12 +73,6 @@ export class EmailAlertSink implements AlertSink {
       this.sent.set(key, t);
     };
     const failed = (err: unknown) => console.error(`[mia] alert mail failed (${a.severity}):`, err instanceof Error ? err.message : err);
-    if (a.severity === "high") {
-      try { await this.send(mail); done(); } catch (err) { failed(err); throw err; }
-      return;
-    }
-    // Medium never holds her turn. The dedupe slot is taken at once so a repeat while in flight is not mailed twice.
-    done();
-    this.send(mail).catch((err) => { this.sent.delete(key); failed(err); });
+    return { mail, done, failed };
   }
 }
