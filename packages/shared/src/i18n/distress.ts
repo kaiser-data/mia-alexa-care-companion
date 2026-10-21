@@ -38,6 +38,7 @@ const ALWAYS = [
 const PILL_WORDS = new Set(["pill", "pills", "tablet", "tablets", "medicine", "medicines", "medication", "medications", "meds", "dose", "doses",
   "tablette", "tabletten", "pille", "pillen", "medikament", "medikamente", "medizin", "dosis", "arznei"]);
 const TAKEN_WORDS = new Set(["took", "taken", "swallowed", "had", "genommen", "eingenommen", "geschluckt"]);
+const EN_PRONOUNS = new Set(["them", "it", "those", "these"]);
 const GERMAN_TAKEN = new Set(["genommen", "eingenommen", "geschluckt"]);
 const REPEAT = "zweimal";
 const REPEAT_WORDS = new Set([REPEAT, "twice", "again"]);
@@ -69,6 +70,8 @@ function takenAgainInClause(words: string[]): boolean {
       if (words[t - 1] === REPEAT) return true;
       return repeats.some((r) => r < t && t - r <= DE_SPAN) && pills.some((p) => p < t && t - p <= DE_SPAN);
     }
+    // "I took them again" after the pill talk: the pronoun stands for the pills when the repeat word follows at once.
+    if (EN_PRONOUNS.has(words[t + 1]!) && words[t + 2] !== undefined && REPEAT_WORDS.has(words[t + 2]!)) return true;
     return pills.some((p) => p > t && p - t <= EN_PILL_SPAN) && repeats.some((r) => r > t && r - t <= EN_REPEAT_SPAN);
   });
 }

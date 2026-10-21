@@ -66,3 +66,11 @@ describe("the repeat word must belong to the taking, not to the next clause (fix
   it.each(["i took my pills again today", "i had my pills again this morning"])("accepted false alarm, pinned: %s", (t) =>
     expect(detectDistress(t)).toBe(true));
 });
+
+describe("English pronouns after the pill talk (fixes review I-B)", () => {
+  it.each(["i took them again", "i took it again", "i swallowed them again", "i think i took them again this morning",
+    "Oh, I took them again!", "i already took my pills and now i took them again", "i took my pills already and then i took them again",
+    "i took my pills and then took them again", "I've taken them again"])("%s", (t) => expect(detectDistress(t)).toBe(true));
+  it.each(["should i take them again", "i haven't taken them again", "i took it out again", "i took them to the shop again"])("not: %s", (t) =>
+    expect(detectDistress(t)).toBe(false));
+});
