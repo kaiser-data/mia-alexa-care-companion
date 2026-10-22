@@ -282,3 +282,32 @@ describe("the hold is decided on her whole words (Codex re-review #1)", () => {
     expect((await m.call("get_medication_status")).say).toEqual(["I'm not sure if you had your morning pills yet.", "Let's ask Tom first."]);
   });
 });
+
+describe("the hold belongs to the moment she spoke, not to the mail (Codex re-review #4)", () => {
+  it("reported at 23:59:59, mail done at 00:00:01: the next day's pills are not held", async () => {
+    let m!: Awaited<ReturnType<typeof connect>>;
+    const slowMailer = { send: async () => { m.setNow(at("2026-10-13T00:00:01")); } };
+    m = await connect(at("2026-10-12T23:59:59"), rose(), {}, { mailer: slowMailer });
+    await m.call("report_problem", { what: "I took my pills twice" });
+    const hold = (await m.store.eventsSince("rose", "2026-10-01T00:00:00Z")).find((e) => e.type === "med_hold");
+    expect(hold?.at).toBe(at("2026-10-12T23:59:59").toISOString());
+    expect((await m.store.listAlerts("rose"))[0]!.at).toBe(at("2026-10-12T23:59:59").toISOString());
+    m.setNow(at("2026-10-13T08:05:00"));
+    expect((await m.call("get_medication_status")).say[0]).toBe("Now it's time for your morning pills.");
+  });
+  it("the hold is written while the mail is still on its way", async () => {
+    let m!: Awaited<ReturnType<typeof connect>>;
+    let heldDuringMail = false;
+    const mailer = {
+      send: async () => {
+        for (let i = 0; i < 20 && !heldDuringMail; i++) {
+          heldDuringMail = (await m.store.eventsSince("rose", "2026-10-01T00:00:00Z")).some((e) => e.type === "med_hold");
+          await new Promise((r) => setImmediate(r));
+        }
+      },
+    };
+    m = await connect(at("2026-10-12T08:05:00"), rose(), {}, { mailer });
+    await m.call("report_problem", { what: "I took my pills twice" });
+    expect(heldDuringMail).toBe(true);
+  });
+});

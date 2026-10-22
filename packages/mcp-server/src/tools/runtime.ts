@@ -50,8 +50,9 @@ export function capTextEnd(s: string, n: number): string {
   return Array.from(s).slice(-n).join("");
 }
 
-export async function logEvent(ctx: ToolContext, type: EventType, detail?: Record<string, string>): Promise<void> {
-  await ctx.store.addEvent({ profileId: ctx.profileId, type, at: ctx.now().toISOString(), ...(detail ? { detail } : {}) });
+/** `at` defaults to now; pass the moment she spoke when the event is written after something slow (a mail). */
+export async function logEvent(ctx: ToolContext, type: EventType, detail?: Record<string, string>, at?: string): Promise<void> {
+  await ctx.store.addEvent({ profileId: ctx.profileId, type, at: at ?? ctx.now().toISOString(), ...(detail ? { detail } : {}) });
 }
 
 export function toResult(r: MiaResult): CallToolResult {

@@ -16,6 +16,14 @@ export function registerProblemTools(server: McpServer, ctx: ToolContext): void 
   }, async ({ what: rawWhat }) => {
     // Her last words are where "I fell" is most likely to be.
     const what = rawWhat === undefined ? undefined : capTextEnd(rawWhat, 200);
+    // The moment she spoke: the alert, the hold and the log carry it, however long the mail takes (23:59:59 stays today).
+    const at = ctx.now().toISOString();
+    // Pills taken twice: no dose is prompted for the rest of that day. Started at once, beside the alert: neither waits
+    // for the other. Decided on her whole words: the stored text keeps only the last 200 characters.
+    const hold = rawWhat && detectOverdose(rawWhat)
+      ? Promise.resolve().then(() => logEvent(ctx, "med_hold", { reason: "overdose_report" }, at))
+        .catch((err) => console.error("[mia] medication hold failed:", err))
+      : Promise.resolve();
     // Deliberately not run(): the alert must not depend on reading the profile's event log.
     let p: Profile | null = null;
     try { p = await ctx.store.getProfile(ctx.profileId); } catch (err) { console.error("[mia] distress: profile read failed:", err); }
@@ -26,19 +34,14 @@ export function registerProblemTools(server: McpServer, ctx: ToolContext): void 
       await ctx.alerts.raise({
         profileId: ctx.profileId, rule: "distress", severity: "high",
         message: `${p?.preferredName ?? "Your family member"} asked for help${what ? `: "${what}"` : ""}.`,
-        at: ctx.now().toISOString(),
+        at,
       });
       // Without a mailer the alert is only stored: she is told to call for help, never that the carer knows.
       alerted = ctx.alerts.notifies === true;
       if (!alerted) console.error("[mia] distress alert stored but nobody was told: alert email is off");
     } catch (err) { console.error("[mia] distress alert failed:", err); }
-    // Pills taken twice: no dose is prompted for the rest of the day. Written after the alert, which never waits for it.
-    // Decided on her whole words: the stored text keeps only the last 200 characters, "twice" may be before them.
-    if (rawWhat && detectOverdose(rawWhat)) {
-      await logEvent(ctx, "med_hold", { reason: "overdose_report" })
-        .catch((err) => console.error("[mia] medication hold failed:", err));
-    }
-    await logEvent(ctx, "distress", what ? { what } : undefined)
+    await hold;
+    await logEvent(ctx, "distress", what ? { what } : undefined, at)
       .catch((err) => console.error("[mia] distress log failed:", err));
     // Without a profile there is no carer name to start the follow-up sentence with.
     const say = !alerted ? [T.distressFailed(carer)] : p ? [T.distressAck(carer), T.distressFollow(carer)] : [T.distressAck(carer)];
