@@ -69,6 +69,7 @@ A private profile: `MIA_PROFILE_FILE=.mia-data/<name>.json` (gitignored; same sh
 - Stored data is encrypted with AES-256-GCM using a generated local key (`.mia-data/`, gitignored).
 - All data in this repository is fictional (Rose Whitaker, Tom). A private profile is loaded with `MIA_PROFILE_FILE`, which stays outside git.
 - Mia keeps no transcripts outside the encrypted local store. What Rose says is sent to the model provider you configure. In the browser, speech recognition runs on the browser vendor's service (Chrome/Edge), and on the Echo, Amazon processes the speech. Other outbound calls: Open-Meteo for weather, and Amazon SES for alarm mail when enabled.
+- On AWS, the app and its encrypted database run in Frankfurt (eu-central-1). The model provider, the browser speech service and SES email are outside that server and not limited to the EU by Mia.
 - Health data is treated as GDPR Art. 9 data by design.
 
 ## Limits

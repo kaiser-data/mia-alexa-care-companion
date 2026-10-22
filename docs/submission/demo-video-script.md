@@ -18,7 +18,13 @@ Every line Mia says below is a line the software can say. The sentences come fro
 | Alarm email | start the server with `MIA_ALERT_EMAIL_TO` and `MIA_ALERT_EMAIL_FROM` set (Amazon SES, instance role on AWS). Open Tom's inbox in a second window and keep it ready for scenes 3 and 5. Run locally with AWS credentials for SES exported in the shell (never on screen), or on the Frankfurt EC2 instance (`MIA_PUBLIC_ORIGIN` set). The recipient must be SES-verified while the account is in the sandbox. |
 | Date | **Monday 2026-10-26** is a group day (Rose goes Monday, Tuesday, Thursday). New York is still on summer time on that date (offset `-04:00`; clocks change on 2026-11-01), so the offsets below are right. |
 
-Start command pattern (local):
+Record on the Frankfurt EC2 instance if you can: then the closing slide is true as it stands. Deploy the current build first (`deploy/aws/deploy.sh`). For each take, on the server (the clock starts when `mia` restarts, so restart right before the take):
+
+    printf 'MIA_PROFILE=rose\nMIA_DATA_DIR=.mia-data/take-1a\nMIA_CLOCK_START=2026-10-26T07:59:40-04:00\n' | sudo tee /etc/mia/take.env >/dev/null && sudo systemctl restart mia
+
+then open `https://<ip-dashes>.sslip.io` (basic auth), tap the circle once, and talk. `/etc/mia/take.env` overrides `/etc/mia/mia.env`. After the last take: `sudo rm /etc/mia/take.env && sudo systemctl restart mia`.
+
+Start command pattern (local, if you record on your own machine):
 
     MIA_PROFILE=rose MIA_DATA_DIR=.mia-data/take-1a MIA_CLOCK_START=2026-10-26T07:59:40-04:00 pnpm dev
 
@@ -148,7 +154,9 @@ Slide A (about 8 seconds): the architecture diagram.
                  ->  alarm email        (Amazon SES)
     Runs on one EC2 instance in Frankfurt (eu-central-1), HTTPS by Caddy.
 
-Voice-over: "The Mia server is a real MCP server over Streamable HTTP, built to the documented Alexa Plus client behaviour. The simulator is an MCP client. The language model picks tools and phrase ids and writes nothing. Everything runs on one server on AWS in Frankfurt, and alarms go out through Amazon SES."
+If the takes were recorded locally, the last slide line reads "Also runs on one EC2 instance in Frankfurt (eu-central-1), HTTPS by Caddy."
+
+Voice-over: "The Mia server is a real MCP server over Streamable HTTP, built to the documented Alexa Plus client behaviour. The simulator is an MCP client. The language model picks tools and phrase ids and writes nothing. Mia runs on one server on AWS in Frankfurt, and alarms go out through Amazon SES." If the takes were recorded locally, say instead: "The same build runs on one server on AWS in Frankfurt, and alarms go out through Amazon SES."
 
 Slide B (about 7 seconds), labelled **"Proposal, not current Alexa+ behaviour":**
 

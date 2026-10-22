@@ -12,7 +12,7 @@ Structured as the Devpost rules ask: which tools and for what, what worked, what
 | Model Context Protocol, TypeScript SDK `@modelcontextprotocol/sdk` 1.32.1 | the Mia server (16 tools over Streamable HTTP) and the client inside the simulator |
 | Hackathon pages (rules, FAQ) | requirements; the simulator path |
 | Alexa Skills Kit / Alexa developer console (classic custom skill, de-DE) | a bridge meant to let a German Echo reach Mia (works in the developer console simulator only; Alexa+ Echos refuse in-development skills) |
-| Amazon EC2 (t4g.small, Amazon Linux 2023, encrypted gp3 volume), Elastic IP, IAM instance role | the server in Frankfurt (eu-central-1), no access keys on the box |
+| Amazon EC2 (t4g.small, Amazon Linux 2023, encrypted gp3 volume), Elastic IP, IAM instance role | the server in Frankfurt (eu-central-1), no AWS access keys on the box |
 | Amazon SES (v2 API) | alarm email to the carer for medium and high severity alerts |
 | LLM APIs: Featherless (OpenAI-compatible, `openai/gpt-oss-120b` default) and the Anthropic API (adapter) | choosing a tool and fixed phrase ids; never writing spoken text |
 | Browser Web Speech API (Chrome) | listening and speaking in the simulator |
@@ -69,10 +69,10 @@ Honest scope: this build uses a small set of AWS services, each with a documente
 
 - **Amazon EC2** (t4g.small, Amazon Linux 2023, Frankfurt `eu-central-1`, encrypted gp3 volume) runs the Mia Voice gateway and the embedded Mia MCP server under systemd. Caddy terminates HTTPS and puts basic auth in front of the page and `/api`.
 - **Elastic IP + sslip.io** give a stable HTTPS address without a domain.
-- **IAM instance role** gives the server permission to send mail; there are no access keys on the instance.
+- **IAM instance role** gives the server permission to send mail; there are no AWS access keys on the instance.
 - **Amazon SES (v2 API)**: the alarm channel. Medium and high alerts are stored, then mailed to Tom. The same medium alert is mailed at most once per 6 hours; a cry for help is mailed every time. If a high alert cannot be mailed, the server throws and Mia tells Rose: "I couldn't reach Tom. Please call for help." Subjects look like `[Mia] URGENT: Rose asked for help: "I fell.".`
 - Provisioning and deploy scripts, the Caddyfile and the systemd unit are in `deploy/aws/` in the repository, with a README.
-- Why Frankfurt: Mia treats health data as sensitive personal data from the start (GDPR Art. 9), so the data stays in an EU region.
+- Why Frankfurt: Mia treats health data as sensitive personal data from the start (GDPR Art. 9), so the hosted app and its encrypted database run in an EU region. Three things leave that server: what Rose says and the tool results go to the language model provider (Featherless), speech recognition runs on the browser vendor's service (Chrome), and alarm mail goes through Amazon SES to Tom's mailbox. None of these is limited to the EU by Mia.
 
 What we would add next on AWS: DynamoDB with a customer-managed KMS key in place of local SQLite, Amazon Transcribe and Polly for the voice pipeline, and Bedrock as an optional model provider. They are in the design (`docs/superpowers/specs/2026-10-06-mia-design.md`) and not built.
 
