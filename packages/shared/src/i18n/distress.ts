@@ -26,7 +26,8 @@ const ALWAYS = [
  * Pills taken a second time ("Ich habe heute zweimal meine Tabletten genommen", "I took my pills again"): inside one clause,
  * a past "taken" verb, a repeat word and a pill word in the order each language uses.
  * - German puts the participle last: the repeat word and the pill word come before "genommen"/"eingenommen"/"geschluckt"
- *   ("… sie noch mal genommen": a repeat word right before the participle is enough).
+ *   ("… sie noch mal genommen": a repeat word right before the participle is enough). A repeat word may also follow
+ *   the participle closely when the pills come before it ("Ich habe meine Tabletten genommen, schon wieder").
  * - English puts the verb first: "took/taken/had/swallowed", then the pill word and the repeat word after it.
  * Clauses end at sentence marks, at and/und/but/aber/then/dann/so/also and where a new "I/ich" clause starts, so
  * "Ich habe Tabletten genommen und dann nochmal Tom angerufen" or "I took my pills, I'll check again later" stay quiet.
@@ -44,9 +45,18 @@ const TAKEN_WORDS = new Set(["took", "taken", "swallowed", "had", "genommen", "e
 const EN_PRONOUNS = new Set(["them", "it", "those", "these"]);
 const GERMAN_TAKEN = new Set(["genommen", "eingenommen", "geschluckt"]);
 const REPEAT = "zweimal";
+/** "noch eine (Tablette)" repeats only before the participle: after it, it starts something new ("genommen, noch eine Frage"). */
+const ONE_MORE = "nocheine";
 /** "another"/"extra" count as repeat words only after an English taken-verb ("I took another dose"), never in a plan question. */
-const REPEAT_WORDS = new Set([REPEAT, "twice", "again", "another", "extra"]);
-const REPEAT_PHRASES = /\b(?:a second time|second time|one more time|two times|noch mal|noch einmal|nochmal|nochmals|zum zweiten mal|ein zweites mal|zwei mal|schon wieder|noch eine|noch einen)\b/g;
+const REPEAT_WORDS = new Set([REPEAT, ONE_MORE, "twice", "again", "another", "extra"]);
+const REPEAT_PHRASES = /\b(?:a second time|second time|one more time|two times|once again|all over again|over again|yet again|once more|noch mal|noch einmal|nochmal|nochmals|zum zweiten mal|ein zweites mal|zwei mal|schon wieder)\b/g;
+const ONE_MORE_PHRASES = /\b(?:noch eine|noch einen)\b/g;
+/** Words that may stand between "took them" and the repeat word ("I took them all again", "… by mistake again"). */
+const PRONOUN_FILLERS = new Set(["all", "both", "just", "now", "today", "already", "accidentally", "by", "mistake", "really"]);
+/** German: words that stand for the pills before the participle ("Ich habe sie genommen, noch mal"). */
+const DE_PRONOUNS = new Set(["sie", "die", "es"]);
+/** German: a repeat word this many words after the participle ("… genommen, heute schon wieder"). */
+const DE_AFTER_SPAN = 2;
 const CLAUSE_BREAKS = new Set(["and", "und", "but", "aber", "then", "dann", "so", "also", "i", "i'll", "i'm", "i've", "i'd", "ich"]);
 const isNegation = (w: string | undefined) => w !== undefined && (["not", "never", "nicht", "nie", "kein", "keine"].includes(w) || w.endsWith("n't"));
 /** German: the repeat and pill words are at most this many words before the participle. */
@@ -57,7 +67,7 @@ const EN_REPEAT_SPAN = 6;
 
 function clauses(n: string): string[][] {
   const out: string[][] = [[]];
-  for (const w of n.replace(REPEAT_PHRASES, REPEAT).split(" ")) {
+  for (const w of n.replace(REPEAT_PHRASES, REPEAT).replace(ONE_MORE_PHRASES, ONE_MORE).split(" ")) {
     if (CLAUSE_BREAKS.has(w)) out.push([]);
     else out[out.length - 1]!.push(w);
   }
@@ -71,12 +81,21 @@ function takenAgainInClause(words: string[]): boolean {
   const pills = at(PILL_WORDS);
   return taken.some((t) => {
     if (GERMAN_TAKEN.has(words[t]!)) {
-      if (words[t - 1] === REPEAT) return true;
+      const germanRepeat = (w: string | undefined) => w === REPEAT || w === ONE_MORE;
+      if (germanRepeat(words[t - 1])) return true;
       // German "extra" means "on purpose" ("extra die Tabletten genommen"), so only the German repeat words count here.
-      return repeats.some((r) => r < t && t - r <= DE_SPAN && words[r] === REPEAT) && pills.some((p) => p < t && t - p <= DE_SPAN);
+      if (repeats.some((r) => r < t && t - r <= DE_SPAN && germanRepeat(words[r])) && pills.some((p) => p < t && t - p <= DE_SPAN)) return true;
+      // Repeat said after the participle ("Ich habe meine Tabletten genommen, schon wieder"): the pills (or "sie") come before it.
+      const pillsBefore = words.some((w, i) => i < t && t - i <= DE_SPAN && (PILL_WORDS.has(w) || DE_PRONOUNS.has(w)));
+      return pillsBefore && words.slice(t + 1, t + 1 + DE_AFTER_SPAN).includes(REPEAT);
     }
-    // "I took them again" after the pill talk: the pronoun stands for the pills when the repeat word follows at once.
-    if (EN_PRONOUNS.has(words[t + 1]!) && words[t + 2] !== undefined && REPEAT_WORDS.has(words[t + 2]!)) return true;
+    // "I took them again" after the pill talk: the pronoun stands for the pills when the repeat word follows, at most
+    // after a few filler words ("I took them all again", "… once again"); "I took it out again" stays quiet.
+    if (EN_PRONOUNS.has(words[t + 1]!)) {
+      let i = t + 2;
+      while (i < words.length && PRONOUN_FILLERS.has(words[i]!)) i++;
+      if (words[i] !== undefined && REPEAT_WORDS.has(words[i]!)) return true;
+    }
     return pills.some((p) => p > t && p - t <= EN_PILL_SPAN) && repeats.some((r) => r > t && r - t <= EN_REPEAT_SPAN);
   });
 }

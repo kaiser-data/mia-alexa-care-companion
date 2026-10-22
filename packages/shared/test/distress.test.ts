@@ -89,3 +89,17 @@ describe("English pronouns after the pill talk (fixes review I-B)", () => {
   it.each(["should i take them again", "i haven't taken them again", "zu viele Kekse", "i took it out again", "i took them to the shop again"])("not: %s", (t) =>
     expect(detectDistress(t)).toBe(false));
 });
+
+describe("words between the pronoun or participle and the repeat word (Codex review #1)", () => {
+  it.each([
+    "I took my pills and then took them once again", "I took my pills, then I took them once again", "i took them once again",
+    "i took them all again", "i took them both again", "i took them all over again", "i swallowed them by mistake again", "i took it yet again",
+    "Ich habe meine Tabletten genommen, schon wieder", "ich habe meine tabletten genommen nochmal", "Ich habe die Tabletten genommen, heute schon wieder",
+    "Ich habe sie genommen, noch mal", "ich habe meine pillen eingenommen schon wieder",
+  ])("%s", (t) => expect(detectDistress(t)).toBe(true));
+  it.each([
+    "ich habe meine tabletten genommen noch eine frage", "Ich habe meine Tabletten genommen und dann nochmal Tom angerufen",
+    "i took it out again", "i took them to the shop again", "should i take them once again", "i haven't taken them once again",
+    "Ich habe meine Tabletten genommen. Schon wieder regnet es.",
+  ])("not: %s", (t) => expect(detectDistress(t)).toBe(false));
+});
