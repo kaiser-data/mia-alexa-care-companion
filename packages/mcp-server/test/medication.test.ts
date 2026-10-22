@@ -271,3 +271,14 @@ describe("after a pills-taken-twice alert no dose is prompted that day (Codex #2
     expect(await m.store.listAlerts("rose")).toMatchObject([{ rule: "distress", severity: "high" }]);
   });
 });
+
+describe("the hold is decided on her whole words (Codex re-review #1)", () => {
+  it("a long report that starts with 'I took my pills twice' still holds the pills", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"));
+    const what = `I took my pills twice. ${"And then I sat down in the kitchen and looked out of the window for a while. ".repeat(4)}`;
+    expect(what.length).toBeGreaterThan(300);
+    await m.call("report_problem", { what });
+    expect(await types(m)).toContain("med_hold");
+    expect((await m.call("get_medication_status")).say).toEqual(["I'm not sure if you had your morning pills yet.", "Let's ask Tom first."]);
+  });
+});

@@ -33,7 +33,8 @@ export function registerProblemTools(server: McpServer, ctx: ToolContext): void 
       if (!alerted) console.error("[mia] distress alert stored but nobody was told: alert email is off");
     } catch (err) { console.error("[mia] distress alert failed:", err); }
     // Pills taken twice: no dose is prompted for the rest of the day. Written after the alert, which never waits for it.
-    if (what && detectOverdose(what)) {
+    // Decided on her whole words: the stored text keeps only the last 200 characters, "twice" may be before them.
+    if (rawWhat && detectOverdose(rawWhat)) {
       await logEvent(ctx, "med_hold", { reason: "overdose_report" })
         .catch((err) => console.error("[mia] medication hold failed:", err));
     }
