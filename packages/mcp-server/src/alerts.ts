@@ -17,7 +17,8 @@ export class StoreAlertSink implements AlertSink {
     // A repeat within the mail dedupe window is the same open alert, not a new row per question. A cry for help is always stored.
     if (a.severity !== "high") {
       const t = Date.parse(a.at);
-      const open = await this.store.listAlerts(a.profileId);
+      // A failed read never stops a new alert: it is stored (and mailed) as before.
+      const open = await this.store.listAlerts(a.profileId).catch((err) => { console.error("[mia] alert dedupe read failed:", err); return []; });
       if (open.some((o) => o.state === "open" && o.rule === a.rule && o.message === a.message && t - Date.parse(o.at) < MAIL_DEDUPE_MS)) return;
     }
     await this.store.addAlert(a);

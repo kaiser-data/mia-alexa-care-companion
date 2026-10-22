@@ -375,6 +375,14 @@ describe("unsure doses: one open alert, and no promise without alert email (Code
     expect(new Set((await unsure()).map((a) => a.message)).size).toBe(first.length);
     expect(m.mails.filter((x) => x.subject.includes("not sure"))).toHaveLength(first.length);
   });
+  it("a failed read of past alerts never stops a new one", async () => {
+    const m = await connect(at("2026-10-12T16:31:00"));
+    const listAlerts = m.store.listAlerts.bind(m.store);
+    m.store.listAlerts = async () => { m.store.listAlerts = listAlerts; throw new Error("cannot decrypt an old alert"); };
+    await m.call("request_call");
+    expect(await m.store.listAlerts("rose")).toMatchObject([{ rule: "call_requested" }]);
+    expect(m.mails).toHaveLength(1);
+  });
   it("a cry for help is stored every time", async () => {
     const m = await connect(at("2026-10-12T08:05:00"));
     await m.call("report_problem", { what: "Help" });
