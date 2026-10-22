@@ -36,7 +36,7 @@ describe("templates", () => {
       T.medDue("your morning pills"), T.medIs("the white capsule"), T.medTaken("your morning pills", "five past eight"),
       T.medNextAt("eight o'clock in the evening"), T.medAtAppt("your noon pill", "Maple Grove Day Club"), T.medNoneToday(),
       T.medConfirmed("your morning pills"), T.medAlreadyTaken("your morning pills", "five past eight"), T.noMoreNow(),
-      T.safeAtHome(), T.callOffer(carer), T.callRequested(carer), T.nightIs("ten past three"), T.nightSafe(),
+      T.safeAtHome(), T.callOffer(carer), T.callRequested(carer), T.callNotSent(carer), T.nightIs("ten past three"), T.nightSafe(),
       T.distressAck(carer), T.distressFollow(carer), T.systemError(carer), T.personIs("Tom", "son"), T.healthAsk(), T.askCarerFirst(carer),
     ];
   };

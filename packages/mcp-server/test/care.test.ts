@@ -41,6 +41,15 @@ describe("comfort", () => {
     expect(r.say).toEqual(["I've asked Tom to call you."]);
     expect(await m.store.listAlerts("rose")).toMatchObject([{ rule: "call_requested", severity: "medium", message: "Rose would like a call." }]);
   });
+  it("request_call without alert email: stored, but never 'I've asked Tom' (Codex #4)", async () => {
+    const m = await connect(at("2026-10-12T16:31:00"), rose(), {}, { mailer: null });
+    const r = await m.call("request_call");
+    expect(r.say).toEqual(["I couldn't reach Tom just now."]);
+    expect(r.facts).toEqual({ notified: false });
+    expect(await m.store.listAlerts("rose")).toMatchObject([{ rule: "call_requested", severity: "medium" }]);
+    const de = await connect(at("2026-10-12T16:31:00"), roseDe(), {}, { mailer: null });
+    expect((await de.call("request_call")).say).toEqual(["Ich konnte Tom gerade nicht erreichen."]);
+  });
   it("chat_about_life: speaks the day's life-story topic verbatim, then asks if she remembers", async () => {
     const m = await connect(at("2026-10-14T15:00:00"));
     const r = await m.call("chat_about_life");

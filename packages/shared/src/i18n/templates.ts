@@ -38,6 +38,8 @@ export interface Templates {
   safeAtHome(): string;
   callOffer(carer: string): string;
   callRequested(carer: string): string;
+  /** A call request that could not be sent (no alert email): never claims the carer was asked. */
+  callNotSent(carer: string): string;
   nightIs(time: string): string;
   nightSafe(): string;
   distressAck(carer: string): string;
@@ -96,6 +98,7 @@ const EN: Templates = {
   safeAtHome: () => "You're safe at home.",
   callOffer: (c) => `Shall I ask ${c} to call you?`,
   callRequested: (c) => `I've asked ${c} to call you.`,
+  callNotSent: (c) => `I couldn't reach ${c} just now.`,
   nightIs: (t) => `It's ${t}, in the middle of the night.`,
   nightSafe: () => "You're safe at home. You can go back to sleep.",
   distressAck: (c) => `I've let ${c} know right away.`,
@@ -154,6 +157,7 @@ const DE: Templates = {
   safeAtHome: () => "Du bist sicher zu Hause.",
   callOffer: (c) => `Soll ich ${c} um einen Anruf bitten?`,
   callRequested: (c) => `Ich habe ${c} um einen Anruf gebeten.`,
+  callNotSent: (c) => `Ich konnte ${c} gerade nicht erreichen.`,
   nightIs: (t) => `Es ist ${t}, mitten in der Nacht.`,
   nightSafe: () => "Du bist sicher zu Hause. Du kannst weiterschlafen.",
   distressAck: (c) => `Ich habe ${c} sofort Bescheid gegeben.`,
