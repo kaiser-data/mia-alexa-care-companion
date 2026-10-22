@@ -1,7 +1,7 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import { detectOverdose, templates, type Profile } from "@mia/shared";
-import { capTextEnd, logEvent, OUTPUT_SHAPE, toResult, type ToolContext } from "./runtime";
+import { capTextEnd, logEvent, OUTPUT_SHAPE, toResult, writeHold, type ToolContext } from "./runtime";
 
 export function registerProblemTools(server: McpServer, ctx: ToolContext): void {
   server.registerTool("report_problem", {
@@ -21,8 +21,7 @@ export function registerProblemTools(server: McpServer, ctx: ToolContext): void 
     // Pills taken twice: no dose is prompted for the rest of that day. Started at once, beside the alert: neither waits
     // for the other. Decided on her whole words: the stored text keeps only the last 200 characters.
     const hold = rawWhat && detectOverdose(rawWhat)
-      ? Promise.resolve().then(() => logEvent(ctx, "med_hold", { reason: "overdose_report" }, at))
-        .catch((err) => console.error("[mia] medication hold failed:", err))
+      ? Promise.resolve().then(() => writeHold(ctx, at))
       : Promise.resolve();
     // Deliberately not run(): the alert must not depend on reading the profile's event log.
     let p: Profile | null = null;

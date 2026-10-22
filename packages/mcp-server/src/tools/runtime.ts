@@ -55,6 +55,27 @@ export async function logEvent(ctx: ToolContext, type: EventType, detail?: Recor
   await ctx.store.addEvent({ profileId: ctx.profileId, type, at: at ?? ctx.now().toISOString(), ...(detail ? { detail } : {}) });
 }
 
+/** Pill holds whose write failed, per store: they still hold the pills and are written on the next read (fail closed). */
+const pendingHolds = new WeakMap<Store, CareEvent[]>();
+
+/** Pills taken twice: no dose is prompted for the rest of that day. A failed write is kept in memory, never dropped. */
+export async function writeHold(ctx: ToolContext, at: string): Promise<void> {
+  const e: CareEvent = { profileId: ctx.profileId, type: "med_hold", at, detail: { reason: "overdose_report" } };
+  try { await ctx.store.addEvent(e); } catch (err) {
+    console.error("[mia] medication hold not written, kept in memory:", err);
+    pendingHolds.set(ctx.store, [...(pendingHolds.get(ctx.store) ?? []), e]);
+  }
+}
+
+/** The event log since `since`, with any unwritten holds; each one is written again first. */
+export async function readEvents(ctx: ToolContext, since: string): Promise<CareEvent[]> {
+  const pending = pendingHolds.get(ctx.store);
+  pendingHolds.delete(ctx.store);
+  for (const e of pending ?? []) await writeHold({ ...ctx, profileId: e.profileId }, e.at);
+  const unwritten = (pendingHolds.get(ctx.store) ?? []).filter((e) => e.profileId === ctx.profileId && e.at >= since);
+  return [...await ctx.store.eventsSince(ctx.profileId, since), ...unwritten];
+}
+
 export function toResult(r: MiaResult): CallToolResult {
   return {
     content: [{ type: "text", text: r.say.length ? r.say.join(" ") : (r.text ?? "") }],
@@ -72,7 +93,7 @@ export async function run(
     profile = await ctx.store.getProfile(ctx.profileId);
     if (!profile) throw new Error(`profile ${ctx.profileId} not found`);
     const since = new Date(ctx.now().getTime() - LOOKBACK_MS).toISOString();
-    const result = await fn(profile, await ctx.store.eventsSince(ctx.profileId, since));
+    const result = await fn(profile, await readEvents(ctx, since));
     if (opts.remember !== false && result.say.length) await ctx.store.setLastSay(ctx.profileId, result.say);
     return toResult(result);
   } catch (err) {

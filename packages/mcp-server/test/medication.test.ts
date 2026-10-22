@@ -5,6 +5,8 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { rose, roseDe } from "@mia/shared";
 import { at } from "@mia/shared/testing";
+import { StoreAlertSink } from "../src/alerts";
+import { nextProactive } from "../src/proactive";
 import { LocalAesCipher } from "../src/store/crypto";
 import { SqliteStore } from "../src/store/sqliteStore";
 import { connect } from "./helpers";
@@ -280,6 +282,45 @@ describe("the hold is decided on her whole words (Codex re-review #1)", () => {
     await m.call("report_problem", { what });
     expect(await types(m)).toContain("med_hold");
     expect((await m.call("get_medication_status")).say).toEqual(["I'm not sure if you had your morning pills yet.", "Let's ask Tom first."]);
+  });
+});
+
+describe("a hold that cannot be written still blocks the pills (Codex re-review #2)", () => {
+  const failHolds = (m: Awaited<ReturnType<typeof connect>>) => {
+    const addEvent = m.store.addEvent.bind(m.store);
+    const state = { failing: true };
+    m.store.addEvent = async (e) => { if (state.failing && e.type === "med_hold") throw new Error("disk full"); await addEvent(e); };
+    return state;
+  };
+  const ctxOf = (m: Awaited<ReturnType<typeof connect>>, now: Date) =>
+    ({ store: m.store, profileId: "rose", now: () => now, alerts: new StoreAlertSink(m.store) });
+
+  it("the alert goes out, the pill tool and the proactive prompt still ask Tom first all day", async () => {
+    const m = await connect(at("2026-10-12T07:55:00"));
+    failHolds(m);
+    expect((await m.call("report_problem", { what: "I took my pills twice" })).facts.alerted).toBe(true);
+    expect(m.mails).toHaveLength(1);
+    m.setNow(at("2026-10-12T08:05:00"));
+    expect((await m.call("get_medication_status")).say).toEqual(["I'm not sure if you had your morning pills yet.", "Let's ask Tom first."]);
+    expect(await nextProactive(ctxOf(m, at("2026-10-12T08:05:00")))).toBeNull();
+    m.setNow(at("2026-10-12T20:05:00"));
+    expect((await m.call("get_medication_status")).say.join(" ")).not.toContain("time for your");
+    expect(await nextProactive(ctxOf(m, at("2026-10-12T20:05:00")))).toBeNull();
+    m.setNow(at("2026-10-13T08:05:00"));
+    expect((await m.call("get_medication_status")).say[0]).toBe("Now it's time for your morning pills.");
+  });
+  it("the hold is written on the next pill question once the database works again", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"));
+    const state = failHolds(m);
+    await m.call("report_problem", { what: "I took my pills twice" });
+    expect(await types(m)).not.toContain("med_hold");
+    state.failing = false;
+    await m.call("get_medication_status");
+    const holds = (await m.store.eventsSince("rose", "2026-10-01T00:00:00Z")).filter((e) => e.type === "med_hold");
+    expect(holds.map((e) => e.at)).toEqual([at("2026-10-12T08:05:00").toISOString()]);
+    m.setNow(at("2026-10-12T08:10:00"));
+    await m.call("get_medication_status");
+    expect((await types(m)).filter((t) => t === "med_hold")).toHaveLength(1);
   });
 });
 
