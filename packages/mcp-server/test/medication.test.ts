@@ -352,3 +352,42 @@ describe("the hold belongs to the moment she spoke, not to the mail (Codex re-re
     expect(heldDuringMail).toBe(true);
   });
 });
+
+describe("unsure doses: one open alert, and no promise without alert email (Codex re-review #6, #7)", () => {
+  it("five unsure questions store one open alert and send one mail per held dose", async () => {
+    const m = await connect(at("2026-10-12T07:55:00"));
+    await m.call("report_problem", { what: "I took my pills twice" });
+    m.setNow(at("2026-10-12T08:05:00"));
+    const unsure = async () => (await m.store.listAlerts("rose")).filter((a) => a.rule === "med_unsure");
+    await m.call("get_medication_status");
+    const first = await unsure();
+    expect(first.length).toBeGreaterThan(0);
+    for (let i = 0; i < 4; i++) await m.call("get_medication_status");
+    expect(await unsure()).toHaveLength(first.length);
+    expect(new Set((await unsure()).map((a) => a.message)).size).toBe(first.length);
+    expect(m.mails.filter((x) => x.subject.includes("not sure"))).toHaveLength(first.length);
+  });
+  it("a cry for help is stored every time", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"));
+    await m.call("report_problem", { what: "Help" });
+    await m.call("report_problem", { what: "Help" });
+    expect((await m.store.listAlerts("rose")).filter((a) => a.rule === "distress")).toHaveLength(2);
+  });
+  it("without alert email, 'I took my pills' during a hold is noted and asks Tom first, never 'I'll tell Tom'", async () => {
+    for (const [profile, want] of [
+      [rose(), ["Thank you. I've written that down.", "Let's ask Tom first."]],
+      [roseDe(), ["Danke. Ich habe es aufgeschrieben.", "Wir fragen zuerst Tom."]],
+    ] as const) {
+      const m = await connect(at("2026-10-12T07:55:00"), profile, {}, { mailer: null });
+      await m.call("report_problem", { what: "I took my pills twice" });
+      m.setNow(at("2026-10-12T08:05:00"));
+      expect((await m.call("confirm_medication")).say).toEqual(want);
+    }
+  });
+  it("with alert email the self-report still says Tom will be told", async () => {
+    const m = await connect(at("2026-10-12T07:55:00"));
+    await m.call("report_problem", { what: "I took my pills twice" });
+    m.setNow(at("2026-10-12T08:05:00"));
+    expect((await m.call("confirm_medication")).say).toEqual(["Thank you. I'll tell Tom."]);
+  });
+});

@@ -33,6 +33,8 @@ export interface Templates {
   medNoneToday(): string;
   medConfirmed(names: string): string;
   medEarlyNoted(carer: string): string;
+  /** A self-report noted without alert email: never claims the carer will be told; always followed by askCarerFirst. */
+  medNoted(): string;
   medAlreadyTaken(name: string, time: string): string;
   noMoreNow(): string;
   safeAtHome(): string;
@@ -93,6 +95,7 @@ const EN: Templates = {
   medNoneToday: () => "There are no more pills today.",
   medConfirmed: (n) => `Thank you. I've noted ${n}.`,
   medEarlyNoted: (c) => `Thank you. I'll tell ${c}.`,
+  medNoted: () => "Thank you. I've written that down.",
   medAlreadyTaken: (n, t) => `You took ${n} at ${t}.`,
   noMoreNow: () => "No more pills needed now.",
   safeAtHome: () => "You're safe at home.",
@@ -152,6 +155,7 @@ const DE: Templates = {
   medNoneToday: () => "Heute sind keine Tabletten mehr dran.",
   medConfirmed: (n) => `Danke. Ich habe ${n} notiert.`,
   medEarlyNoted: (c) => `Danke. Ich sage es ${c}.`,
+  medNoted: () => "Danke. Ich habe es aufgeschrieben.",
   medAlreadyTaken: (n, t) => `Du hast ${n} um ${t} genommen.`,
   noMoreNow: () => "Jetzt brauchst du keine mehr.",
   safeAtHome: () => "Du bist sicher zu Hause.",

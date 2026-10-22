@@ -32,6 +32,12 @@ async function flagUnsure(ctx: ToolContext, p: Profile, doses: DoseStatus[], ext
   }
 }
 
+/** A self-report the carer checks. Without alert email it is only stored: never say the carer will be told. */
+const earlyNoted = (ctx: ToolContext, p: Profile) => {
+  const T = templates(p.locale);
+  return ctx.alerts.notifies === true ? [T.medEarlyNoted(p.carerName)] : [T.medNoted(), T.askCarerFirst(p.carerName)];
+};
+
 export function registerMedicationTools(server: McpServer, ctx: ToolContext): void {
   server.registerTool("get_medication_status", {
     title: "Did I take my pills",
@@ -96,7 +102,7 @@ export function registerMedicationTools(server: McpServer, ctx: ToolContext): vo
       // The carer checks unsure doses; a self-report may have meant another dose.
       await flagUnsure(ctx, p, unsure, due.length ? undefined : { selfReported: "true" });
       // A self-report for unsure doses is not read back as a list; the carer checks it.
-      const say = due.length ? [T.medConfirmed(names(due, p))] : [T.medEarlyNoted(p.carerName)];
+      const say = due.length ? [T.medConfirmed(names(due, p))] : earlyNoted(ctx, p);
       return { facts: { confirmed: toConfirm.map((d) => d.medicationId) }, say, verbatim: true };
     }
     // Close to the next dose time a "yes, I took it" may be a real early dose — also after an earlier dose today.
@@ -104,7 +110,7 @@ export function registerMedicationTools(server: McpServer, ctx: ToolContext): vo
     if (next && toMinutes(next.time) - nowMinutes <= OVERDUE_MINUTES) {
       await logEvent(ctx, "med_not_due_attempt", { medicationId: next.medicationId, doseTime: next.time });
       await flagUnsure(ctx, p, [next], { reason: "early_report", selfReported: "true" });
-      return { facts: { notDue: true, earlyNoted: true }, say: [T.medEarlyNoted(p.carerName)], verbatim: true };
+      return { facts: { notDue: true, earlyNoted: true }, say: earlyNoted(ctx, p), verbatim: true };
     }
     if (taken.length) {
       const last = taken.at(-1)!;
