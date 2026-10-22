@@ -16,9 +16,19 @@ function split(s: DoseStatus[]) {
 
 const facts = (s: DoseStatus[]) => ({ doses: s.map(({ medicationId, name, time, state, takenAt }) => ({ medicationId, name, time, state, takenAt: takenAt ?? null })) });
 
-async function flagUnsure(ctx: ToolContext, doses: DoseStatus[], extra?: Record<string, string>) {
+/**
+ * Logs each unsure dose and flags the carer with a medium alert. The message names profile, date and dose, so the
+ * alert sink's 6 h medium dedupe mails each dose once however often she asks. A failed alert never stops her answer.
+ */
+async function flagUnsure(ctx: ToolContext, p: Profile, doses: DoseStatus[], extra?: Record<string, string>) {
+  const date = localParts(ctx.now(), p.timezone).date;
   for (const d of doses) {
     await logEvent(ctx, "med_unsure", { medicationId: d.medicationId, doseTime: d.time, ...(d.unsureReason ? { reason: d.unsureReason } : {}), ...extra });
+    await ctx.alerts.raise({
+      profileId: p.id, rule: "med_unsure", severity: "medium",
+      message: `${p.preferredName}: not sure whether ${d.medicationId} (${d.time}) on ${date} was taken${d.unsureReason ? ` (${d.unsureReason})` : ""}. Please check.`,
+      at: ctx.now().toISOString(),
+    }).catch((err) => console.error("[mia] med_unsure alert failed:", err));
   }
 }
 
@@ -38,12 +48,12 @@ export function registerMedicationTools(server: McpServer, ctx: ToolContext): vo
     await logEvent(ctx, "med_asked");
     let say: string[];
     if (due.length) {
-      await flagUnsure(ctx, unsure);
+      await flagUnsure(ctx, p, unsure);
       // A due dose never opens with "Not yet": it reads as "don't take it". Only an earlier dose today is named first.
       const lead = taken.length ? [T.medTaken(taken.at(-1)!.name, timeWords(taken.at(-1)!.takenAt!, p.locale))] : [];
       say = [...lead, T.medDue(names(due, p)), T.medIs(joinList(due.map((d) => d.description), p.locale))];
     } else if (unsure.length) {
-      await flagUnsure(ctx, unsure);
+      await flagUnsure(ctx, p, unsure);
       // Name only the earliest unsure dose: two names make the sentence too long to follow. The carer is told about all of them.
       say = [T.medUnsure(names(unsure.slice(0, 1), p)), T.askCarerFirst(p.carerName)];
     } else if (taken.length) {
@@ -84,7 +94,7 @@ export function registerMedicationTools(server: McpServer, ctx: ToolContext): vo
     if (toConfirm.length || held) {
       for (const d of toConfirm) await logEvent(ctx, "med_confirmed", { medicationId: d.medicationId, doseTime: d.time });
       // The carer checks unsure doses; a self-report may have meant another dose.
-      await flagUnsure(ctx, unsure, due.length ? undefined : { selfReported: "true" });
+      await flagUnsure(ctx, p, unsure, due.length ? undefined : { selfReported: "true" });
       // A self-report for unsure doses is not read back as a list; the carer checks it.
       const say = due.length ? [T.medConfirmed(names(due, p))] : [T.medEarlyNoted(p.carerName)];
       return { facts: { confirmed: toConfirm.map((d) => d.medicationId) }, say, verbatim: true };
@@ -93,7 +103,7 @@ export function registerMedicationTools(server: McpServer, ctx: ToolContext): vo
     const next = upcoming[0];
     if (next && toMinutes(next.time) - nowMinutes <= OVERDUE_MINUTES) {
       await logEvent(ctx, "med_not_due_attempt", { medicationId: next.medicationId, doseTime: next.time });
-      await flagUnsure(ctx, [next], { reason: "early_report", selfReported: "true" });
+      await flagUnsure(ctx, p, [next], { reason: "early_report", selfReported: "true" });
       return { facts: { notDue: true, earlyNoted: true }, say: [T.medEarlyNoted(p.carerName)], verbatim: true };
     }
     if (taken.length) {

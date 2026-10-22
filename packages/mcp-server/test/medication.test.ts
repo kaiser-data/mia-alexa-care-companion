@@ -199,6 +199,25 @@ describe("early self-report after an earlier dose was taken", () => {
   });
 });
 
+describe("an unsure dose flags Tom with a medium alert (Codex #5)", () => {
+  it("overdue and unconfirmed: one medium alert mailed, repeated questions are not mailed again", async () => {
+    const m = await connect(at("2026-10-14T10:30:00"));
+    expect((await m.call("get_medication_status")).say).toEqual(["I'm not sure if you had your morning pills yet.", "Let's ask Tom first."]);
+    await m.call("get_medication_status");
+    m.setNow(at("2026-10-14T11:00:00"));
+    await m.call("get_medication_status");
+    const alerts = await m.store.listAlerts("rose");
+    expect(alerts[0]).toMatchObject({ rule: "med_unsure", severity: "medium" });
+    expect(alerts[0]!.message).toContain("morning-pills");
+    expect(m.mails.map((x) => x.subject)).toHaveLength(1);
+  });
+  it("a broken alert store does not stop the answer", async () => {
+    const m = await connect(at("2026-10-14T10:30:00"));
+    m.store.addAlert = async () => { throw new Error("disk full"); };
+    expect((await m.call("get_medication_status")).say).toEqual(["I'm not sure if you had your morning pills yet.", "Let's ask Tom first."]);
+  });
+});
+
 describe("after a pills-taken-twice alert no dose is prompted that day (Codex #2)", () => {
   it("08:05 'I took my pills twice' → the pill tool asks Tom first, never 'Now it's time'", async () => {
     const m = await connect(at("2026-10-12T08:05:00"));
