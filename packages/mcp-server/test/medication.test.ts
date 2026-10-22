@@ -309,6 +309,14 @@ describe("a hold that cannot be written still blocks the pills (Codex re-review 
     m.setNow(at("2026-10-13T08:05:00"));
     expect((await m.call("get_medication_status")).say[0]).toBe("Now it's time for your morning pills.");
   });
+  it("two questions at the same moment both still ask Tom first", async () => {
+    const m = await connect(at("2026-10-12T07:55:00"));
+    failHolds(m);
+    await m.call("report_problem", { what: "I took my pills twice" });
+    m.setNow(at("2026-10-12T08:05:00"));
+    const both = await Promise.all([m.call("get_medication_status"), m.call("get_medication_status")]);
+    for (const r of both) expect(r.say).toEqual(["I'm not sure if you had your morning pills yet.", "Let's ask Tom first."]);
+  });
   it("the hold is written on the next pill question once the database works again", async () => {
     const m = await connect(at("2026-10-12T08:05:00"));
     const state = failHolds(m);

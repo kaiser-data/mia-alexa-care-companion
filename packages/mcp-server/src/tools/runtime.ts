@@ -67,11 +67,16 @@ export async function writeHold(ctx: ToolContext, at: string): Promise<void> {
   }
 }
 
-/** The event log since `since`, with any unwritten holds; each one is written again first. */
+/**
+ * The event log since `since`, with any unwritten holds; each one is written again first. A hold leaves the pending list
+ * only once written, so a concurrent read always sees it (at worst it is written twice, which holds the same).
+ */
 export async function readEvents(ctx: ToolContext, since: string): Promise<CareEvent[]> {
-  const pending = pendingHolds.get(ctx.store);
-  pendingHolds.delete(ctx.store);
-  for (const e of pending ?? []) await writeHold({ ...ctx, profileId: e.profileId }, e.at);
+  for (const e of pendingHolds.get(ctx.store) ?? []) {
+    try { await ctx.store.addEvent(e); } catch { continue; }
+    const left = (pendingHolds.get(ctx.store) ?? []).filter((x) => x !== e);
+    if (left.length) pendingHolds.set(ctx.store, left); else pendingHolds.delete(ctx.store);
+  }
   const unwritten = (pendingHolds.get(ctx.store) ?? []).filter((e) => e.profileId === ctx.profileId && e.at >= since);
   return [...await ctx.store.eventsSince(ctx.profileId, since), ...unwritten];
 }
