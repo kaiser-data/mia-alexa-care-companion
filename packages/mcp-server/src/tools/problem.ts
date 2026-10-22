@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import { templates, type Profile } from "@mia/shared";
+import { detectOverdose, templates, type Profile } from "@mia/shared";
 import { capTextEnd, logEvent, OUTPUT_SHAPE, toResult, type ToolContext } from "./runtime";
 
 export function registerProblemTools(server: McpServer, ctx: ToolContext): void {
@@ -30,6 +30,11 @@ export function registerProblemTools(server: McpServer, ctx: ToolContext): void 
       });
       alerted = true;
     } catch (err) { console.error("[mia] distress alert failed:", err); }
+    // Pills taken twice: no dose is prompted for the rest of the day. Written after the alert, which never waits for it.
+    if (what && detectOverdose(what)) {
+      await logEvent(ctx, "med_hold", { reason: "overdose_report" })
+        .catch((err) => console.error("[mia] medication hold failed:", err));
+    }
     await logEvent(ctx, "distress", what ? { what } : undefined)
       .catch((err) => console.error("[mia] distress log failed:", err));
     // Without a profile there is no carer name to start the follow-up sentence with.

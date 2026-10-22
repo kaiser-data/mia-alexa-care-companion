@@ -86,6 +86,8 @@ export interface Profile {
 export const EVENT_TYPES = [
   "orientation_asked", "left_home", "arrived_home", "stayed_home",
   "med_asked", "med_confirmed", "med_duplicate_attempt", "med_not_due_attempt", "med_unsure",
+  // After a pills-taken-twice alert: no dose is prompted for the rest of that day (the carer is asked first).
+  "med_hold",
   "anxious", "night_awake", "person_asked", "lonely", "call_requested",
   "distress", "repeat_asked", "unknown_question", "proactive_spoken", "music_played",
 ] as const;

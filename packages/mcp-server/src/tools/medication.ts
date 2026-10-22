@@ -1,5 +1,5 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { doseStatuses, joinList, localParts, OVERDUE_MINUTES, templates, timeWords, toMinutes, type DoseStatus, type Profile } from "@mia/shared";
+import { doseStatuses, DUE_WINDOW_MINUTES, joinList, localParts, OVERDUE_MINUTES, templates, timeWords, toMinutes, type DoseStatus, type Profile } from "@mia/shared";
 import { logEvent, OUTPUT_SHAPE, run, type MiaResult, type ToolContext } from "./runtime";
 
 const names = (doses: DoseStatus[], p: Profile) => joinList([...new Set(doses.map((d) => d.name))], p.locale);
@@ -75,9 +75,13 @@ export function registerMedicationTools(server: McpServer, ctx: ToolContext): vo
     const T = templates(p.locale);
     const s = doseStatuses(p, events, ctx.now());
     const { due, taken, upcoming, unsure } = split(s);
+    const nowMinutes = localParts(ctx.now(), p.timezone).minutes;
     // A self-report of an unsure dose is recorded: recording can only prevent a second dose.
-    const toConfirm = due.length ? due : unsure;
-    if (toConfirm.length) {
+    // Under a hold only doses whose time has come are recorded: a later dose is not marked as taken in the morning.
+    const held = unsure.some((d) => d.unsureReason === "hold");
+    const toConfirm = due.length ? due
+      : unsure.filter((d) => d.unsureReason !== "hold" || toMinutes(d.time) - DUE_WINDOW_MINUTES <= nowMinutes);
+    if (toConfirm.length || held) {
       for (const d of toConfirm) await logEvent(ctx, "med_confirmed", { medicationId: d.medicationId, doseTime: d.time });
       // The carer checks unsure doses; a self-report may have meant another dose.
       await flagUnsure(ctx, unsure, due.length ? undefined : { selfReported: "true" });
@@ -87,7 +91,6 @@ export function registerMedicationTools(server: McpServer, ctx: ToolContext): vo
     }
     // Close to the next dose time a "yes, I took it" may be a real early dose — also after an earlier dose today.
     const next = upcoming[0];
-    const nowMinutes = localParts(ctx.now(), p.timezone).minutes;
     if (next && toMinutes(next.time) - nowMinutes <= OVERDUE_MINUTES) {
       await logEvent(ctx, "med_not_due_attempt", { medicationId: next.medicationId, doseTime: next.time });
       await flagUnsure(ctx, [next], { reason: "early_report", selfReported: "true" });

@@ -1,6 +1,12 @@
+import { randomBytes } from "node:crypto";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { roseDe } from "@mia/shared";
+import { rose, roseDe } from "@mia/shared";
 import { at } from "@mia/shared/testing";
+import { LocalAesCipher } from "../src/store/crypto";
+import { SqliteStore } from "../src/store/sqliteStore";
 import { connect } from "./helpers";
 
 const types = async (m: Awaited<ReturnType<typeof connect>>) =>
@@ -190,5 +196,59 @@ describe("early self-report after an earlier dose was taken", () => {
     await m.call("confirm_medication");
     m.setNow(at("2026-10-14T08:07:00"));
     expect((await m.call("confirm_medication")).say).toEqual(["You took your morning pills at five past eight.", "No more pills needed now."]);
+  });
+});
+
+describe("after a pills-taken-twice alert no dose is prompted that day (Codex #2)", () => {
+  it("08:05 'I took my pills twice' → the pill tool asks Tom first, never 'Now it's time'", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"));
+    await m.call("report_problem", { what: "I took my pills twice" });
+    m.setNow(at("2026-10-12T08:06:00"));
+    const r = await m.call("get_medication_status");
+    expect(r.say).toEqual(["I'm not sure if you had your morning pills yet.", "Let's ask Tom first."]);
+    m.setNow(at("2026-10-12T20:05:00"));
+    expect((await m.call("get_medication_status")).say.join(" ")).not.toContain("time for your");
+  });
+  it("German", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"), roseDe());
+    await m.call("report_problem", { what: "Ich habe meine Tabletten genommen, schon wieder" });
+    expect((await m.call("get_medication_status")).say).toEqual(["Ich weiß nicht sicher, ob du deine Morgentabletten schon hattest.", "Wir fragen zuerst Tom."]);
+  });
+  it("'I took my pills' under the hold records only doses already due and says Tom is told", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"));
+    await m.call("report_problem", { what: "I took them again" });
+    const r = await m.call("confirm_medication");
+    expect(r.say).toEqual(["Thank you. I'll tell Tom."]);
+    const confirmed = (await m.store.eventsSince("rose", "2026-10-01T00:00:00Z")).filter((e) => e.type === "med_confirmed");
+    expect(confirmed.map((e) => e.detail?.medicationId)).toEqual(["morning-pills"]);
+  });
+  it("a fall does not hold the pills", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"));
+    await m.call("report_problem", { what: "I fell" });
+    expect((await m.call("get_medication_status")).say[0]).toBe("Now it's time for your morning pills.");
+  });
+  it("the hold is in the database: it survives a restart and ends the next day", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "mia-hold-"));
+    const key = randomBytes(32);
+    const open = () => new SqliteStore(join(dir, "mia.db"), new LocalAesCipher(key));
+    const first = open();
+    await first.putProfile(rose());
+    const m = await connect(at("2026-10-12T08:05:00"), rose(), { store: first });
+    await m.call("report_problem", { what: "I took my pills twice" });
+    first.close();
+    const second = open();
+    const again = await connect(at("2026-10-12T08:30:00"), rose(), { store: second });
+    expect((await again.call("get_medication_status")).say).toEqual(["I'm not sure if you had your morning pills yet.", "Let's ask Tom first."]);
+    again.setNow(at("2026-10-13T08:05:00"));
+    expect((await again.call("get_medication_status")).say[0]).toBe("Now it's time for your morning pills.");
+    second.close();
+  });
+  it("the alert goes out even when the hold cannot be written", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"));
+    const addEvent = m.store.addEvent.bind(m.store);
+    m.store.addEvent = async (e) => { if (e.type === "med_hold") throw new Error("disk full"); await addEvent(e); };
+    const r = await m.call("report_problem", { what: "I took my pills twice" });
+    expect(r.facts.alerted).toBe(true);
+    expect(await m.store.listAlerts("rose")).toMatchObject([{ rule: "distress", severity: "high" }]);
   });
 });

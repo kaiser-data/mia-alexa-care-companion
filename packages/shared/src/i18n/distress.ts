@@ -11,7 +11,9 @@ const ALWAYS = [
   "gestürzt", "hingefallen", "umgefallen", "bin gefallen", "ausgerutscht", "komme nicht hoch", "komme nicht mehr hoch",
   "kann nicht aufstehen", "kann nicht mehr aufstehen", "keine luft", "weh", "schmerzen",
   "notarzt", "krankenwagen", "notfall", "blute", "blutet", "hilfe holen",
-  // Too many or the wrong pills is a possible emergency, never a question for the pill tool.
+];
+/** Too many or the wrong pills is a possible emergency, never a question for the pill tool. */
+const OVERDOSE = [
   "too many pills", "too many tablets", "took too many", "double dose", "overdose", "wrong pills",
   "pills twice", "tablets twice", "took them twice", "took it twice",
   "tablet twice", "medication twice", "medicine twice", "taken them twice", "taken it twice", "pills two times", "tablets two times",
@@ -121,12 +123,22 @@ function normalise(text: string): string {
     .trim();
 }
 
+const phraseIn = (n: string) => {
+  const padded = ` ${n} `;
+  return (phrase: string) => padded.includes(` ${phrase} `);
+};
+
+/** Too many, the wrong or the same pills again: after this alert no dose is prompted that day. */
+export function detectOverdose(text: string): boolean {
+  const n = normalise(text);
+  return n !== "" && (OVERDOSE.some(phraseIn(n)) || takenAgain(text));
+}
+
 export function detectDistress(text: string): boolean {
   const n = normalise(text);
   if (!n) return false;
-  const padded = ` ${n} `;
-  const has = (phrase: string) => padded.includes(` ${phrase} `);
-  if (ALWAYS.some(has) || takenAgain(text)) return true;
+  const has = phraseIn(n);
+  if (ALWAYS.some(has) || detectOverdose(text)) return true;
   const words = n.split(" ");
   if (OPENING_CRY.includes(words[0]!) && words[1] !== "me") return true;
   return words.length <= SHORT_UTTERANCE_WORDS && SHORT_ONLY.some(has);
