@@ -14,6 +14,12 @@ export class StoreAlertSink implements AlertSink {
   readonly notifies = false;
   constructor(private readonly store: Store) {}
   async raise(a: AlertInput): Promise<void> {
+    // A repeat within the mail dedupe window is the same open alert, not a new row per question. A cry for help is always stored.
+    if (a.severity !== "high") {
+      const t = Date.parse(a.at);
+      const open = await this.store.listAlerts(a.profileId);
+      if (open.some((o) => o.state === "open" && o.rule === a.rule && o.message === a.message && t - Date.parse(o.at) < MAIL_DEDUPE_MS)) return;
+    }
     await this.store.addAlert(a);
   }
 }
