@@ -118,3 +118,15 @@ describe("ordinary modifiers inside the medication clause still alarm (Codex re-
     "Ich habe meine Tabletten leider nicht noch mal genommen", "I haven't actually taken them again", "Ich habe heute leider wieder meine Tabletten genommen",
   ])("not: %s", (t) => expect(detectDistress(t)).toBe(false));
 });
+
+describe("repeated thanks is not a repeated dose (Codex re-review #5)", () => {
+  it.each([
+    "Ich habe meine Tabletten genommen, noch mal danke", "Ich habe meine Tabletten genommen, nochmal danke",
+    "Ich habe meine Tabletten genommen, noch mal vielen Dank", "Ich habe meine Tabletten genommen, danke nochmal",
+    "Ich habe meine Tabletten genommen, nochmals danke", "Ich habe sie genommen, noch einmal herzlichen Dank",
+    "I took my pills, thanks again", "I took my pills, thank you again", "I took my pills, thank you so much again",
+    "I took them, thanks again",
+  ])("not: %s", (t) => expect(detectDistress(t)).toBe(false));
+  it.each(["Ich habe meine Tabletten genommen, noch mal", "Ich habe meine Tabletten genommen, schon wieder, danke", "I took my pills again, thanks",
+    "I took them again, thank you"])("still alarms: %s", (t) => expect(detectDistress(t)).toBe(true));
+});

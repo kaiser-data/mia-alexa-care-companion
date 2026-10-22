@@ -81,9 +81,20 @@ const MODIFIERS = new RegExp(`(?<![\\p{L}'])(?:${[
   "glaube ich", "glaub ich", "denke ich", "fürchte ich",
 ].join("|")})(?![\\p{L}'])`, "gu");
 
+/**
+ * Thanks said again is not pills taken again: "Ich habe meine Tabletten genommen, noch mal danke", "… danke nochmal",
+ * "I took my pills, thanks again". The repeat word that belongs to the thanks is dropped with it.
+ */
+const DE_REPEAT = "(?:noch mal|nochmal|noch einmal|nochmals)";
+const DE_THANKS = "(?:(?:vielen|herzlichen|tausend) )?(?:dank|danke|dankeschön)(?: schön| sehr)?";
+const THANKS_AGAIN = new RegExp(
+  `(?<![\\p{L}'])(?:${DE_REPEAT} ${DE_THANKS}|${DE_THANKS} ${DE_REPEAT}|(?:thanks|thank you)(?: so much| very much)? (?:again|once again|once more))(?![\\p{L}'])`,
+  "gu",
+);
+
 function clauses(n: string): string[][] {
   const out: string[][] = [[]];
-  const words = n.replace(REPEAT_PHRASES, REPEAT).replace(ONE_MORE_PHRASES, ONE_MORE).replace(MODIFIERS, " ").replace(/\s+/g, " ").trim();
+  const words = n.replace(THANKS_AGAIN, " thanks ").replace(REPEAT_PHRASES, REPEAT).replace(ONE_MORE_PHRASES, ONE_MORE).replace(MODIFIERS, " ").replace(/\s+/g, " ").trim();
   for (const w of words.split(" ")) {
     if (CLAUSE_BREAKS.has(w)) out.push([]);
     else out[out.length - 1]!.push(w);
