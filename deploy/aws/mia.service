@@ -1,0 +1,34 @@
+[Unit]
+Description=Mia Voice (local mode on one server)
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User=mia
+Group=mia
+WorkingDirectory=/opt/mia/packages/voice
+EnvironmentFile=/etc/mia/mia.env
+# Optional per-take overrides for the demo recording (MIA_CLOCK_START, MIA_DATA_DIR, MIA_PROFILE); later file wins.
+EnvironmentFile=-/etc/mia/take.env
+ExecStart=/usr/bin/node --import tsx src/main.ts
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/mia/.mia-data
+PrivateTmp=true
+UMask=0077
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+CapabilityBoundingSet=
+# AF_NETLINK: glibc's getaddrinfo asks the kernel which address families exist.
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+# No MemoryDenyWriteExecute: V8's JIT needs writable code pages.
+
+[Install]
+WantedBy=multi-user.target

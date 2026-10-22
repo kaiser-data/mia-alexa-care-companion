@@ -41,6 +41,15 @@ describe("comfort", () => {
     expect(r.say).toEqual(["I've asked Tom to call you."]);
     expect(await m.store.listAlerts("rose")).toMatchObject([{ rule: "call_requested", severity: "medium", message: "Rose would like a call." }]);
   });
+  it("request_call without alert email: stored, but never 'I've asked Tom' (Codex #4)", async () => {
+    const m = await connect(at("2026-10-12T16:31:00"), rose(), {}, { mailer: null });
+    const r = await m.call("request_call");
+    expect(r.say).toEqual(["I couldn't reach Tom just now."]);
+    expect(r.facts).toEqual({ notified: false });
+    expect(await m.store.listAlerts("rose")).toMatchObject([{ rule: "call_requested", severity: "medium" }]);
+    const de = await connect(at("2026-10-12T16:31:00"), roseDe(), {}, { mailer: null });
+    expect((await de.call("request_call")).say).toEqual(["Ich konnte Tom gerade nicht erreichen."]);
+  });
   it("chat_about_life: speaks the day's life-story topic verbatim, then asks if she remembers", async () => {
     const m = await connect(at("2026-10-14T15:00:00"));
     const r = await m.call("chat_about_life");
@@ -124,16 +133,31 @@ describe("report_problem failure paths", () => {
     expect(r.say).toEqual(["I've let Tom know right away.", "Tom will get in touch with you."]);
     expect(await m.store.listAlerts("rose")).toMatchObject([{ rule: "distress", severity: "high" }]);
   });
-  it("when the alert cannot be raised, she is told to call for help", async () => {
-    const m = await connect(at("2026-10-12T11:00:00"));
-    m.store.addAlert = async () => { throw new Error("disk full"); };
+  const sesDown = { mailer: { send: async () => { throw new Error("SES down"); } } };
+  it("when the alert cannot be mailed, she is told to call for help", async () => {
+    const m = await connect(at("2026-10-12T11:00:00"), rose(), {}, sesDown);
     const r = await m.call("report_problem", { what: "I fell" });
     expect(r.say).toEqual(["I couldn't reach Tom. Please call for help."]);
+    expect(await m.store.listAlerts("rose")).toMatchObject([{ rule: "distress", severity: "high" }]);
   });
   it("German failure reply", async () => {
-    const m = await connect(at("2026-10-12T11:00:00"), roseDe());
-    m.store.addAlert = async () => { throw new Error("disk full"); };
+    const m = await connect(at("2026-10-12T11:00:00"), roseDe(), {}, sesDown);
     expect((await m.call("report_problem")).say).toEqual(["Ich konnte Tom nicht erreichen. Bitte ruf um Hilfe."]);
+  });
+  it("a broken database does not stop the mail: Tom was told, so she hears it", async () => {
+    const m = await connect(at("2026-10-12T11:00:00"));
+    m.store.addAlert = async () => { throw new Error("disk full"); };
+    expect((await m.call("report_problem", { what: "I fell" })).say).toEqual(["I've let Tom know right away.", "Tom will get in touch with you."]);
+    expect(m.mails).toHaveLength(1);
+  });
+  it("no email configured: the alert is stored, but she never hears that Tom was told (Codex #3)", async () => {
+    const m = await connect(at("2026-10-12T11:00:00"), rose(), {}, { mailer: null });
+    const r = await m.call("report_problem", { what: "I fell" });
+    expect(r.say).toEqual(["I couldn't reach Tom. Please call for help."]);
+    expect(r.facts.alerted).toBe(false);
+    expect(await m.store.listAlerts("rose")).toMatchObject([{ rule: "distress", severity: "high", state: "open" }]);
+    const de = await connect(at("2026-10-12T11:00:00"), roseDe(), {}, { mailer: null });
+    expect((await de.call("report_problem", { what: "Hilfe" })).say).toEqual(["Ich konnte Tom nicht erreichen. Bitte ruf um Hilfe."]);
   });
 });
 

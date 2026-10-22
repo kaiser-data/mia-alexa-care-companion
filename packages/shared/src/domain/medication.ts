@@ -13,7 +13,7 @@ export interface DoseStatus {
   takenAt?: HHMM;
   appointmentName?: string;
   /** why Mia is not sure; set whenever state is "unsure" */
-  unsureReason?: "appointment" | "overdue" | "early_report" | "came_home";
+  unsureReason?: "appointment" | "overdue" | "early_report" | "came_home" | "hold";
 }
 
 export const DUE_WINDOW_MINUTES = 30;
@@ -65,6 +65,8 @@ export function doseStatuses(p: Profile, events: CareEvent[], now: Date): DoseSt
   const l = localParts(now, p.timezone);
   const todays = appointmentsOn(p, l.date, l.weekday);
   const out: DoseStatus[] = [];
+  // A pills-taken-twice alert today: never risk another dose, every dose not yet taken waits for the carer.
+  const held = events.some((e) => e.type === "med_hold" && new Date(e.at) <= now && localParts(new Date(e.at), p.timezone).date === l.date);
   for (const m of p.medications) {
     if (m.weekdays && !m.weekdays.includes(l.weekday)) continue;
     for (const time of m.times) {
@@ -74,6 +76,10 @@ export function doseStatuses(p: Profile, events: CareEvent[], now: Date): DoseSt
         localParts(new Date(e.at), p.timezone).date === l.date);
       if (taken) {
         out.push({ ...base, state: "taken", takenAt: localParts(new Date(taken.at), p.timezone).time });
+        continue;
+      }
+      if (held) {
+        out.push({ ...base, state: "unsure", unsureReason: "hold" });
         continue;
       }
       const appt = m.takenAtAppointmentId

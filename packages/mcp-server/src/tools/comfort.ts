@@ -32,6 +32,9 @@ export function registerComfortTools(server: McpServer, ctx: ToolContext): void 
     const T = templates(p.locale);
     await logEvent(ctx, "call_requested");
     await ctx.alerts.raise({ profileId: p.id, rule: "call_requested", severity: "medium", message: `${p.preferredName} would like a call.`, at: ctx.now().toISOString() });
+    // Without alert email the request is only stored: never say the carer was asked. (A mail that fails later is
+    // fire-and-forget by design and only logged.)
+    if (ctx.alerts.notifies !== true) return { facts: { notified: false }, say: [T.callNotSent(p.carerName)], verbatim: true };
     return { facts: {}, say: [T.callRequested(p.carerName)], verbatim: true };
   }));
 

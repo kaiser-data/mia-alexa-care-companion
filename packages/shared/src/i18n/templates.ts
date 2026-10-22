@@ -33,11 +33,15 @@ export interface Templates {
   medNoneToday(): string;
   medConfirmed(names: string): string;
   medEarlyNoted(carer: string): string;
+  /** A self-report noted without alert email: never claims the carer will be told; always followed by askCarerFirst. */
+  medNoted(): string;
   medAlreadyTaken(name: string, time: string): string;
   noMoreNow(): string;
   safeAtHome(): string;
   callOffer(carer: string): string;
   callRequested(carer: string): string;
+  /** A call request that could not be sent (no alert email): never claims the carer was asked. */
+  callNotSent(carer: string): string;
   nightIs(time: string): string;
   nightSafe(): string;
   distressAck(carer: string): string;
@@ -91,11 +95,13 @@ const EN: Templates = {
   medNoneToday: () => "There are no more pills today.",
   medConfirmed: (n) => `Thank you. I've noted ${n}.`,
   medEarlyNoted: (c) => `Thank you. I'll tell ${c}.`,
+  medNoted: () => "Thank you. I've written that down.",
   medAlreadyTaken: (n, t) => `You took ${n} at ${t}.`,
   noMoreNow: () => "No more pills needed now.",
   safeAtHome: () => "You're safe at home.",
   callOffer: (c) => `Shall I ask ${c} to call you?`,
   callRequested: (c) => `I've asked ${c} to call you.`,
+  callNotSent: (c) => `I couldn't reach ${c} just now.`,
   nightIs: (t) => `It's ${t}, in the middle of the night.`,
   nightSafe: () => "You're safe at home. You can go back to sleep.",
   distressAck: (c) => `I've let ${c} know right away.`,
@@ -149,11 +155,13 @@ const DE: Templates = {
   medNoneToday: () => "Heute sind keine Tabletten mehr dran.",
   medConfirmed: (n) => `Danke. Ich habe ${n} notiert.`,
   medEarlyNoted: (c) => `Danke. Ich sage es ${c}.`,
+  medNoted: () => "Danke. Ich habe es aufgeschrieben.",
   medAlreadyTaken: (n, t) => `Du hast ${n} um ${t} genommen.`,
   noMoreNow: () => "Jetzt brauchst du keine mehr.",
   safeAtHome: () => "Du bist sicher zu Hause.",
   callOffer: (c) => `Soll ich ${c} um einen Anruf bitten?`,
   callRequested: (c) => `Ich habe ${c} um einen Anruf gebeten.`,
+  callNotSent: (c) => `Ich konnte ${c} gerade nicht erreichen.`,
   nightIs: (t) => `Es ist ${t}, mitten in der Nacht.`,
   nightSafe: () => "Du bist sicher zu Hause. Du kannst weiterschlafen.",
   distressAck: (c) => `Ich habe ${c} sofort Bescheid gegeben.`,

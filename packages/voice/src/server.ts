@@ -39,13 +39,19 @@ function parseTurn(body: unknown): TurnInput | null {
   return confidence === undefined ? { text: kept } : { text: kept, confidence };
 }
 
-export interface VoiceAppDeps { brain: Pick<Brain, "turn" | "proactive">; profile: VoiceProfile; publicDir: string; port: number }
+export interface VoiceAppDeps { brain: Pick<Brain, "turn" | "proactive">; profile: VoiceProfile; publicDir: string; port: number; publicOrigin?: string }
 
 export function createVoiceApp(deps: VoiceAppDeps): Hono {
   const app = new Hono();
   const { speech, locale, carerName } = deps.profile;
   const hosts = [`127.0.0.1:${deps.port}`, `localhost:${deps.port}`];
   const origins = hosts.map((h) => `http://${h}`);
+  if (deps.publicOrigin) {
+    const u = new URL(deps.publicOrigin);
+    if (u.protocol !== "https:") throw new Error("MIA_PUBLIC_ORIGIN must be https");
+    hosts.push(u.host);
+    origins.push(u.origin);
+  }
 
   // Every response, errors included: the browser must never guess a content type.
   app.use("*", async (c, next) => {

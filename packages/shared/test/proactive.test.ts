@@ -22,6 +22,11 @@ describe("proactivePrompt", () => {
       "Jetzt ist Zeit für deine Morgentabletten.", "Hast du deine Morgentabletten schon genommen?",
     ]);
   });
+  it("after a pills-taken-twice alert no pill prompt is spoken that day (Codex #2)", () => {
+    const hold = ev("med_hold", "2026-10-12T11:30:00Z", { reason: "overdose_report" });
+    expect(proactivePrompt(rose(), [hold], at("2026-10-12T08:00:00"))?.kind).not.toBe("medication");
+    expect(proactivePrompt(rose(), [hold], at("2026-10-12T20:00:00"))?.kind).not.toBe("medication");
+  });
   it("a prompt is spoken only once", () => {
     const events = [spoken("med:morning-pills:08:00:2026-10-12", "2026-10-12T12:00:00Z")];
     expect(proactivePrompt(rose(), events, at("2026-10-12T08:10:00"))).toBeNull();

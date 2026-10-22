@@ -8,10 +8,12 @@
   },
   "exports": {
     "./local": "./src/local.ts",
+    "./ses": "./src/ses.ts",
     "./testing": "./src/testing.ts",
     "./weather": "./src/weather.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-sesv2": "3.1154.0",
     "@hono/node-server": "2.1.3",
     "@mia/shared": "workspace:*",
     "@modelcontextprotocol/sdk": "1.32.1",

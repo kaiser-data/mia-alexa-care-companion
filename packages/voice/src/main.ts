@@ -1,6 +1,8 @@
 import { join, resolve } from "node:path";
+import { offsetClock } from "@mia/shared";
 import { serve } from "@hono/node-server";
 import { checkDevToken, loadProfile, startLocalMia } from "@mia/mcp-server/local";
+import { alertEmailOffWarning, maskEmail, sesMailerFromEnv } from "@mia/mcp-server/ses";
 import { OpenMeteoWeather } from "@mia/mcp-server/weather";
 import { alexaSignatureVerifier, createAlexaApp } from "./alexa";
 import { Brain } from "./brain";
@@ -18,17 +20,26 @@ console.log(`[mia-voice] LLM: ${provider} / ${model}`);
 const profileFile = process.env.MIA_PROFILE_FILE;
 const profile = loadProfile({ ...process.env, MIA_PROFILE_FILE: profileFile && resolve(root, profileFile) });
 
+// Demo recordings: MIA_CLOCK_START starts Mia's clock at a chosen time. Alexa's timestamp check keeps the real clock.
+const now = offsetClock(process.env.MIA_CLOCK_START);
+if (process.env.MIA_CLOCK_START) console.log(`[mia-voice] clock starts at ${now().toISOString()} (MIA_CLOCK_START)`);
+
 const voicePort = parseVoicePort(process.env.VOICE_PORT);
 
 // Embedded Mia only talks to this gateway: any free port will do.
+const mailer = process.env.MIA_MCP_URL ? null : sesMailerFromEnv(process.env);
+if (mailer) console.log(`[mia] alert email on → ${maskEmail(process.env.MIA_ALERT_EMAIL_TO)}`);
+// With MIA_MCP_URL the separate MCP process owns the mailer and warns for itself.
+const mailOff = alertEmailOffWarning(process.env, mailer !== null || Boolean(process.env.MIA_MCP_URL));
+if (mailOff) console.warn(mailOff);
 const miaUrl = process.env.MIA_MCP_URL ?? (await startLocalMia({
   token, profile, port: 0,
-  dataDir: resolve(root, process.env.MIA_DATA_DIR ?? ".mia-data"), weather: new OpenMeteoWeather(),
+  dataDir: resolve(root, process.env.MIA_DATA_DIR ?? ".mia-data"), weather: new OpenMeteoWeather(), now, mailer,
 })).url;
 
 const mia = await connectMia({ url: miaUrl, token });
-const brain = new Brain({ mia, llm, profile, now: () => new Date() });
-const app = createVoiceApp({ brain, profile, publicDir: resolve(import.meta.dirname, "../public"), port: voicePort });
+const brain = new Brain({ mia, llm, profile, now });
+const app = createVoiceApp({ brain, profile, publicDir: resolve(import.meta.dirname, "../public"), port: voicePort, publicOrigin: process.env.MIA_PUBLIC_ORIGIN || undefined });
 serve({ fetch: app.fetch, port: voicePort, hostname: "127.0.0.1" });
 console.log(`[mia-voice] LOCAL MODE — not production. Open http://127.0.0.1:${voicePort} in Chrome or Edge (profile: ${profile.id}, Mia: ${miaUrl}).`);
 

@@ -98,4 +98,18 @@ describe("doseStatuses", () => {
       expect(doseStatuses(rose(), [stayed("2026-10-12T17:00:00Z")], mon("12:30"))[1]!.state).toBe("unsure");
     });
   });
+
+  describe("medication hold after a pills-taken-twice alert (Codex #2)", () => {
+    const hold = (iso: string): CareEvent => ({ profileId: "rose", type: "med_hold", at: iso, detail: { reason: "overdose_report" } });
+    it("every dose not taken is unsure (hold) for the rest of the day; taken stays taken", () => {
+      const s = doseStatuses(rose(), [confirmed("morning-pills", "08:00", "2026-10-14T12:05:00Z"), hold("2026-10-14T12:10:00Z")], at("2026-10-14T12:30:00"));
+      expect(states(s)).toEqual([["morning-pills", "taken"], ["noon-pill", "unsure"], ["evening-pill", "unsure"]]);
+      expect(s.slice(1).map((d) => d.unsureReason)).toEqual(["hold", "hold"]);
+      expect(doseStatuses(rose(), [hold("2026-10-14T12:10:00Z")], at("2026-10-14T20:05:00")).map((d) => d.state)).not.toContain("due");
+    });
+    it("the hold ends with the day and does not act before it was set", () => {
+      expect(doseStatuses(rose(), [hold("2026-10-14T12:10:00Z")], at("2026-10-15T08:05:00"))[0]!.state).toBe("due");
+      expect(doseStatuses(rose(), [hold("2026-10-14T13:10:00Z")], at("2026-10-14T08:05:00"))[0]!.state).toBe("due");
+    });
+  });
 });

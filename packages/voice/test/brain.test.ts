@@ -65,6 +65,18 @@ describe("Brain.turn", () => {
     expect(s.llm.requests).toHaveLength(0);
     expect(await s.store.listAlerts("rose")).toMatchObject([{ rule: "distress", severity: "high", message: 'Rose asked for help: "I fell in the kitchen".' }]);
   });
+  it.each([
+    ["I took my pills and then took them once again", rose()],
+    ["I took them all again", rose()],
+    ["Ich habe meine Tabletten genommen, schon wieder", roseDe()],
+    ["Ich habe sie genommen, noch mal", roseDe()],
+  ])("pills taken twice alerts the carer without the LLM (Codex #1): %s", async (said, profile) => {
+    const s = await setup("2026-10-12T08:05:00", [], profile);
+    const r = await s.brain.turn({ text: said, confidence: 0.9 });
+    expect(r.tools).toEqual(["report_problem"]);
+    expect(s.llm.requests).toHaveLength(0);
+    expect(await s.store.listAlerts(profile.id)).toMatchObject([{ rule: "distress", severity: "high" }]);
+  });
   it("German distress word", async () => {
     const s = await setup("2026-10-12T11:00:00", [], roseDe());
     expect((await s.brain.turn({ text: "Hilfe!" })).sentences).toEqual(["Ich habe Tom sofort Bescheid gegeben.", "Tom meldet sich bei dir."]);

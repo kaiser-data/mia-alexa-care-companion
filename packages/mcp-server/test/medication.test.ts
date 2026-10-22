@@ -1,6 +1,14 @@
+import { randomBytes } from "node:crypto";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { roseDe } from "@mia/shared";
+import { rose, roseDe } from "@mia/shared";
 import { at } from "@mia/shared/testing";
+import { StoreAlertSink } from "../src/alerts";
+import { nextProactive } from "../src/proactive";
+import { LocalAesCipher } from "../src/store/crypto";
+import { SqliteStore } from "../src/store/sqliteStore";
 import { connect } from "./helpers";
 
 const types = async (m: Awaited<ReturnType<typeof connect>>) =>
@@ -190,5 +198,212 @@ describe("early self-report after an earlier dose was taken", () => {
     await m.call("confirm_medication");
     m.setNow(at("2026-10-14T08:07:00"));
     expect((await m.call("confirm_medication")).say).toEqual(["You took your morning pills at five past eight.", "No more pills needed now."]);
+  });
+});
+
+describe("an unsure dose flags Tom with a medium alert (Codex #5)", () => {
+  it("overdue and unconfirmed: one medium alert mailed, repeated questions are not mailed again", async () => {
+    const m = await connect(at("2026-10-14T10:30:00"));
+    expect((await m.call("get_medication_status")).say).toEqual(["I'm not sure if you had your morning pills yet.", "Let's ask Tom first."]);
+    await m.call("get_medication_status");
+    m.setNow(at("2026-10-14T11:00:00"));
+    await m.call("get_medication_status");
+    const alerts = await m.store.listAlerts("rose");
+    expect(alerts[0]).toMatchObject({ rule: "med_unsure", severity: "medium" });
+    expect(alerts[0]!.message).toContain("morning-pills");
+    expect(m.mails.map((x) => x.subject)).toHaveLength(1);
+  });
+  it("a broken alert store does not stop the answer", async () => {
+    const m = await connect(at("2026-10-14T10:30:00"));
+    m.store.addAlert = async () => { throw new Error("disk full"); };
+    expect((await m.call("get_medication_status")).say).toEqual(["I'm not sure if you had your morning pills yet.", "Let's ask Tom first."]);
+  });
+});
+
+describe("after a pills-taken-twice alert no dose is prompted that day (Codex #2)", () => {
+  it("08:05 'I took my pills twice' → the pill tool asks Tom first, never 'Now it's time'", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"));
+    await m.call("report_problem", { what: "I took my pills twice" });
+    m.setNow(at("2026-10-12T08:06:00"));
+    const r = await m.call("get_medication_status");
+    expect(r.say).toEqual(["I'm not sure if you had your morning pills yet.", "Let's ask Tom first."]);
+    m.setNow(at("2026-10-12T20:05:00"));
+    expect((await m.call("get_medication_status")).say.join(" ")).not.toContain("time for your");
+  });
+  it("German", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"), roseDe());
+    await m.call("report_problem", { what: "Ich habe meine Tabletten genommen, schon wieder" });
+    expect((await m.call("get_medication_status")).say).toEqual(["Ich weiß nicht sicher, ob du deine Morgentabletten schon hattest.", "Wir fragen zuerst Tom."]);
+  });
+  it("'I took my pills' under the hold records only doses already due and says Tom is told", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"));
+    await m.call("report_problem", { what: "I took them again" });
+    const r = await m.call("confirm_medication");
+    expect(r.say).toEqual(["Thank you. I'll tell Tom."]);
+    const confirmed = (await m.store.eventsSince("rose", "2026-10-01T00:00:00Z")).filter((e) => e.type === "med_confirmed");
+    expect(confirmed.map((e) => e.detail?.medicationId)).toEqual(["morning-pills"]);
+  });
+  it("a fall does not hold the pills", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"));
+    await m.call("report_problem", { what: "I fell" });
+    expect((await m.call("get_medication_status")).say[0]).toBe("Now it's time for your morning pills.");
+  });
+  it("the hold is in the database: it survives a restart and ends the next day", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "mia-hold-"));
+    const key = randomBytes(32);
+    const open = () => new SqliteStore(join(dir, "mia.db"), new LocalAesCipher(key));
+    const first = open();
+    await first.putProfile(rose());
+    const m = await connect(at("2026-10-12T08:05:00"), rose(), { store: first });
+    await m.call("report_problem", { what: "I took my pills twice" });
+    first.close();
+    const second = open();
+    const again = await connect(at("2026-10-12T08:30:00"), rose(), { store: second });
+    expect((await again.call("get_medication_status")).say).toEqual(["I'm not sure if you had your morning pills yet.", "Let's ask Tom first."]);
+    again.setNow(at("2026-10-13T08:05:00"));
+    expect((await again.call("get_medication_status")).say[0]).toBe("Now it's time for your morning pills.");
+    second.close();
+  });
+  it("the alert goes out even when the hold cannot be written", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"));
+    const addEvent = m.store.addEvent.bind(m.store);
+    m.store.addEvent = async (e) => { if (e.type === "med_hold") throw new Error("disk full"); await addEvent(e); };
+    const r = await m.call("report_problem", { what: "I took my pills twice" });
+    expect(r.facts.alerted).toBe(true);
+    expect(await m.store.listAlerts("rose")).toMatchObject([{ rule: "distress", severity: "high" }]);
+  });
+});
+
+describe("the hold is decided on her whole words (Codex re-review #1)", () => {
+  it("a long report that starts with 'I took my pills twice' still holds the pills", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"));
+    const what = `I took my pills twice. ${"And then I sat down in the kitchen and looked out of the window for a while. ".repeat(4)}`;
+    expect(what.length).toBeGreaterThan(300);
+    await m.call("report_problem", { what });
+    expect(await types(m)).toContain("med_hold");
+    expect((await m.call("get_medication_status")).say).toEqual(["I'm not sure if you had your morning pills yet.", "Let's ask Tom first."]);
+  });
+});
+
+describe("a hold that cannot be written still blocks the pills (Codex re-review #2)", () => {
+  const failHolds = (m: Awaited<ReturnType<typeof connect>>) => {
+    const addEvent = m.store.addEvent.bind(m.store);
+    const state = { failing: true };
+    m.store.addEvent = async (e) => { if (state.failing && e.type === "med_hold") throw new Error("disk full"); await addEvent(e); };
+    return state;
+  };
+  const ctxOf = (m: Awaited<ReturnType<typeof connect>>, now: Date) =>
+    ({ store: m.store, profileId: "rose", now: () => now, alerts: new StoreAlertSink(m.store) });
+
+  it("the alert goes out, the pill tool and the proactive prompt still ask Tom first all day", async () => {
+    const m = await connect(at("2026-10-12T07:55:00"));
+    failHolds(m);
+    expect((await m.call("report_problem", { what: "I took my pills twice" })).facts.alerted).toBe(true);
+    expect(m.mails).toHaveLength(1);
+    m.setNow(at("2026-10-12T08:05:00"));
+    expect((await m.call("get_medication_status")).say).toEqual(["I'm not sure if you had your morning pills yet.", "Let's ask Tom first."]);
+    expect(await nextProactive(ctxOf(m, at("2026-10-12T08:05:00")))).toBeNull();
+    m.setNow(at("2026-10-12T20:05:00"));
+    expect((await m.call("get_medication_status")).say.join(" ")).not.toContain("time for your");
+    expect(await nextProactive(ctxOf(m, at("2026-10-12T20:05:00")))).toBeNull();
+    m.setNow(at("2026-10-13T08:05:00"));
+    expect((await m.call("get_medication_status")).say[0]).toBe("Now it's time for your morning pills.");
+  });
+  it("two questions at the same moment both still ask Tom first", async () => {
+    const m = await connect(at("2026-10-12T07:55:00"));
+    failHolds(m);
+    await m.call("report_problem", { what: "I took my pills twice" });
+    m.setNow(at("2026-10-12T08:05:00"));
+    const both = await Promise.all([m.call("get_medication_status"), m.call("get_medication_status")]);
+    for (const r of both) expect(r.say).toEqual(["I'm not sure if you had your morning pills yet.", "Let's ask Tom first."]);
+  });
+  it("the hold is written on the next pill question once the database works again", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"));
+    const state = failHolds(m);
+    await m.call("report_problem", { what: "I took my pills twice" });
+    expect(await types(m)).not.toContain("med_hold");
+    state.failing = false;
+    await m.call("get_medication_status");
+    const holds = (await m.store.eventsSince("rose", "2026-10-01T00:00:00Z")).filter((e) => e.type === "med_hold");
+    expect(holds.map((e) => e.at)).toEqual([at("2026-10-12T08:05:00").toISOString()]);
+    m.setNow(at("2026-10-12T08:10:00"));
+    await m.call("get_medication_status");
+    expect((await types(m)).filter((t) => t === "med_hold")).toHaveLength(1);
+  });
+});
+
+describe("the hold belongs to the moment she spoke, not to the mail (Codex re-review #4)", () => {
+  it("reported at 23:59:59, mail done at 00:00:01: the next day's pills are not held", async () => {
+    let m!: Awaited<ReturnType<typeof connect>>;
+    const slowMailer = { send: async () => { m.setNow(at("2026-10-13T00:00:01")); } };
+    m = await connect(at("2026-10-12T23:59:59"), rose(), {}, { mailer: slowMailer });
+    await m.call("report_problem", { what: "I took my pills twice" });
+    const hold = (await m.store.eventsSince("rose", "2026-10-01T00:00:00Z")).find((e) => e.type === "med_hold");
+    expect(hold?.at).toBe(at("2026-10-12T23:59:59").toISOString());
+    expect((await m.store.listAlerts("rose"))[0]!.at).toBe(at("2026-10-12T23:59:59").toISOString());
+    m.setNow(at("2026-10-13T08:05:00"));
+    expect((await m.call("get_medication_status")).say[0]).toBe("Now it's time for your morning pills.");
+  });
+  it("the hold is written while the mail is still on its way", async () => {
+    let m!: Awaited<ReturnType<typeof connect>>;
+    let heldDuringMail = false;
+    const mailer = {
+      send: async () => {
+        for (let i = 0; i < 20 && !heldDuringMail; i++) {
+          heldDuringMail = (await m.store.eventsSince("rose", "2026-10-01T00:00:00Z")).some((e) => e.type === "med_hold");
+          await new Promise((r) => setImmediate(r));
+        }
+      },
+    };
+    m = await connect(at("2026-10-12T08:05:00"), rose(), {}, { mailer });
+    await m.call("report_problem", { what: "I took my pills twice" });
+    expect(heldDuringMail).toBe(true);
+  });
+});
+
+describe("unsure doses: one open alert, and no promise without alert email (Codex re-review #6, #7)", () => {
+  it("five unsure questions store one open alert and send one mail per held dose", async () => {
+    const m = await connect(at("2026-10-12T07:55:00"));
+    await m.call("report_problem", { what: "I took my pills twice" });
+    m.setNow(at("2026-10-12T08:05:00"));
+    const unsure = async () => (await m.store.listAlerts("rose")).filter((a) => a.rule === "med_unsure");
+    await m.call("get_medication_status");
+    const first = await unsure();
+    expect(first.length).toBeGreaterThan(0);
+    for (let i = 0; i < 4; i++) await m.call("get_medication_status");
+    expect(await unsure()).toHaveLength(first.length);
+    expect(new Set((await unsure()).map((a) => a.message)).size).toBe(first.length);
+    expect(m.mails.filter((x) => x.subject.includes("not sure"))).toHaveLength(first.length);
+  });
+  it("a failed read of past alerts never stops a new one", async () => {
+    const m = await connect(at("2026-10-12T16:31:00"));
+    const listAlerts = m.store.listAlerts.bind(m.store);
+    m.store.listAlerts = async () => { m.store.listAlerts = listAlerts; throw new Error("cannot decrypt an old alert"); };
+    await m.call("request_call");
+    expect(await m.store.listAlerts("rose")).toMatchObject([{ rule: "call_requested" }]);
+    expect(m.mails).toHaveLength(1);
+  });
+  it("a cry for help is stored every time", async () => {
+    const m = await connect(at("2026-10-12T08:05:00"));
+    await m.call("report_problem", { what: "Help" });
+    await m.call("report_problem", { what: "Help" });
+    expect((await m.store.listAlerts("rose")).filter((a) => a.rule === "distress")).toHaveLength(2);
+  });
+  it("without alert email, 'I took my pills' during a hold is noted and asks Tom first, never 'I'll tell Tom'", async () => {
+    for (const [profile, want] of [
+      [rose(), ["Thank you. I've written that down.", "Let's ask Tom first."]],
+      [roseDe(), ["Danke. Ich habe es aufgeschrieben.", "Wir fragen zuerst Tom."]],
+    ] as const) {
+      const m = await connect(at("2026-10-12T07:55:00"), profile, {}, { mailer: null });
+      await m.call("report_problem", { what: "I took my pills twice" });
+      m.setNow(at("2026-10-12T08:05:00"));
+      expect((await m.call("confirm_medication")).say).toEqual(want);
+    }
+  });
+  it("with alert email the self-report still says Tom will be told", async () => {
+    const m = await connect(at("2026-10-12T07:55:00"));
+    await m.call("report_problem", { what: "I took my pills twice" });
+    m.setNow(at("2026-10-12T08:05:00"));
+    expect((await m.call("confirm_medication")).say).toEqual(["Thank you. I'll tell Tom."]);
   });
 });

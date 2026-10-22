@@ -1,5 +1,5 @@
 import { proactivePrompt, type ProactivePrompt } from "@mia/shared";
-import { logEvent, type ToolContext } from "./tools/runtime";
+import { logEvent, readEvents, type ToolContext } from "./tools/runtime";
 
 const LOOKBACK_MS = 36 * 3600 * 1000;
 
@@ -12,7 +12,7 @@ export async function nextProactive(ctx: ToolContext): Promise<ProactivePrompt |
   const p = await ctx.store.getProfile(ctx.profileId);
   if (!p) return null;
   const now = ctx.now();
-  const events = await ctx.store.eventsSince(ctx.profileId, new Date(now.getTime() - LOOKBACK_MS).toISOString());
+  const events = await readEvents(ctx, new Date(now.getTime() - LOOKBACK_MS).toISOString());
   const prompt = proactivePrompt(p, events, now);
   if (!prompt) return null;
   await logEvent(ctx, "proactive_spoken", { promptId: prompt.id });
