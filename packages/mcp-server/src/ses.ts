@@ -19,7 +19,8 @@ export function sesMailerFromEnv(env: Record<string, string | undefined>): Maile
 }
 
 /**
- * On a public deploy (MIA_PUBLIC_ORIGIN) without a mailer every alert is only stored, yet Mia says the carer was told.
+ * On a public deploy (MIA_PUBLIC_ORIGIN) without a mailer every alert is only stored (Mia then tells her she could not
+ * reach the carer).
  * Startup does not refuse (a demo must still run), but says so loudly on stderr.
  */
 export function alertEmailOffWarning(env: Record<string, string | undefined>, mailerOn: boolean): string | null {

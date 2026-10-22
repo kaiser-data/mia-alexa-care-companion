@@ -2,10 +2,16 @@ import type { AlertInput, Store } from "./store/store";
 
 export interface AlertSink {
   raise(a: AlertInput): Promise<void>;
+  /**
+   * True when a resolved raise() of a medium or high alert means the carer was sent a message. False or missing: alerts
+   * are only stored, so Mia must never say the carer was told.
+   */
+  readonly notifies?: boolean;
 }
 
-/** Persists alerts as open. Delivery: EmailAlertSink (SES). */
+/** Persists alerts as open. Delivery: EmailAlertSink (SES). Alone it tells nobody. */
 export class StoreAlertSink implements AlertSink {
+  readonly notifies = false;
   constructor(private readonly store: Store) {}
   async raise(a: AlertInput): Promise<void> {
     await this.store.addAlert(a);
@@ -30,6 +36,7 @@ function mailSubject(s: string): string {
  * A cry for help (high) is awaited and throws when it cannot be mailed; medium is fire-and-forget (logged on failure).
  */
 export class EmailAlertSink implements AlertSink {
+  readonly notifies = true;
   private readonly sent = new Map<string, number>();
   constructor(private readonly inner: AlertSink, private readonly mailer: Mailer, private readonly o: { now: () => Date; timeoutMs?: number }) {}
   private send(m: { subject: string; text: string }): Promise<void> {

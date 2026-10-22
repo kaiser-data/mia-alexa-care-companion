@@ -28,7 +28,9 @@ export function registerProblemTools(server: McpServer, ctx: ToolContext): void 
         message: `${p?.preferredName ?? "Your family member"} asked for help${what ? `: "${what}"` : ""}.`,
         at: ctx.now().toISOString(),
       });
-      alerted = true;
+      // Without a mailer the alert is only stored: she is told to call for help, never that the carer knows.
+      alerted = ctx.alerts.notifies === true;
+      if (!alerted) console.error("[mia] distress alert stored but nobody was told: alert email is off");
     } catch (err) { console.error("[mia] distress alert failed:", err); }
     // Pills taken twice: no dose is prompted for the rest of the day. Written after the alert, which never waits for it.
     if (what && detectOverdose(what)) {
