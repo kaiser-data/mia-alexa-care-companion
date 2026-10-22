@@ -86,7 +86,8 @@ const MODIFIERS = new RegExp(`(?<![\\p{L}'])(?:${[
  * "I took my pills, thanks again". The repeat word that belongs to the thanks is dropped with it.
  */
 const DE_REPEAT = "(?:noch mal|nochmal|noch einmal|nochmals)";
-const DE_THANKS = "(?:(?:vielen|herzlichen|tausend) )?(?:dank|danke|dankeschön)(?: schön| sehr)?";
+// A bare "dank" is the preposition ("nochmal dank deiner Erinnerung genommen"): thanks only as "vielen Dank" and the like.
+const DE_THANKS = "(?:(?:vielen|herzlichen|tausend) dank|danke|dankeschön)(?: schön| sehr)?";
 const THANKS_AGAIN = new RegExp(
   `(?<![\\p{L}'])(?:${DE_REPEAT} ${DE_THANKS}|${DE_THANKS} ${DE_REPEAT}|(?:thanks|thank you)(?: so much| very much)? (?:again|once again|once more))(?![\\p{L}'])`,
   "gu",

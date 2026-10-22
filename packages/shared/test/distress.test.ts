@@ -128,5 +128,5 @@ describe("repeated thanks is not a repeated dose (Codex re-review #5)", () => {
     "I took them, thanks again",
   ])("not: %s", (t) => expect(detectDistress(t)).toBe(false));
   it.each(["Ich habe meine Tabletten genommen, noch mal", "Ich habe meine Tabletten genommen, schon wieder, danke", "I took my pills again, thanks",
-    "I took them again, thank you"])("still alarms: %s", (t) => expect(detectDistress(t)).toBe(true));
+    "I took them again, thank you", "Ich habe meine Tabletten nochmal dank deiner Erinnerung genommen"])("still alarms: %s", (t) => expect(detectDistress(t)).toBe(true));
 });
