@@ -103,3 +103,18 @@ describe("words between the pronoun or participle and the repeat word (Codex rev
     "Ich habe meine Tabletten genommen. Schon wieder regnet es.",
   ])("not: %s", (t) => expect(detectDistress(t)).toBe(false));
 });
+
+describe("ordinary modifiers inside the medication clause still alarm (Codex re-review #3)", () => {
+  it.each([
+    "I took them by accident again", "Ich habe meine Tabletten genommen, heute leider schon wieder",
+    "I took them probably again", "I took them unfortunately once again", "I took them accidentally again today",
+    "I've taken them by mistake once more", "I took them actually again",
+    "Ich habe sie genommen, aus Versehen noch mal", "Ich habe meine Tabletten genommen, glaube ich, noch einmal",
+    "Ich habe meine Tabletten zweimal glaube ich genommen", "Ich habe meine Tabletten genommen, wohl schon wieder",
+    "Ich habe die Tabletten genommen, heute leider aus Versehen nochmal", "Ich habe meine Tabletten genommen, heute morgen schon wieder",
+  ])("%s", (t) => expect(detectDistress(t)).toBe(true));
+  it.each([
+    "Ich habe meine Tabletten genommen und leider noch mal Tom angerufen", "I took my pills by accident and then I called Tom again",
+    "Ich habe meine Tabletten leider nicht noch mal genommen", "I haven't actually taken them again", "Ich habe heute leider wieder meine Tabletten genommen",
+  ])("not: %s", (t) => expect(detectDistress(t)).toBe(false));
+});

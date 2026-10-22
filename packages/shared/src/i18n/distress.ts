@@ -67,9 +67,24 @@ const DE_SPAN = 5;
 const EN_PILL_SPAN = 4;
 const EN_REPEAT_SPAN = 6;
 
+/**
+ * Ordinary modifiers inside the medication clause ("I took them by accident again", "… genommen, heute leider schon wieder",
+ * "… genommen, glaube ich, noch einmal") say nothing about the dose and are dropped before the clause is read, so they never
+ * push the repeat word out of reach. Only words that cannot start a new clause or negate are listed; "glaube ich" (verb
+ * first) is always an aside, while "ich glaube" starts a clause and is left alone.
+ */
+const MODIFIERS = new RegExp(`(?<![\\p{L}'])(?:${[
+  "by accident", "by mistake", "accidentally", "mistakenly", "unfortunately", "probably", "perhaps", "maybe", "actually",
+  "really", "just", "already", "today", "this morning", "this evening", "tonight", "even", "somehow",
+  "aus versehen", "versehentlich", "leider", "wohl", "wahrscheinlich", "vielleicht", "bestimmt", "eben", "gerade", "irgendwie",
+  "wirklich", "heute morgen", "heute früh", "heute abend", "heute", "morgens", "abends",
+  "glaube ich", "glaub ich", "denke ich", "fürchte ich",
+].join("|")})(?![\\p{L}'])`, "gu");
+
 function clauses(n: string): string[][] {
   const out: string[][] = [[]];
-  for (const w of n.replace(REPEAT_PHRASES, REPEAT).replace(ONE_MORE_PHRASES, ONE_MORE).split(" ")) {
+  const words = n.replace(REPEAT_PHRASES, REPEAT).replace(ONE_MORE_PHRASES, ONE_MORE).replace(MODIFIERS, " ").replace(/\s+/g, " ").trim();
+  for (const w of words.split(" ")) {
     if (CLAUSE_BREAKS.has(w)) out.push([]);
     else out[out.length - 1]!.push(w);
   }
