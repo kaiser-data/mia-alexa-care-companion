@@ -84,7 +84,7 @@ One t4g.small in eu-central-1 runs Mia Voice (local mode) behind Caddy:
 - **New instance on the same IP** (ssh says the host key changed): `ssh-keygen -R <ip>`, then deploy again.
 - **New Elastic IP**: `deploy.sh` keeps the first `MIA_HOST` in `/etc/mia/caddy.env`. Edit that line and
   `MIA_PUBLIC_ORIGIN` in `/etc/mia/mia.env` to the new `<ip-dashes>.sslip.io`, then deploy again.
-- **Demo recording with a set clock**: `/etc/mia/take.env` overrides `mia.env` (see `docs/submission/demo-video-script.md`).
+- **Demo recording with a set clock**: `/etc/mia/take.env` overrides `mia.env` (see `docs/project/demo-video-script.md`).
   Remove it and restart `mia` when done.
 
 ## Checks

@@ -61,7 +61,7 @@ Structured as the Devpost rules ask: which tools and for what, what worked, what
 | Account-level senior speech profile (rate, end-of-turn pause, vocabulary) | speech recognition errors are higher for older and dementia voices | Nice-to-have |
 | A banner in the developer console when a skill does not run on Alexa+ devices | would have saved a day | Nice-to-have |
 
-Full proposal: `docs/submission/care-mode-proposal.md`.
+Full proposal: `docs/project/care-mode-proposal.md`.
 
 ## 7. AWS Builder mini challenge: which AWS services and how
 

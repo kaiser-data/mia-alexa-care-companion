@@ -1,0 +1,700 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mia Teleprompter</title>
+<style>
+:root {
+  --bg: #f5f3ee; --surface: #ffffff; --ink: #1b1d22; --muted: #5d6370; --line: #e2ded4;
+  --accent: #c2410c; --accent-ink: #ffffff; --warn: #b91c1c;
+  --vo: #1d4ed8; --rose: #b4235a; --mia: #0f766e; --note: #8a6d1d; --caption: #6d28d9; --screen: #475569;
+  --radius: 10px;
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #111317; --surface: #1a1d23; --ink: #eceae4; --muted: #9aa0ab; --line: #2b2f37;
+    --accent: #fb923c; --accent-ink: #1a1206; --warn: #f87171;
+    --vo: #93b4ff; --rose: #f9a8c9; --mia: #5eead4; --note: #e3c56b; --caption: #c4b5fd; --screen: #a3afc2;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #111317; --surface: #1a1d23; --ink: #eceae4; --muted: #9aa0ab; --line: #2b2f37;
+  --accent: #fb923c; --accent-ink: #1a1206; --warn: #f87171;
+  --vo: #93b4ff; --rose: #f9a8c9; --mia: #5eead4; --note: #e3c56b; --caption: #c4b5fd; --screen: #a3afc2;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--ink); font: 15px/1.5 var(--font); }
+button, select, input { font: inherit; color: inherit; }
+button { cursor: pointer; }
+
+/* ---------- header ---------- */
+.top { position: sticky; top: 0; z-index: 10; background: var(--bg); border-bottom: 1px solid var(--line); }
+.top-inner { max-width: 1040px; margin: 0 auto; padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; }
+.brand { font-weight: 700; letter-spacing: -.01em; margin-right: auto; }
+.brand small { font-weight: 500; color: var(--muted); margin-left: 6px; }
+.tabs { display: flex; gap: 4px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+.tabs button { border: 0; background: transparent; padding: 6px 14px; border-radius: 999px; color: var(--muted); }
+.tabs button[aria-selected="true"] { background: var(--ink); color: var(--bg); }
+.btn { border: 1px solid var(--line); background: var(--surface); padding: 6px 12px; border-radius: 8px; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+.btn.on { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn.small { padding: 3px 8px; font-size: 13px; }
+
+/* ---------- script view ---------- */
+main { max-width: 1040px; margin: 0 auto; padding: 20px 16px 80px; }
+.summary { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: baseline; margin-bottom: 16px; color: var(--muted); }
+.summary b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.summary .over { color: var(--warn); }
+.toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+.hint { color: var(--muted); font-size: 13px; margin: -8px 0 20px; }
+.scene { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 16px; overflow: hidden; }
+.scene-head { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: baseline; padding: 14px 16px 10px; border-bottom: 1px solid var(--line); }
+.scene-no { font-family: var(--mono); color: var(--accent); font-weight: 700; }
+.scene-title { font-size: 18px; font-weight: 650; flex: 1 1 200px; }
+.scene-time { font-family: var(--mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.scene-time input { width: 56px; padding: 1px 4px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font-family: var(--mono); font-size: 13px; }
+.setup { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 10px 16px; background: color-mix(in srgb, var(--bg) 60%, var(--surface)); border-bottom: 1px solid var(--line); font-size: 13px; }
+.chip { font-family: var(--mono); font-size: 12px; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); }
+.lines { padding: 6px 0; }
+.ln { display: grid; grid-template-columns: 128px 1fr auto; gap: 12px; padding: 7px 16px; align-items: start; }
+.ln + .ln { border-top: 1px dashed color-mix(in srgb, var(--line) 70%, transparent); }
+.who { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; padding-top: 2px; }
+.who select { font-size: 12px; padding: 1px 2px; border-radius: 6px; border: 1px solid var(--line); background: var(--bg); width: 100%; }
+.w-vo { color: var(--vo); } .w-rose { color: var(--rose); } .w-mia { color: var(--mia); }
+.w-note { color: var(--note); } .w-caption { color: var(--caption); } .w-screen { color: var(--screen); }
+.txt { white-space: pre-wrap; }
+.ln.k-mia .txt { color: var(--muted); font-style: italic; }
+.ln.k-note .txt, .ln.k-screen .txt { font-size: 13.5px; color: var(--muted); }
+.ln.k-caption .txt { font-weight: 600; }
+.ln.k-vo .txt, .ln.k-rose .txt { font-weight: 600; font-size: 16px; }
+[contenteditable="true"] { outline: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 3px; border-radius: 4px; cursor: text; }
+[contenteditable="true"]:focus { outline: 2px solid var(--accent); }
+.ln-actions { display: flex; gap: 4px; }
+.add-row { padding: 6px 16px 12px; }
+@media (max-width: 640px) {
+  .ln { grid-template-columns: 1fr auto; }
+  .ln .who { grid-column: 1 / -1; }
+}
+
+/* ---------- teleprompter ---------- */
+#prompter { position: fixed; inset: 0; z-index: 50; background: #000; color: #f4f4f4; display: none; }
+#prompter.open { display: block; }
+#pScroll { position: absolute; inset: 0; overflow-y: auto; scrollbar-width: none; }
+#pScroll::-webkit-scrollbar { display: none; }
+#pContent { max-width: 1100px; margin: 0 auto; padding: 38vh 6vw 90vh; font-size: var(--pfs, 52px); line-height: 1.35; font-weight: 600; }
+#pContent.mirror { transform: scaleX(-1); }
+.p-scene { margin-bottom: 1.4em; }
+.p-scene h2 { font-size: .5em; text-transform: uppercase; letter-spacing: .12em; color: #fb923c; margin: 0 0 .6em; font-weight: 700; border-top: 2px solid #3a2a1a; padding-top: .9em; }
+.p-scene h2 span { color: #8a8a8a; font-weight: 500; margin-left: .6em; }
+.p-ln { margin: 0 0 .55em; }
+.p-txt { display: block; line-height: 1.3; }
+.p-who { display: block; font-size: .36em; letter-spacing: .14em; text-transform: uppercase; font-weight: 700; margin-bottom: .1em; }
+.p-vo .p-who { color: #93b4ff; } .p-rose .p-who { color: #f9a8c9; } .p-mia .p-who { color: #5eead4; }
+.p-caption .p-who { color: #c4b5fd; } .p-note .p-who, .p-screen .p-who { color: #e3c56b; }
+.p-mia .p-txt { color: #7d8790; font-style: italic; font-weight: 500; font-size: .8em; }
+.p-note .p-txt, .p-screen .p-txt { color: #c9b26a; font-size: .5em; font-weight: 500; }
+.p-caption .p-txt { color: #c4b5fd; font-size: .6em; font-weight: 600; }
+.p-setup { font-family: var(--mono); font-size: .32em; color: #8a8a8a; margin: -.6em 0 1em; }
+#prompter.hide-notes .p-note, #prompter.hide-notes .p-screen, #prompter.hide-notes .p-setup { display: none; }
+#prompter.hide-mia .p-mia { display: none; }
+#prompter.hide-captions .p-caption { display: none; }
+.p-end { text-align: center; color: #555; font-size: .5em; letter-spacing: .3em; }
+#guide { position: absolute; left: 0; right: 0; top: 38vh; height: 0; pointer-events: none; }
+#guide::before { content: ""; position: absolute; left: 0; right: 0; top: -.15em; height: 1.6em; font-size: var(--pfs, 52px);
+  background: linear-gradient(to bottom, rgba(251,146,60,.10), rgba(251,146,60,.04)); border-top: 1px solid rgba(251,146,60,.35); }
+#guide::after { content: "▶"; position: absolute; left: 10px; top: -10px; color: #fb923c; font-size: 22px; }
+.fade-top, .fade-bot { position: absolute; left: 0; right: 0; pointer-events: none; }
+.fade-top { top: 0; height: 18vh; background: linear-gradient(#000, transparent); }
+.fade-bot { bottom: 0; height: 22vh; background: linear-gradient(transparent, #000); }
+#pHud { position: absolute; top: 12px; left: 16px; right: 16px; display: flex; justify-content: space-between; gap: 12px; font: 600 15px/1.3 var(--font); color: #9a9a9a; pointer-events: none; }
+#pHud b { color: #f4f4f4; font-variant-numeric: tabular-nums; }
+#pHud .over { color: #f87171; }
+#pBar { position: absolute; left: 50%; bottom: 16px; transform: translateX(-50%); display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; align-items: center;
+  background: rgba(24,24,27,.92); border: 1px solid #333; border-radius: 14px; padding: 8px 10px; font: 14px/1 var(--font); max-width: calc(100vw - 32px); transition: opacity .3s; }
+#prompter.playing #pBar { opacity: .12; }
+#prompter.playing #pBar:hover { opacity: 1; }
+#pBar button { background: #2a2a2e; color: #eee; border: 1px solid #3a3a40; border-radius: 8px; padding: 7px 10px; min-width: 36px; }
+#pBar button:hover { background: #3a3a40; }
+#pBar button.on { background: #fb923c; color: #1a1206; border-color: #fb923c; }
+#pBar .val { color: #ddd; min-width: 58px; text-align: center; font-variant-numeric: tabular-nums; }
+#pBar .sep { width: 1px; height: 24px; background: #3a3a40; margin: 0 4px; }
+#pPlay { min-width: 92px !important; font-weight: 700; }
+#countdown { position: absolute; inset: 0; display: none; place-items: center; font: 800 28vh/1 var(--font); color: #fb923c; background: rgba(0,0,0,.55); }
+#countdown.show { display: grid; }
+
+/* ---------- slides ---------- */
+#slides { display: none; }
+#slides.open { display: block; }
+.slide-nav { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 14px; }
+.slide-nav .count { color: var(--muted); font-variant-numeric: tabular-nums; margin-right: auto; }
+.stage-wrap { display: grid; place-items: center; }
+.stage { container-type: inline-size; width: min(100%, calc((100vh - 200px) * 16 / 9)); aspect-ratio: 16 / 9; background: #0e1116; color: #f2efe8; border-radius: 12px; overflow: hidden; position: relative; box-shadow: 0 10px 40px rgba(0,0,0,.25); }
+.stage:fullscreen { width: 100vw; height: 100vh; border-radius: 0; aspect-ratio: auto; display: grid; place-items: center; }
+.stage:fullscreen .slide { width: min(100vw, 100vh * 16 / 9); height: min(100vh, 100vw * 9 / 16); position: relative; inset: auto; }
+.slide { position: absolute; inset: 0; padding: 6cqw 7cqw; display: flex; flex-direction: column; justify-content: center; font-family: var(--font); }
+.slide .kicker { font-size: 1.6cqw; letter-spacing: .18em; text-transform: uppercase; color: #fb923c; font-weight: 700; margin-bottom: 1.4cqw; }
+.slide h3 { font-size: 4.4cqw; line-height: 1.1; margin: 0 0 3cqw; font-weight: 750; letter-spacing: -.02em; }
+.slide .flow { display: grid; gap: 1cqw; }
+.slide .step { display: grid; grid-template-columns: 3.2cqw 22cqw 1fr; gap: 1.6cqw; align-items: center; background: #171b22; border: 1px solid #262c36; border-radius: 1cqw; padding: 1.1cqw 1.6cqw; font-size: 1.85cqw; }
+.slide .step .n { color: #fb923c; font-family: var(--mono); font-weight: 700; }
+.slide .step .lbl { font-weight: 700; }
+.slide .step .dt { color: #a8b0bc; }
+.slide .foot { margin-top: 2.4cqw; font-size: 1.7cqw; color: #a8b0bc; }
+.slide ol.big { margin: 0; padding: 0; list-style: none; counter-reset: c; display: grid; gap: 2cqw; }
+.slide ol.big li { counter-increment: c; font-size: 3cqw; line-height: 1.25; display: grid; grid-template-columns: 5cqw 1fr; align-items: baseline; }
+.slide ol.big li::before { content: counter(c); color: #fb923c; font-weight: 800; font-family: var(--mono); }
+.slide.caption { justify-content: flex-end; padding-bottom: 7cqw; }
+.slide.caption .cap { font-size: 3.4cqw; line-height: 1.3; font-weight: 600; background: rgba(0,0,0,.6); padding: 1.6cqw 2.4cqw; border-radius: 1cqw; max-width: 80cqw; }
+.slide.end { align-items: center; text-align: center; }
+.slide.end h3 { font-size: 8cqw; margin-bottom: 1cqw; }
+.slide.end .sub { font-size: 2.6cqw; color: #c9c4b8; margin-bottom: 4cqw; }
+.slide.end .meta { font-size: 2cqw; color: #a8b0bc; display: grid; gap: .8cqw; }
+.slide.end .meta div:first-child { font-family: var(--mono); color: #f2efe8; }
+.slide [contenteditable="true"] { outline-color: rgba(251,146,60,.6); }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">Mia · Demo-Video <small>Skript &amp; Teleprompter</small></div>
+    <div class="tabs" role="tablist">
+      <button role="tab" data-view="script" aria-selected="true">Skript</button>
+      <button role="tab" data-view="prompter" aria-selected="false">Teleprompter</button>
+      <button role="tab" data-view="slides" aria-selected="false">Folien</button>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section id="script">
+    <div class="summary" id="summary"></div>
+    <div class="toolbar">
+      <button class="btn primary" id="startPrompter">▶ Teleprompter starten</button>
+      <button class="btn" id="editToggle">✎ Bearbeiten</button>
+      <button class="btn" id="exportMd">Export .md</button>
+      <button class="btn" id="exportJson">Export .json</button>
+      <button class="btn" id="importJson">Import .json</button>
+      <button class="btn" id="resetAll">Zurücksetzen</button>
+      <input type="file" id="importFile" accept="application/json,.json" hidden>
+    </div>
+    <p class="hint" id="editHint" hidden>Bearbeitungsmodus: Texte direkt anklicken und ändern. Änderungen werden in diesem Browser gespeichert. Mit „Export .md“ übernimmst du sie ins Repo.</p>
+    <div id="scenes"></div>
+  </section>
+
+  <section id="slides">
+    <div class="slide-nav">
+      <span class="count" id="slideCount"></span>
+      <button class="btn" id="slidePrev">← Zurück</button>
+      <button class="btn" id="slideNext">Weiter →</button>
+      <button class="btn" id="slideFs">⛶ Vollbild (F)</button>
+    </div>
+    <div class="stage-wrap"><div class="stage" id="stage"></div></div>
+    <p class="hint" style="margin-top:14px">Vollbild öffnen und abfilmen. Die Pfeiltasten blättern. Im Bearbeitungsmodus (Tab „Skript“ → ✎) lassen sich die Folientexte direkt ändern.</p>
+  </section>
+</main>
+
+<div id="prompter" aria-hidden="true">
+  <div id="pScroll"><div id="pContent"></div></div>
+  <div id="guide"></div>
+  <div class="fade-top"></div><div class="fade-bot"></div>
+  <div id="pHud"><span id="pScene"></span><span id="pTime"></span></div>
+  <div id="countdown"></div>
+  <div id="pBar">
+    <button id="pPlay" title="Start / Pause (Leertaste)">▶ Start</button>
+    <span class="sep"></span>
+    <button data-p="slower" title="Langsamer (↓)">−</button>
+    <span class="val" id="pSpeed"></span>
+    <button data-p="faster" title="Schneller (↑)">+</button>
+    <span class="sep"></span>
+    <button data-p="smaller" title="Schrift kleiner (-)">A−</button>
+    <button data-p="bigger" title="Schrift größer (+)">A+</button>
+    <span class="sep"></span>
+    <button data-p="prev" title="Vorige Szene (←)">⏮</button>
+    <button data-p="next" title="Nächste Szene (→)">⏭</button>
+    <button data-p="top" title="An den Anfang (R)">↺</button>
+    <span class="sep"></span>
+    <button data-p="mia" title="Mia-Zeilen ein/aus">Mia</button>
+    <button data-p="notes" title="Regie-Hinweise ein/aus (N)">Regie</button>
+    <button data-p="mirror" title="Spiegeln für Teleprompter-Glas (M)">⇋</button>
+    <button data-p="fs" title="Vollbild (F)">⛶</button>
+    <button data-p="close" title="Schließen (Esc)">✕</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+const REPO = "github.com/kaiser-data/mia-alexa-care-companion";
+
+const WHO = {
+  vo: "Voice-over (du)", rose: "Rose", mia: "Mia (erwartet)",
+  caption: "Einblendung", screen: "Bild", note: "Regie"
+};
+
+const DEFAULT = {
+  scenes: [
+    { title: "Opening", len: 12, profile: "", clock: "", lines: [
+      { who: "screen", text: "The Mia page, big circle." },
+      { who: "caption", text: "Rose, 81, lives alone with Alzheimer's. Her son Tom lives two hours away." },
+      { who: "vo", text: "Mia is built as an add-on for Alexa Plus, by a carer for his mother, who lives with dementia. Rose never has to learn a name or a command. Mia knows her day, her pills and her people, and tells Tom when something is wrong. This is our own simulator of Alexa Plus, because the Alexa Plus tools are closed to hackathon participants." }
+    ]},
+    { title: "Morning pills, Mia speaks first", len: 43, profile: "rose", clock: "2026-10-26T07:59:40-04:00", lines: [
+      { who: "note", text: "Tap the circle once. Say nothing. Caption “Monday, 8:00”. Say “I took them” within two minutes after 8:00." },
+      { who: "mia", text: "Now it's time for your morning pills. Have you taken your morning pills yet?" },
+      { who: "rose", text: "Did I take my pills?" },
+      { who: "mia", text: "Now it's time for your morning pills. That's the small white pill and the round pink one." },
+      { who: "rose", text: "I took them." },
+      { who: "mia", text: "Thank you. I've noted your morning pills." },
+      { who: "note", text: "About 30 seconds later. Cut the wait." },
+      { who: "rose", text: "Did I take my pills?" },
+      { who: "mia", text: "You took your morning pills at about eight o'clock. No more pills needed now. Your next pills are at eight o'clock in the evening." },
+      { who: "caption", text: "Answers come from the log Tom's plan creates, never from the model." }
+    ]},
+    { title: "A group day: leave-by reminder, checklist, weather", len: 25, profile: "rose", clock: "2026-10-26T09:34:45-04:00", lines: [
+      { who: "mia", text: "You leave for Maple Grove Day Club at twenty to ten. Shall I tell you what to take?" },
+      { who: "rose", text: "Yes." },
+      { who: "mia", text: "(only if cold or rainy) “It's cold today. Wear your warm coat.” or “It may rain today. Take your umbrella.”" },
+      { who: "mia", text: "Take your keys on the red lanyard and your handbag." },
+      { who: "rose", text: "And then?" },
+      { who: "mia", text: "Take your glasses and your coat." },
+      { who: "note", text: "No weather line? That is correct. Never fake it. Say in the voice-over instead: “on a cold day she also hears a weather line”." },
+      { who: "caption", text: "She never said 'Mia'. She never said 'group'. Mia spoke first and asked a yes or no question." }
+    ]},
+    { title: "A health question: Mia does not answer, Tom is told", len: 25, profile: "rose", clock: "2026-10-26T14:20:00-04:00", lines: [
+      { who: "rose", text: "Can I take an aspirin?" },
+      { who: "mia", text: "I can't answer that one. Let's ask Tom first." },
+      { who: "screen", text: "Cut to Tom's inbox. Subject: [Mia] Rose has a health question: “Can I take an aspirin?”. Severity: medium." },
+      { who: "caption", text: "Mia never gives medical advice. It says so, and it tells Tom." }
+    ]},
+    { title: "Two in the morning", len: 13, profile: "rose", clock: "2026-10-27T02:00:05-04:00", lines: [
+      { who: "note", text: "Ask within 50 seconds. From 02:01 on, Mia says “about two o'clock”." },
+      { who: "rose", text: "Is it morning?" },
+      { who: "mia", text: "It's two o'clock, in the middle of the night. You're safe at home. You can go back to sleep." },
+      { who: "caption", text: "At night, a confused question gets the same calm answer, every time." }
+    ]},
+    { title: "“I fell”", len: 17, profile: "rose", clock: "2026-10-26T16:10:00-04:00", lines: [
+      { who: "rose", text: "I fell." },
+      { who: "mia", text: "I've let Tom know right away. Tom will get in touch with you." },
+      { who: "screen", text: "Cut to Tom's inbox. Subject: [Mia] URGENT: Rose asked for help: “I fell.”. Severity: high." },
+      { who: "vo", text: "If the email cannot be sent, Mia says so: 'I couldn't reach Tom. Please call for help.' She is never left with silence." }
+    ]},
+    { title: "German in 20 seconds", len: 20, profile: "rose-de", clock: "2026-10-26T08:00:30-04:00", lines: [
+      { who: "mia", text: "Jetzt ist Zeit für deine Morgentabletten. Hast du deine Morgentabletten schon genommen?" },
+      { who: "rose", text: "Ich habe sie genommen." },
+      { who: "mia", text: "Danke. Ich habe deine Morgentabletten notiert." },
+      { who: "rose", text: "Hilfe, ich bin gestürzt." },
+      { who: "mia", text: "Ich habe Tom sofort Bescheid gegeben. Tom meldet sich bei dir." },
+      { who: "caption", text: "The same Mia in German. Alexa Plus add-ons are English (en-US) only today; in our simulator, a new language is a set of templates." }
+    ]},
+    { title: "Architecture, Care Mode proposal, AWS", len: 15, profile: "", clock: "", lines: [
+      { who: "screen", text: "Slide A: architecture (about 8 s). Tab “Folien”." },
+      { who: "vo", text: "The Mia server is a real MCP server over Streamable HTTP, built to the documented Alexa Plus client behaviour. The simulator is an MCP client. The language model picks tools and phrase ids and writes nothing. Mia runs on one server on AWS in Frankfurt, and alarms go out through Amazon SES." },
+      { who: "note", text: "Recorded locally? Say instead: “The same build runs on one server on AWS in Frankfurt, and alarms go out through Amazon SES.”" },
+      { who: "screen", text: "Slide B: Care Mode proposal (about 7 s)." },
+      { who: "vo", text: "What you saw, Mia speaking first and being reached without its name, is not possible in Alexa Plus add-ons today. We built it in the simulator and wrote it up as a Care Mode proposal for Amazon. Code, license and setup are in the repository." },
+      { who: "screen", text: "End card: project name, repository URL, “Fictional persona: Rose Whitaker”." }
+    ]}
+  ],
+  slides: [
+    { kind: "caption", text: "Rose, 81, lives alone with Alzheimer's. Her son Tom lives two hours away." },
+    { kind: "flow", kicker: "Architecture", title: "How Mia works", steps: [
+      ["Rose speaks", "Browser “Echo” simulator · Chrome speech, no wake word"],
+      ["Mia Voice gateway", "The LLM picks a tool + catalogue phrases, writes nothing"],
+      ["Mia MCP server", "Streamable HTTP · MCP 2025-11-25 · 16 tools"],
+      ["Encrypted store", "SQLite · AES-256-GCM"],
+      ["Alarm email", "Amazon SES → Tom's inbox"]
+    ], foot: "Runs on one EC2 instance in Frankfurt (eu-central-1), HTTPS by Caddy." },
+    { kind: "list", kicker: "Proposal, not current Alexa+ behaviour", title: "Care Mode", items: [
+      "Care topics reach a trusted add-on without its name.",
+      "The add-on may speak first at agreed times.",
+      "Carer-set limits on both."
+    ]},
+    { kind: "end", title: "Mia", sub: "Memory & Care Companion for Alexa+", items: [REPO, "MIT licensed · Fictional persona: Rose Whitaker"] }
+  ]
+};
+
+const STORE_KEY = "mia-prompter-v1";
+const PREF_KEY = "mia-prompter-prefs-v1";
+const clone = (o) => JSON.parse(JSON.stringify(o));
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const fmt = (s) => { s = Math.max(0, Math.round(s)); return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); };
+
+function load(key) { try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch { return null; } }
+function save(key, v) { try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* storage unavailable */ } }
+
+let state = load(STORE_KEY);
+if (!state || !Array.isArray(state.scenes) || !Array.isArray(state.slides)) state = clone(DEFAULT);
+const prefs = Object.assign({ speed: 55, size: 52, mirror: false, notes: true, mia: true }, load(PREF_KEY) || {});
+let editing = false;
+let saveTimer = 0;
+function persist() { clearTimeout(saveTimer); saveTimer = setTimeout(() => save(STORE_KEY, state), 250); }
+
+function setPath(path, value) {
+  const keys = path.split(".");
+  let o = state;
+  for (let i = 0; i < keys.length - 1; i++) o = o[keys[i]];
+  o[keys[keys.length - 1]] = value;
+}
+const ce = (path) => editing ? ` contenteditable="true" spellcheck="true" data-path="${path}"` : "";
+
+/* ---------- script view ---------- */
+function starts() { let t = 0; return state.scenes.map((s) => { const st = t; t += Number(s.len) || 0; return st; }); }
+function total() { return state.scenes.reduce((a, s) => a + (Number(s.len) || 0), 0); }
+
+function renderSummary() {
+  const t = total();
+  const over = t >= 180;
+  document.getElementById("summary").innerHTML =
+    `<span>Gesamtlänge <b class="${over ? "over" : ""}">${fmt(t)}</b> von max. 2:59${over ? ' <b class="over">· zu lang</b>' : ""}</span>` +
+    `<span>${state.scenes.length} Szenen</span>` +
+    `<span>Ziel <b>2:50</b></span>`;
+  const st = starts();
+  document.querySelectorAll("[data-start]").forEach((el) => {
+    const i = +el.dataset.start;
+    el.textContent = `${fmt(st[i])}–${fmt(st[i] + (Number(state.scenes[i].len) || 0))}`;
+  });
+}
+
+function cmds(s, i) {
+  const vars = `MIA_PROFILE=${s.profile} MIA_DATA_DIR=.mia-data/take-${i}-$(date +%H%M%S) MIA_CLOCK_START=${s.clock}`;
+  return {
+    server: `printf 'MIA_PROFILE=${s.profile}\\nMIA_DATA_DIR=.mia-data/take-${i}-%s\\nMIA_CLOCK_START=${s.clock}\\n' "$(date +%H%M%S)" | sudo tee /etc/mia/take.env >/dev/null && sudo systemctl restart mia`,
+    local: `${vars} pnpm dev`
+  };
+}
+
+function renderScenes() {
+  const st = starts();
+  document.getElementById("scenes").innerHTML = state.scenes.map((s, i) => {
+    const setup = s.profile ? `
+      <div class="setup">
+        <span class="chip">MIA_PROFILE=${esc(s.profile)}</span>
+        <span class="chip">MIA_CLOCK_START=${esc(s.clock)}</span>
+        <span style="margin-left:auto;display:flex;gap:6px">
+          <button class="btn small" data-act="copy" data-kind="server" data-s="${i}" title="Befehl für den EC2-Server kopieren (frisches Datenverzeichnis pro Take)">⧉ Server-Take</button>
+          <button class="btn small" data-act="copy" data-kind="local" data-s="${i}" title="Befehl für lokal kopieren">⧉ Lokal</button>
+        </span>
+      </div>` : "";
+    const lines = s.lines.map((l, j) => `
+      <div class="ln k-${l.who}">
+        <div class="who w-${l.who}">${editing
+          ? `<select data-path="scenes.${i}.lines.${j}.who">${Object.keys(WHO).map((k) => `<option value="${k}"${k === l.who ? " selected" : ""}>${WHO[k]}</option>`).join("")}</select>`
+          : WHO[l.who] || l.who}</div>
+        <div class="txt"${ce(`scenes.${i}.lines.${j}.text`)}>${esc(l.text)}</div>
+        <div class="ln-actions">${editing ? `
+          <button class="btn small" data-act="up" data-s="${i}" data-l="${j}" title="Nach oben">↑</button>
+          <button class="btn small" data-act="del" data-s="${i}" data-l="${j}" title="Zeile löschen">✕</button>` : ""}</div>
+      </div>`).join("");
+    return `
+      <article class="scene" id="scene-${i}">
+        <div class="scene-head">
+          <span class="scene-no">${i}</span>
+          <span class="scene-title"${ce(`scenes.${i}.title`)}>${esc(s.title)}</span>
+          <span class="scene-time"><span data-start="${i}">${fmt(st[i])}</span> · ${editing
+            ? `<input type="number" min="0" max="180" data-path="scenes.${i}.len" data-num value="${Number(s.len) || 0}"> s`
+            : `${Number(s.len) || 0} s`}</span>
+        </div>
+        ${setup}
+        <div class="lines">${lines}</div>
+        ${editing ? `<div class="add-row"><button class="btn small" data-act="add" data-s="${i}">+ Zeile</button></div>` : ""}
+      </article>`;
+  }).join("");
+  renderSummary();
+}
+
+const scenesEl = document.getElementById("scenes");
+scenesEl.addEventListener("input", (e) => {
+  const t = e.target;
+  if (!t.dataset.path) return;
+  if (t.isContentEditable) setPath(t.dataset.path, t.innerText.replace(/\n+$/, ""));
+  else if (t.dataset.num !== undefined) { setPath(t.dataset.path, Math.max(0, Number(t.value) || 0)); renderSummary(); }
+  persist();
+});
+scenesEl.addEventListener("change", (e) => {
+  const t = e.target;
+  if (t.tagName === "SELECT" && t.dataset.path) { setPath(t.dataset.path, t.value); persist(); renderScenes(); }
+});
+scenesEl.addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-act]");
+  if (!b) return;
+  const s = state.scenes[+b.dataset.s];
+  const j = +b.dataset.l;
+  switch (b.dataset.act) {
+    case "copy": copy(cmds(s, +b.dataset.s)[b.dataset.kind], b); return;
+    case "del": s.lines.splice(j, 1); break;
+    case "up": if (j > 0) [s.lines[j - 1], s.lines[j]] = [s.lines[j], s.lines[j - 1]]; break;
+    case "add": s.lines.push({ who: "rose", text: "…" }); break;
+  }
+  persist(); renderScenes();
+});
+
+function copy(text, btn) {
+  const done = () => { const o = btn.textContent; btn.textContent = "✓ kopiert"; setTimeout(() => (btn.textContent = o), 1400); };
+  if (navigator.clipboard) navigator.clipboard.writeText(text).then(done, () => fallbackCopy(text, done));
+  else fallbackCopy(text, done);
+}
+function fallbackCopy(text, done) {
+  const ta = document.createElement("textarea");
+  ta.value = text; document.body.appendChild(ta); ta.select();
+  try { document.execCommand("copy"); done(); } catch { prompt("Kopieren:", text); }
+  ta.remove();
+}
+
+/* ---------- toolbar ---------- */
+document.getElementById("editToggle").addEventListener("click", (e) => {
+  editing = !editing;
+  e.currentTarget.classList.toggle("on", editing);
+  e.currentTarget.textContent = editing ? "✓ Fertig" : "✎ Bearbeiten";
+  document.getElementById("editHint").hidden = !editing;
+  renderScenes(); renderSlide();
+});
+document.getElementById("resetAll").addEventListener("click", () => {
+  if (!confirm("Alle Änderungen verwerfen und das Original-Skript laden?")) return;
+  state = clone(DEFAULT); save(STORE_KEY, state); renderScenes(); renderSlide();
+});
+function download(name, text, type) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([text], { type }));
+  a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+document.getElementById("exportJson").addEventListener("click", () => download("mia-video-script.json", JSON.stringify(state, null, 2), "application/json"));
+document.getElementById("importJson").addEventListener("click", () => document.getElementById("importFile").click());
+document.getElementById("importFile").addEventListener("change", (e) => {
+  const f = e.target.files[0];
+  if (!f) return;
+  f.text().then((t) => {
+    try {
+      const d = JSON.parse(t);
+      if (!Array.isArray(d.scenes) || !Array.isArray(d.slides)) throw new Error("scenes/slides fehlen");
+      state = d; persist(); renderScenes(); renderSlide();
+    } catch (err) { alert("Import fehlgeschlagen: " + err.message); }
+  });
+  e.target.value = "";
+});
+document.getElementById("exportMd").addEventListener("click", () => {
+  const st = starts();
+  let md = `# Mia: demo video script (teleprompter export)\n\nTotal ${fmt(total())}.\n`;
+  state.scenes.forEach((s, i) => {
+    md += `\n### ${i}. ${s.title} (${fmt(st[i])} to ${fmt(st[i] + (Number(s.len) || 0))})\n\n`;
+    if (s.profile) md += `\`MIA_PROFILE=${s.profile}\` \`MIA_CLOCK_START=${s.clock}\`\n\n`;
+    md += `| Who | Line |\n|---|---|\n`;
+    s.lines.forEach((l) => { md += `| ${WHO[l.who] || l.who} | ${l.text.replace(/\|/g, "\\|").replace(/\n/g, " ")} |\n`; });
+  });
+  download("demo-video-script.export.md", md, "text/markdown");
+});
+
+/* ---------- views ---------- */
+const views = { script: document.getElementById("script"), slides: document.getElementById("slides") };
+function show(view) {
+  document.querySelectorAll(".tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === view)));
+  if (view === "prompter") { openPrompter(); return; }
+  views.script.style.display = view === "script" ? "" : "none";
+  views.slides.classList.toggle("open", view === "slides");
+  current = view;
+  try { localStorage.setItem("mia-prompter-view", view); } catch { /* ignore */ }
+}
+let current = "script";
+document.querySelectorAll(".tabs button").forEach((b) => b.addEventListener("click", () => show(b.dataset.view)));
+document.getElementById("startPrompter").addEventListener("click", () => show("prompter"));
+
+/* ---------- teleprompter ---------- */
+const P = document.getElementById("prompter");
+const pScroll = document.getElementById("pScroll");
+const pContent = document.getElementById("pContent");
+let playing = false, pos = 0, last = 0, elapsed = 0, raf = 0, cdTimer = 0;
+
+function buildPrompter() {
+  const st = starts();
+  pContent.innerHTML = state.scenes.map((s, i) => `
+    <section class="p-scene" data-i="${i}">
+      <h2>${i} · ${esc(s.title)}<span>${fmt(st[i])} · ${Number(s.len) || 0}s</span></h2>
+      ${s.profile ? `<div class="p-setup">${esc(s.profile)} · ${esc(s.clock)}</div>` : ""}
+      ${s.lines.map((l) => `<div class="p-ln p-${l.who}"><span class="p-who">${esc(WHO[l.who] || l.who)}</span><span class="p-txt">${esc(l.text)}</span></div>`).join("")}
+    </section>`).join("") + `<div class="p-end">— ENDE —</div>`;
+  applyPrefs();
+}
+function applyPrefs() {
+  P.style.setProperty("--pfs", prefs.size + "px");
+  pContent.classList.toggle("mirror", prefs.mirror);
+  P.classList.toggle("hide-notes", !prefs.notes);
+  P.classList.toggle("hide-mia", !prefs.mia);
+  document.getElementById("pSpeed").textContent = prefs.speed + " px/s";
+  P.querySelector('[data-p="mirror"]').classList.toggle("on", prefs.mirror);
+  P.querySelector('[data-p="notes"]').classList.toggle("on", prefs.notes);
+  P.querySelector('[data-p="mia"]').classList.toggle("on", prefs.mia);
+  save(PREF_KEY, prefs);
+}
+function openPrompter() {
+  buildPrompter();
+  P.classList.add("open"); P.setAttribute("aria-hidden", "false");
+  document.body.style.overflow = "hidden";
+  pos = pScroll.scrollTop; hud();
+}
+function closePrompter() {
+  pause();
+  P.classList.remove("open"); P.setAttribute("aria-hidden", "true");
+  document.body.style.overflow = "";
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  document.querySelectorAll(".tabs button").forEach((b) => b.setAttribute("aria-selected", String(b.dataset.view === current)));
+}
+function tick(now) {
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  if (Math.abs(pScroll.scrollTop - pos) > 3) pos = pScroll.scrollTop; // manual scroll wins
+  pos += prefs.speed * dt;
+  pScroll.scrollTop = pos;
+  elapsed += dt;
+  hud();
+  if (pScroll.scrollTop + pScroll.clientHeight >= pScroll.scrollHeight - 1) { pause(); return; }
+  raf = requestAnimationFrame(tick);
+}
+function play() {
+  if (playing) return;
+  const go = () => {
+    playing = true; P.classList.add("playing");
+    document.getElementById("pPlay").textContent = "❚❚ Pause";
+    pos = pScroll.scrollTop; last = performance.now();
+    raf = requestAnimationFrame(tick);
+  };
+  if (pScroll.scrollTop < 5) {
+    const cd = document.getElementById("countdown");
+    let n = 3; cd.textContent = n; cd.classList.add("show");
+    clearInterval(cdTimer);
+    cdTimer = setInterval(() => {
+      n--;
+      if (n <= 0) { clearInterval(cdTimer); cd.classList.remove("show"); go(); }
+      else cd.textContent = n;
+    }, 800);
+  } else go();
+}
+function pause() {
+  clearInterval(cdTimer); document.getElementById("countdown").classList.remove("show");
+  playing = false; P.classList.remove("playing");
+  cancelAnimationFrame(raf);
+  document.getElementById("pPlay").textContent = "▶ Start";
+}
+function guideY() { return window.innerHeight * 0.38; }
+function sceneAt() {
+  const secs = [...pContent.querySelectorAll(".p-scene")];
+  const y = pScroll.scrollTop + guideY() + 10;
+  let idx = 0;
+  secs.forEach((s, i) => { if (s.offsetTop <= y) idx = i; });
+  return idx;
+}
+function jump(delta) {
+  const secs = [...pContent.querySelectorAll(".p-scene")];
+  const i = Math.min(secs.length - 1, Math.max(0, sceneAt() + delta));
+  pScroll.scrollTop = secs[i].offsetTop - guideY() + 4;
+  pos = pScroll.scrollTop; hud();
+}
+function hud() {
+  const i = sceneAt();
+  const s = state.scenes[i];
+  if (!s) return;
+  const over = elapsed > 179;
+  document.getElementById("pScene").innerHTML = `Szene <b>${i}</b> · ${esc(s.title)} · Budget ${Number(s.len) || 0}s`;
+  document.getElementById("pTime").innerHTML = `<b class="${over ? "over" : ""}">${fmt(elapsed)}</b> / ${fmt(total())}`;
+}
+pScroll.addEventListener("scroll", () => { if (!playing) hud(); });
+document.getElementById("pPlay").addEventListener("click", () => (playing ? pause() : play()));
+P.querySelector("#pBar").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-p]");
+  if (b) act(b.dataset.p);
+});
+function act(a) {
+  switch (a) {
+    case "slower": prefs.speed = Math.max(5, prefs.speed - 5); break;
+    case "faster": prefs.speed = Math.min(400, prefs.speed + 5); break;
+    case "smaller": prefs.size = Math.max(20, prefs.size - 4); break;
+    case "bigger": prefs.size = Math.min(140, prefs.size + 4); break;
+    case "mirror": prefs.mirror = !prefs.mirror; break;
+    case "notes": prefs.notes = !prefs.notes; break;
+    case "mia": prefs.mia = !prefs.mia; break;
+    case "prev": jump(-1); return;
+    case "next": jump(1); return;
+    case "top": pause(); pScroll.scrollTop = 0; pos = 0; elapsed = 0; hud(); return;
+    case "fs": toggleFs(P); return;
+    case "close": closePrompter(); return;
+  }
+  applyPrefs();
+}
+function toggleFs(el) {
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  else if (el.requestFullscreen) el.requestFullscreen().catch(() => {});
+}
+
+/* ---------- slides ---------- */
+let slideIdx = 0;
+function renderSlide() {
+  const stage = document.getElementById("stage");
+  slideIdx = Math.min(slideIdx, state.slides.length - 1);
+  const s = state.slides[slideIdx];
+  const p = `slides.${slideIdx}`;
+  let html = "";
+  if (s.kind === "caption") {
+    html = `<div class="slide caption"><div class="cap"${ce(p + ".text")}>${esc(s.text)}</div></div>`;
+  } else if (s.kind === "flow") {
+    html = `<div class="slide">
+      <div class="kicker"${ce(p + ".kicker")}>${esc(s.kicker)}</div>
+      <h3${ce(p + ".title")}>${esc(s.title)}</h3>
+      <div class="flow">${s.steps.map((st, k) => `
+        <div class="step"><span class="n">${k + 1}</span>
+          <span class="lbl"${ce(`${p}.steps.${k}.0`)}>${esc(st[0])}</span>
+          <span class="dt"${ce(`${p}.steps.${k}.1`)}>${esc(st[1])}</span></div>`).join("")}</div>
+      <div class="foot"${ce(p + ".foot")}>${esc(s.foot)}</div></div>`;
+  } else if (s.kind === "list") {
+    html = `<div class="slide">
+      <div class="kicker"${ce(p + ".kicker")}>${esc(s.kicker)}</div>
+      <h3${ce(p + ".title")}>${esc(s.title)}</h3>
+      <ol class="big">${s.items.map((it, k) => `<li><span${ce(`${p}.items.${k}`)}>${esc(it)}</span></li>`).join("")}</ol></div>`;
+  } else {
+    html = `<div class="slide end">
+      <h3${ce(p + ".title")}>${esc(s.title)}</h3>
+      <div class="sub"${ce(p + ".sub")}>${esc(s.sub)}</div>
+      <div class="meta">${s.items.map((it, k) => `<div${ce(`${p}.items.${k}`)}>${esc(it)}</div>`).join("")}</div></div>`;
+  }
+  stage.innerHTML = html;
+  document.getElementById("slideCount").textContent = `Folie ${slideIdx + 1} / ${state.slides.length}`;
+}
+document.getElementById("stage").addEventListener("input", (e) => {
+  const t = e.target.closest("[data-path]");
+  if (t) { setPath(t.dataset.path, t.innerText.replace(/\n+$/, "")); persist(); }
+});
+const stepSlide = (d) => { slideIdx = (slideIdx + d + state.slides.length) % state.slides.length; renderSlide(); };
+document.getElementById("slidePrev").addEventListener("click", () => stepSlide(-1));
+document.getElementById("slideNext").addEventListener("click", () => stepSlide(1));
+document.getElementById("slideFs").addEventListener("click", () => toggleFs(document.getElementById("stage")));
+
+/* ---------- keyboard ---------- */
+document.addEventListener("keydown", (e) => {
+  const t = e.target;
+  if (t.isContentEditable || /^(INPUT|SELECT|TEXTAREA)$/.test(t.tagName)) return;
+  if (P.classList.contains("open")) {
+    const map = { " ": () => (playing ? pause() : play()), ArrowUp: () => act("faster"), ArrowDown: () => act("slower"),
+      ArrowLeft: () => act("prev"), ArrowRight: () => act("next"), "+": () => act("bigger"), "=": () => act("bigger"), "-": () => act("smaller"),
+      m: () => act("mirror"), n: () => act("notes"), f: () => act("fs"), r: () => act("top"), Escape: () => { if (!document.fullscreenElement) closePrompter(); } };
+    const fn = map[e.key.length === 1 ? e.key.toLowerCase() : e.key];
+    if (fn) { e.preventDefault(); fn(); }
+  } else if (current === "slides") {
+    if (e.key === "ArrowRight" || e.key === " " || e.key === "PageDown") { e.preventDefault(); stepSlide(1); }
+    else if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); stepSlide(-1); }
+    else if (e.key.toLowerCase() === "f") toggleFs(document.getElementById("stage"));
+  }
+});
+
+renderScenes();
+renderSlide();
+const [hashView, hashSlide] = location.hash.slice(1).split("-");
+if (hashSlide) { slideIdx = Math.max(0, (+hashSlide || 1) - 1); renderSlide(); }
+if (hashView === "slides" || hashView === "prompter") show(hashView);
+else try { const v = localStorage.getItem("mia-prompter-view"); if (v === "slides") show("slides"); } catch { /* ignore */ }
+</script>
+</body>
+</html>
