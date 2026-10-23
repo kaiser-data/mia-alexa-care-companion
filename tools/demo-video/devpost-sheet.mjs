@@ -36,7 +36,8 @@ const testing = execFileSync("git", ["-C", REPO, "show", "29c0b0e:docs/submissio
 
 const fields = [
   ["Project overview", "Project name", "Mia: Always Remembers"],
-  ["Project overview", "Elevator pitch (200)", "A gentle second brain for people living with dementia and those who care for them: Mia keeps daily routines on track, holds the details of each day, and keeps the family close."],
+  ["Project overview", "Elevator pitch (200)", "Your day, remembered. Your family, reassured. Mia is a gentle second brain on Alexa+ for seniors living with dementia: it keeps daily routines on track and keeps the family close."],
+  ["Project details", "About the project (one field, all sections)", readFileSync(join(new URL(".", import.meta.url).pathname, "about.md"), "utf8").trim()],
   ["Project details", "Inspiration", absLinks(story["Inspiration"])],
   ["Project details", "What it does", absLinks(story["What it does"])],
   ["Project details", "How we built it", absLinks(story["How it was built"])],
@@ -52,6 +53,12 @@ const fields = [
   ["Additional info", "Repository URL", REPO_URL],
   ["Additional info", "GitHub username", "kaiser-data"],
   ["Additional info", "Testing instructions", testing.replace(/Mia is a hackathon prototype/, "Mia is a prototype")],
+  ["Feedback", "Q1 Tools, APIs, SDKs used", absLinks(fb["1. Tools, APIs and SDKs used, and for what"])],
+  ["Feedback", "Q2 What worked well", absLinks(fb["2. What worked well"])],
+  ["Feedback", "Q3 What needs work", absLinks(fb["3. What needs work"])],
+  ["Feedback", "Q4 Onboarding", absLinks(fb["4. Onboarding: zero to hello world"])],
+  ["Feedback", "Q5 Build again?", absLinks(fb["5. Would we build with these devices and services again?"])],
+  ["Feedback", "AI tools used", "Claude Code (Claude Opus) for design, code, tests and reviews; OpenAI Codex CLI for independent code and video reviews; Featherless (gpt-oss-120b) and Anthropic Claude as Mia's tool-picking model; ElevenLabs for the demo video voices; image generation for the brand images."],
   ["Additional info", "Product feedback (all)", absLinks(feedback.replace(/^# .*\n+/, ""))],
   ["Additional info", "AWS services used (§7)", absLinks(fb["7. AWS Builder mini challenge: which AWS services and how"])],
   ["Additional info", "Open Source (§8)", absLinks(fb["8. Open Source mini challenge"])],

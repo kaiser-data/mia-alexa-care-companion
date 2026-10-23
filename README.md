@@ -1,10 +1,12 @@
 <div align="center">
 
-# Mia
+<img src="docs/images/mia-logo.png" alt="Mia · Always Remembers." width="440">
 
-**A memory & care companion for Alexa+, for people living with dementia at home.**
+### Your day, remembered. Your family, reassured.
 
-Mia knows the day, the pills and the people. It answers the same question the same kind way every time, speaks first when it matters, and tells the family when something is wrong.
+A gentle second brain on Alexa+ for seniors living with dementia. Mia knows the day, the pills and the people, answers the same question the same kind way every time, speaks first when it matters, and keeps the family in the loop.
+
+**[▶ Watch the 2-minute demo](https://youtu.be/OGxE203h0Dk)**
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Node 24](https://img.shields.io/badge/node-24-339933?logo=node.js&logoColor=white)
@@ -13,13 +15,17 @@ Mia knows the day, the pills and the people. It answers the same question the sa
 ![Tests](https://img.shields.io/badge/tests-1036%20passing-2EA043)
 ![AWS](https://img.shields.io/badge/AWS-EC2%20%C2%B7%20SES%20%C2%B7%20Frankfurt-FF9900)
 
-[How it works](#how-it-works) · [Quick start](#quick-start) · [Safety](#safety-by-design) · [Privacy](#privacy) · [Status](#status--whats-next) · [Docs](#docs)
+[Demo](#demo) · [How it works](#how-it-works) · [Quick start](#quick-start) · [Safety](#safety-by-design) · [Privacy](#privacy) · [Status](#status--whats-next) · [Docs](#docs)
 
 </div>
 
 ---
 
+<p align="center"><img src="docs/images/rose-kitchen.png" alt="An older woman talks to her speaker at the kitchen table while her son smiles at his phone" width="760"></p>
+
 ## Why Mia
+
+I built Mia for my mother, who lives alone with dementia. I want her to manage her own day, with a companion she can simply talk to, and I want to know when she needs me.
 
 Rose Whitaker is 81 and lives alone with Alzheimer's. Her son Tom looks after her from two hours away. *(Rose and Tom are fictional, see the [persona](docs/persona/rose.md).)*
 
@@ -36,6 +42,12 @@ A general voice assistant guesses, forgets and waits to be called by name. Someo
 When something is wrong, such as a fall, a cry for help or a health question Mia must not answer, **Tom gets an email within seconds**.
 
 Mia started at the [Build, Ship, Shape: Amazon Developer Hackathon](https://amazonappdev2026.devpost.com/) (October 2026) as an exploration of what a care companion on Alexa+ could be. It is a working prototype, see [Status & what's next](#status--whats-next).
+
+## Demo
+
+[![Mia demo video](docs/images/alert-demo.png)](https://youtu.be/OGxE203h0Dk)
+
+The [demo video](https://youtu.be/OGxE203h0Dk) is recorded automatically from the real app by [`tools/demo-video`](tools/demo-video): it starts Mia with a demo clock for each scene, types Rose's lines, voices them with ElevenLabs, captures the real alert emails through a local Amazon SES stand-in, and cuts everything with ffmpeg.
 
 ## What's in the box
 
@@ -71,6 +83,8 @@ flowchart TD
     M["Mia MCP server<br/><sub>16 tools · Streamable HTTP · bearer token</sub>"] --> DB[("SQLite<br/><sub>AES-256-GCM at rest</sub>")]
     M --> A["Alerts"] --> SES["Amazon SES"] --> T["📬 Tom's inbox"]
 ```
+
+<p align="center"><img src="docs/images/aws-infrastructure.png" alt="AWS infrastructure: EC2 in Frankfurt with Caddy, Mia Voice, the MCP server and an encrypted store; IAM role and Amazon SES for alerts" width="760"></p>
 
 **"Claude picks, doesn't write."** The language model never writes a sentence that Rose hears. It only chooses which tool runs and which catalogue phrases come before or after. Every fact comes from a tool, and every sentence comes from the template catalogue in [`packages/shared/src/i18n`](packages/shared/src/i18n). Plain pill questions and cries for help skip the model entirely.
 
@@ -177,6 +191,12 @@ Local mode is a demo, not production. Known open findings are in [docs/known-iss
 | [Demo video script](docs/project/demo-video-script.md) | Scene by scene, also as a [teleprompter page](docs/project/teleprompter.html) (open it locally) |
 
 **More:** [design spec](docs/superpowers/specs/2026-10-06-mia-design.md) · [research](docs/research/2026-10-06-practical-implementation.md) · [roadmap](docs/superpowers/plans/2026-10-07-mia-roadmap.md)
+
+## The bigger picture
+
+<p align="center"><img src="docs/images/every-home.png" alt="Older people in their own homes, connected to their family" width="760"></p>
+
+Alexa is already at home with millions of families. Mia turns that speaker into an affordable companion for seniors living alone: improved from the cloud, tuned to their needs, with easier days for them and calmer days for their families.
 
 ## License
 

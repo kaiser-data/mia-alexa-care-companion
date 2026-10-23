@@ -2,7 +2,7 @@
 // placed on the new timeline, overlays, Tom's inbox, title and closing slides with a narrator.
 // Usage: node build.mjs   ->  out/mia-demo.mp4
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium } from "playwright-core";
 import { tts } from "./tts.mjs";
@@ -48,6 +48,18 @@ const BASE_CSS = `
   .small{position:absolute;left:96px;bottom:44px;font-size:16px;color:#7f8794}
 `;
 
+
+const ASSETS = join(HERE, "..", "..", "docs", "images");
+const img = (n) => existsSync(join(ASSETS, n)) ? `data:image/png;base64,${readFileSync(join(ASSETS, n)).toString("base64")}` : null;
+function photoCard(file, kicker, title, sub, pos = "center") {
+  return `<div class="card" style="padding:0;position:relative;background:#0b0e14">
+    <div style="position:absolute;inset:0;background:url(${img(file)}) ${pos}/cover"></div>
+    <div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(11,14,20,.92) 0%,rgba(11,14,20,.55) 32%,rgba(11,14,20,0) 60%)"></div>
+    <div style="position:absolute;left:64px;right:64px;bottom:48px">
+      <div class="kicker" style="margin-bottom:10px">${kicker}</div>
+      <div style="font-size:50px;font-weight:750;letter-spacing:-.02em;line-height:1.1">${title}</div>
+      ${sub ? `<div style="font-size:24px;color:#e6e0d4;margin-top:10px">${sub}</div>` : ""}</div></div>`;
+}
 function titleCard() {
   return `<div class="card"><div class="kicker">The gentle second brain for Alexa+</div><h1>Mia</h1>
     <p class="sub">Always remembers. Sure of the day, safe at home, family in the loop.<br><span style="font-size:26px;color:#c9c4b8">Built by a son for his mother, who lives alone with dementia.</span></p>
@@ -305,12 +317,12 @@ function scenePart(p, overlayPng, phonePng) {
 const browser = await chromium.launch({ channel: "chrome", headless: true });
 const png = (n) => join(TMP, `${n}.png`);
 const cards = [
-  { html: titleCard(), file: png("title") },
+  { html: img("rose-kitchen.png") ? photoCard("rose-kitchen.png", "Mia · Always Remembers", "Sure of the day. Safe at home. Family in the loop.", "Built by a son for his mother, who lives alone with dementia.", "center 30%") : titleCard(), file: png("title") },
   ...INFRA_STEPS.map((_, i) => ({ html: infraCard(i + 1), file: png(`infra-${i + 1}`) })),
   { html: careCard(), file: png("care") },
-  { html: impactCard(), file: png("impact") },
-  { html: nextCard(), file: png("next") },
-  { html: endCard(), file: png("end") },
+  { html: img("every-home.png") ? photoCard("every-home.png", "The bigger picture", "A gentle second brain in every home", "Everywhere · affordable · always improving · peace of mind for the family", "center 35%") : impactCard(), file: png("impact") },
+  { html: img("morning-coffee.png") ? photoCard("morning-coffee.png", "What's next", "Tuned for older voices. A care page for families. Mia on a real Echo.", "", "center 40%") : nextCard(), file: png("next") },
+  { html: img("mia-logo.png") ? `<div class="card" style="background:#fbf8f2;align-items:center;text-align:center"><img src="${img("mia-logo.png")}" style="width:760px"><p style="font-family:Menlo,monospace;font-size:26px;color:#18293a;margin-top:30px">${REPO_URL}</p><p style="font-size:19px;color:#5d6370;margin-top:10px">Open source · MIT · Prototype for family support · Fictional persona: Rose Whitaker</p></div>` : endCard(), file: png("end") },
   ...PLAN.map((p) => ({ html: overlay(p), file: png(`ov-${p.id}`), transparent: true })),
 ];
 const mailsBy = {};

@@ -1,6 +1,13 @@
 # Mia: the project story
 
-**A calm voice for people living with dementia.**
+**Always Remembers.** Your day, remembered. Your family, reassured.
+
+| For | Mia means |
+|---|---|
+| Seniors living alone | Your day, your way, with a friend who remembers the details. |
+| Sons and daughters | Know Mum and Dad are okay, and hear from Mia when they need you. |
+| Carers and care services | Routines that run themselves, and alerts that matter. |
+| Everyone | A gentle second brain on the speaker already in millions of homes. |
 
 ## Inspiration
 
