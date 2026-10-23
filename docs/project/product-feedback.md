@@ -71,7 +71,7 @@ Honest scope: this build uses a small set of AWS services, each with a documente
 - **Elastic IP + sslip.io** give a stable HTTPS address without a domain.
 - **IAM instance role** gives the server permission to send mail; there are no AWS access keys on the instance.
 - **Amazon SES (v2 API)**: the alarm channel. Medium and high alerts are stored, then mailed to Tom. The same medium alert is mailed at most once per 6 hours; a cry for help is mailed every time. If a high alert cannot be mailed, the server throws and Mia tells Rose: "I couldn't reach Tom. Please call for help." Subjects look like `[Mia] URGENT: Rose asked for help: "I fell.".`
-- Provisioning and deploy scripts, the Caddyfile and the systemd unit are in `deploy/aws/` in the repository, with a README.
+- Provisioning and deploy scripts, the Caddyfile and the systemd unit are in `deploy/aws/` in the repository, with a README. The instance ran live for testing in October 2026, including a real alarm email through SES, and was then shut down to save cost; the scripts redeploy it in minutes.
 - Why Frankfurt: Mia treats health data as sensitive personal data from the start (GDPR Art. 9), so the hosted app and its encrypted database run in an EU region. Three things leave that server: what Rose says and the tool results go to the language model provider (Featherless), speech recognition runs on the browser vendor's service (Chrome), and alarm mail goes through Amazon SES to Tom's mailbox. None of these is limited to the EU by Mia.
 
 What we would add next on AWS: DynamoDB with a customer-managed KMS key in place of local SQLite, Amazon Transcribe and Polly for the voice pipeline, and Bedrock as an optional model provider. They are in the design (`docs/superpowers/specs/2026-10-06-mia-design.md`) and not built.
@@ -79,8 +79,8 @@ What we would add next on AWS: DynamoDB with a customer-managed KMS key in place
 ## 8. Open Source mini challenge
 
 - **Contribution:** a new open-source repository, MIT licence, created during the hackathon window (the first commit is in October 2026). Mia's code, tests and docs are public.
-- **Contribution URL / project repository URL:** `<repository URL>` (to be filled in at submission).
-- **GitHub username:** `<GitHub username>` (to be filled in at submission).
+- **Contribution URL / project repository URL:** https://github.com/kaiser-data/mia-alexa-care-companion.
+- **GitHub username:** `kaiser-data`.
 - **What it is:** an MCP server for people living with dementia (16 tools over Streamable HTTP), a browser voice simulator that acts as an MCP client, a German and English phrase catalogue, an encrypted local store, and an alarm-email sink.
 - **How it works:** the model picks a tool and fixed phrase ids; the server returns the spoken sentences from templates; the test suite includes a sweep of every tool answer over a week at nine times of day (over 1,000 answers per language) and long lists of pill and help phrasings in English and German.
 - **Why it matters:** other developers building care or accessibility add-ons can reuse the "model picks, templates speak" pattern, the pill-safety rules and the alarm sink without having Alexa+ access.

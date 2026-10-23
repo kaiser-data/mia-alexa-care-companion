@@ -1,0 +1,14 @@
+{
+  "name": "mia-demo-video",
+  "private": true,
+  "type": "module",
+  "description": "Records the Mia demo video from the real app: typed turns, ElevenLabs voices, ffmpeg edit.",
+  "scripts": {
+    "record": "node record.mjs",
+    "build": "node build.mjs"
+  },
+  "dependencies": {
+    "@elevenlabs/elevenlabs-js": "2.74.0",
+    "playwright-core": "1.56.1"
+  }
+}

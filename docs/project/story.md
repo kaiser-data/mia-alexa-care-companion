@@ -4,7 +4,9 @@
 
 ## Inspiration
 
-Mia was built by a carer for his mother, who lives with dementia. The hardest moments are small and they repeat: "Did I take my pills?" five times before breakfast, "Is it group today?" every Monday morning, waking at 3 a.m. with the feeling of being late for work. She cannot learn a new device name or a new command, and the family cannot always be there. What she needs is not a clever assistant. She needs the same calm answer every time, a reliable pill log, and a message to the family when something goes wrong.
+Mia was built by a carer for his mother, who lives with dementia. The hardest moments are small and they repeat: "Did I take my pills?" five times before breakfast, "Is it group today?" every Monday morning, waking at 3 a.m. with the feeling of being late for work. She cannot learn a new device name or a new command, and the family cannot always be there. What she needs is not a clever assistant. She needs the same calm answer every time, a reliable pill log, and a message to the family when something goes wrong. Her son wants her to keep managing on her own at home, with a companion she can simply talk to, while he is told when she needs him.
+
+AI can be a second brain. For people in the early or later stages of dementia, and for the people who care for them, that is a real chance to keep daily routines and to live more normally: what is forgotten is remembered for them, events and missed doses are noticed, and relatives get the information they need. Alexa+ is already in many homes; Mia is a companion on it whose workflows and words are shaped around the needs of older people.
 
 Everything in this repository is a fictional demo. **Rose Whitaker**, 81, lives alone in Columbus, Ohio, with an Echo Dot in the kitchen. Her son **Tom** is her carer and lives two hours away.
 
@@ -30,7 +32,7 @@ For Tom, alarm emails go out through Amazon SES for medium and high alerts. A re
 - **MCP server** (TypeScript, Node 24, Hono, official MCP SDK): 16 tools, Streamable HTTP, bearer token, protocol versions 2025-11-25 and 2025-03-26. Sensitive data (pills, people, comfort notes, events, alerts) is stored in SQLite with field-level AES-256-GCM encryption.
 - **Mia Voice**, the browser "Echo": no wake word and no name, Chrome speech recognition and voice, optional captions. It is a real MCP client (initialize, tools/list, tools/call).
 - **Models.** The default is `openai/gpt-oss-120b` through Featherless. In a probe it picked the right tool 15 of 15 times at 3 to 5 seconds per turn; a faster model skipped the pill tool. An Anthropic adapter is included. Plain pill questions and cries for help take fixed routes with no model call.
-- **On AWS.** One EC2 instance (t4g.small, Amazon Linux 2023) in Frankfurt runs the app under systemd. Caddy provides HTTPS and basic auth. The instance role sends alarm mail through Amazon SES, so there are no AWS access keys on the server. The deploy scripts are in [`deploy/aws/`](../../deploy/aws/README.md).
+- **On AWS.** The deploy scripts put the app on one EC2 instance (t4g.small, Amazon Linux 2023) in Frankfurt under systemd. Caddy provides HTTPS and basic auth. The instance role sends alarm mail through Amazon SES, so there are no AWS access keys on the server. It ran live for testing in October 2026, including a real alarm email. The deploy scripts are in [`deploy/aws/`](../../deploy/aws/README.md).
 - **Tested** with more than 1,000 tests. They include a sweep of every tool answer over a week at nine times of day, and long lists of pill and help phrasings in English and German.
 - **Demo clock.** `MIA_CLOCK_START` starts Mia's clock at a chosen time, so a demo can show 8:00, 9:35 and 2:00 in one afternoon.
 

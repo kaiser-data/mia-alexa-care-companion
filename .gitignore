@@ -11,3 +11,6 @@ coverage/
 .mia-data/
 graphify-out/
 HANDOFF.md
+tools/demo-video/out/
+tools/demo-video/tts-cache/
+tools/demo-video/scenes/
